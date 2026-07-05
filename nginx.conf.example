@@ -1,0 +1,19 @@
+# Example nginx config for VPS / own server
+# Copy dist/ contents to /var/www/speakup-daily/
+
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /var/www/speakup-daily;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache static assets
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
