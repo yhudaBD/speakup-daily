@@ -11,7 +11,6 @@
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.0"
@@ -20,6 +19,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "netlify-cli": "^27.5.2",
     "oxlint": "^1.69.0",
     "sharp": "^0.34.5",
     "vite": "^8.1.0"

@@ -1,8 +1,8 @@
 import { systemInstruction } from "../data/rolePlayTopics";
 
-const API_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
-const CHAT_MODEL = "llama-3.1-8b-instant";
-const TRANSLATION_MODEL = "llama-3.3-70b-versatile";
+const PROXY_URL = "/api/groq-proxy";
+const CHAT_MODEL = "openai/gpt-oss-20b";
+const TRANSLATION_MODEL = "openai/gpt-oss-120b";
 
 const TRANSLATION_SYSTEM = `You are a professional English-to-Hebrew translator for Israeli adults learning English.
 Your translations appear under English chat messages to help learners understand.
@@ -116,18 +116,10 @@ Score 0-100 based on: fluency, grammar, vocabulary range, and appropriateness.
 Be encouraging but specific. Reference actual things the user said.`;
 
 async function groqChat({ model, messages, temperature = 0.7, json = true }) {
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetch(PROXY_URL, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      ...(json ? { response_format: { type: "json_object" } } : {}),
-      temperature,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "chat", model, messages, temperature, json }),
   });
 
   if (!response.ok) {
@@ -137,6 +129,17 @@ async function groqChat({ model, messages, temperature = 0.7, json = true }) {
 
   const data = await response.json();
   return data.choices[0].message.content;
+}
+
+async function blobToBase64(blob) {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 async function translateToHebrew(texts) {
@@ -165,38 +168,6 @@ async function translateToHebrew(texts) {
 
 export const aiService = {
   async sendMessage({ systemPrompt, messages, chatDifficulty = "easy" }) {
-    if (!API_KEY) {
-      console.warn("No VITE_GROQ_API_KEY found in .env.local. Using fallback mock responses.");
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const turnCount = messages.filter((m) => m.role === "user").length;
-
-      let ai_reply = "Hi there! Welcome. How can I help you today?";
-      if (turnCount > 0) {
-        ai_reply = "I see! Tell me more about that.";
-        if (turnCount > 2) {
-          ai_reply = "Interesting! What else would you like to know?";
-        }
-      }
-
-      const mockTranslations = {
-        "Hi there! Welcome. How can I help you today?": "היי! ברוכים הבאים. איך אוכל לעזור?",
-        "I see! Tell me more about that.": "הבנתי! ספרו לי עוד על זה.",
-        "Interesting! What else would you like to know?": "מעניין! מה עוד תרצו לדעת?",
-      };
-
-      return {
-        ai_reply,
-        ai_reply_he: mockTranslations[ai_reply] || "",
-        suggested_user_responses: chatDifficulty === "hard" ? [] : [
-          { en: "I would like to order a coffee, please.", he: "הייתי רוצה להזמין קפה, בבקשה." },
-          { en: "Could you tell me more about the options?", he: "אפשר לשמוע עוד על האפשרויות?" },
-          { en: "Thank you, that is all I need for now.", he: "תודה, זה הכל לעכשיו." },
-        ],
-      };
-    }
-
     try {
       const difficultyExtra = DIFFICULTY_INSTRUCTIONS[chatDifficulty] || "";
       const groqMessages = [
@@ -237,35 +208,45 @@ export const aiService = {
         })),
       };
     } catch (error) {
-      console.error("Groq API Error:", error);
-      throw error;
+      console.warn("Groq proxy unavailable, using fallback mock response:", error);
+
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const turnCount = messages.filter((m) => m.role === "user").length;
+
+      let ai_reply = "Hi there! Welcome. How can I help you today?";
+      if (turnCount > 0) {
+        ai_reply = "I see! Tell me more about that.";
+        if (turnCount > 2) {
+          ai_reply = "Interesting! What else would you like to know?";
+        }
+      }
+
+      const mockTranslations = {
+        "Hi there! Welcome. How can I help you today?": "היי! ברוכים הבאים. איך אוכל לעזור?",
+        "I see! Tell me more about that.": "הבנתי! ספרו לי עוד על זה.",
+        "Interesting! What else would you like to know?": "מעניין! מה עוד תרצו לדעת?",
+      };
+
+      return {
+        ai_reply,
+        ai_reply_he: mockTranslations[ai_reply] || "",
+        suggested_user_responses: chatDifficulty === "hard" ? [] : [
+          { en: "I would like to order a coffee, please.", he: "הייתי רוצה להזמין קפה, בבקשה." },
+          { en: "Could you tell me more about the options?", he: "אפשר לשמוע עוד על האפשרויות?" },
+          { en: "Thank you, that is all I need for now.", he: "תודה, זה הכל לעכשיו." },
+        ],
+      };
     }
   },
 
   async transcribeAudio(blob, mimeType = "audio/webm") {
-    if (!API_KEY) {
-      throw new Error("No API key configured");
-    }
+    const audioBase64 = await blobToBase64(blob);
 
-    const ext = mimeType.includes("mp4") || mimeType.includes("aac")
-      ? "m4a"
-      : mimeType.includes("ogg")
-        ? "ogg"
-        : mimeType.includes("wav")
-          ? "wav"
-          : "webm";
-
-    const formData = new FormData();
-    formData.append("file", blob, `recording.${ext}`);
-    formData.append("model", "whisper-large-v3-turbo");
-    formData.append("language", "en");
-    formData.append("response_format", "json");
-    formData.append("temperature", "0");
-
-    const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    const response = await fetch(PROXY_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${API_KEY}` },
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "transcribe", audioBase64, mimeType }),
     });
 
     if (!response.ok) {
@@ -290,7 +271,26 @@ export const aiService = {
       };
     }
 
-    if (!API_KEY) {
+    try {
+      const transcript = messages
+        .map((m) => `${m.role === "user" ? "Student" : "AI"}: ${m.content}`)
+        .join("\n");
+
+      const raw = await groqChat({
+        model: TRANSLATION_MODEL,
+        messages: [
+          { role: "system", content: ANALYSIS_SYSTEM },
+          {
+            role: "user",
+            content: `Topic: ${topicTitle}\n\nConversation:\n${transcript}`,
+          },
+        ],
+        temperature: 0.3,
+      });
+
+      return JSON.parse(raw);
+    } catch (error) {
+      console.warn("Groq proxy unavailable, using fallback mock analysis:", error);
       await new Promise((r) => setTimeout(r, 1200));
       return {
         overall_score: 78,
@@ -301,30 +301,27 @@ export const aiService = {
         vocabulary_suggestions: ["I would appreciate...", "Could you please..."],
       };
     }
-
-    const transcript = messages
-      .map((m) => `${m.role === "user" ? "Student" : "AI"}: ${m.content}`)
-      .join("\n");
-
-    const raw = await groqChat({
-      model: TRANSLATION_MODEL,
-      messages: [
-        { role: "system", content: ANALYSIS_SYSTEM },
-        {
-          role: "user",
-          content: `Topic: ${topicTitle}\n\nConversation:\n${transcript}`,
-        },
-      ],
-      temperature: 0.3,
-    });
-
-    return JSON.parse(raw);
   },
 
   async analyzePracticeSession({ sentences, categoryLabel, difficulty, averageScore }) {
     const sentenceList = sentences.map((s) => `- ${s.text}`).join("\n");
 
-    if (!API_KEY) {
+    try {
+      const raw = await groqChat({
+        model: TRANSLATION_MODEL,
+        messages: [
+          { role: "system", content: PRACTICE_ANALYSIS_SYSTEM },
+          {
+            role: "user",
+            content: `Topic: ${categoryLabel || "Mixed"}\nDifficulty: ${difficulty}\nAverage pronunciation score: ${averageScore}%\n\nSentences practiced:\n${sentenceList}`,
+          },
+        ],
+        temperature: 0.4,
+      });
+
+      return JSON.parse(raw);
+    } catch (error) {
+      console.warn("Groq proxy unavailable, using fallback mock analysis:", error);
       await new Promise((r) => setTimeout(r, 1000));
       return {
         summary_he: `תרגול מצוין בנושא ${categoryLabel || "כללי"}! המשכת להתאמן והגעת לממוצע של ${averageScore}%.`,
@@ -345,24 +342,36 @@ export const aiService = {
         }),
       };
     }
-
-    const raw = await groqChat({
-      model: TRANSLATION_MODEL,
-      messages: [
-        { role: "system", content: PRACTICE_ANALYSIS_SYSTEM },
-        {
-          role: "user",
-          content: `Topic: ${categoryLabel || "Mixed"}\nDifficulty: ${difficulty}\nAverage pronunciation score: ${averageScore}%\n\nSentences practiced:\n${sentenceList}`,
-        },
-      ],
-      temperature: 0.4,
-    });
-
-    return JSON.parse(raw);
   },
 
   async generatePracticeSentences({ topic, difficulty = "easy", count = 5 }) {
-    if (!API_KEY) {
+    try {
+      const raw = await groqChat({
+        model: TRANSLATION_MODEL,
+        messages: [
+          { role: "system", content: GENERATE_SENTENCES_SYSTEM },
+          {
+            role: "user",
+            content: `Topic (in Hebrew or English): "${topic}"\nDifficulty: ${difficulty}\nNumber of sentences: ${count}\n\nGenerate ${count} natural English pronunciation practice sentences about this topic.`,
+          },
+        ],
+        temperature: 0.7,
+      });
+
+      const parsed = JSON.parse(raw);
+      const topicEn = parsed.topic_en || topic;
+      const sentences = (parsed.sentences || []).map((s, i) => ({
+        id: s.id || `ai_${String(i + 1).padStart(3, "0")}`,
+        text: s.text,
+        translation: s.translation || "",
+        category: "ai",
+        difficulty,
+        phonetic_tips: s.phonetic_tips || "",
+      }));
+
+      return { sentences, topicEn };
+    } catch (error) {
+      console.warn("Groq proxy unavailable, using fallback mock sentences:", error);
       await new Promise((r) => setTimeout(r, 1200));
       const fallbackSentences = [
         { id: "ai_001", text: "Let me tell you about that.", translation: "תן לי לספר לך על זה.", category: "ai", difficulty, phonetic_tips: "'tell you' — blend naturally" },
@@ -373,30 +382,5 @@ export const aiService = {
       ].slice(0, count);
       return { sentences: fallbackSentences, topicEn: topic };
     }
-
-    const raw = await groqChat({
-      model: TRANSLATION_MODEL,
-      messages: [
-        { role: "system", content: GENERATE_SENTENCES_SYSTEM },
-        {
-          role: "user",
-          content: `Topic (in Hebrew or English): "${topic}"\nDifficulty: ${difficulty}\nNumber of sentences: ${count}\n\nGenerate ${count} natural English pronunciation practice sentences about this topic.`,
-        },
-      ],
-      temperature: 0.7,
-    });
-
-    const parsed = JSON.parse(raw);
-    const topicEn = parsed.topic_en || topic;
-    const sentences = (parsed.sentences || []).map((s, i) => ({
-      id: s.id || `ai_${String(i + 1).padStart(3, "0")}`,
-      text: s.text,
-      translation: s.translation || "",
-      category: "ai",
-      difficulty,
-      phonetic_tips: s.phonetic_tips || "",
-    }));
-
-    return { sentences, topicEn };
   },
 };
