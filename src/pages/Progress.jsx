@@ -132,7 +132,7 @@ export default function Progress() {
         {/* ALL TIME TAB */}
         {tab === "alltime" && (
           <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-primary)" }}>
                   {allSentences.length}

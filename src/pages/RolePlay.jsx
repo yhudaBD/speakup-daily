@@ -197,8 +197,9 @@ function RolePlayHome({ topics, chats, onSelectTopic, onResumeChat, onDeleteChat
                     onClick={(e) => { e.stopPropagation(); onDeleteTopic(topic.id); }}
                     title="מחק נושא"
                     style={{
-                      position: 'absolute', top: 8, right: 8, background: '#FEE2E2',
-                      border: 'none', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', fontSize: 12
+                      position: 'absolute', top: 4, right: 4, background: '#FEE2E2',
+                      border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 13,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                   >
                     ✕
@@ -263,7 +264,8 @@ function RolePlayHome({ topics, chats, onSelectTopic, onResumeChat, onDeleteChat
                     onClick={() => onDeleteChat(chat.id)}
                     style={{
                       background: 'none', border: 'none', color: '#EF4444',
-                      cursor: 'pointer', fontSize: 18, padding: 4
+                      cursor: 'pointer', fontSize: 18, padding: 10,
+                      minWidth: 40, minHeight: 40, flexShrink: 0
                     }}
                     title="מחק שיחה"
                   >
@@ -331,7 +333,7 @@ function MicButton({ phase, onSpoke, insertText, onInsertConsumed }) {
           <button
             type="button"
             onClick={clearError}
-            style={{ marginRight: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#6B7280' }}
+            style={{ marginRight: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#6B7280', padding: '6px 8px' }}
           >
             ✕
           </button>
@@ -565,9 +567,9 @@ function SavedChatReview({ messages, topic, savedChat, showTranslation, onReplay
   return (
     <div className="chat-shell">
       <div className="chat-shell-header">
-        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20 }}>←</button>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
         <span style={{ fontWeight: 600, fontSize: 14, color: '#6B7280' }}>שיחה שמורה</span>
-        <span style={{ width: 24 }} />
+        <span style={{ width: 40 }} />
       </div>
       <div className="chat-shell-messages">
         {messages.map((msg, i) => (
@@ -735,7 +737,7 @@ export default function RolePlay() {
   return (
     <div className="chat-shell">
       <div className="chat-shell-header">
-        <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20 }}>
+        <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           ←
         </button>
         <span style={{ fontWeight: 600, color: '#1E1B4B', fontSize: 15, textAlign: 'center', flex: 1, padding: '0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -748,7 +750,8 @@ export default function RolePlay() {
             style={{
               background: showTranslation ? '#EEF0FF' : '#F3F4F6',
               border: 'none', borderRadius: 8,
-              color: '#6C63FF', fontSize: 14, padding: '4px 8px', cursor: 'pointer'
+              color: '#6C63FF', fontSize: 14, padding: '8px', cursor: 'pointer',
+              minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
           >
             {showTranslation ? '🙈' : '👁️'}
@@ -761,7 +764,8 @@ export default function RolePlay() {
             }}
             style={{
               background: '#EEF0FF', border: 'none', borderRadius: 8,
-              color: '#6C63FF', fontSize: 11, fontWeight: 600, padding: '4px 8px', cursor: 'pointer'
+              color: '#6C63FF', fontSize: 11, fontWeight: 600, padding: '8px 10px', cursor: 'pointer',
+              minHeight: 36
             }}
           >
             חדש
@@ -770,7 +774,8 @@ export default function RolePlay() {
             onClick={endConversation}
             style={{
               background: 'none', border: '1.5px solid #EF4444', borderRadius: 8,
-              color: '#EF4444', fontSize: 11, fontWeight: 600, padding: '4px 8px', cursor: 'pointer'
+              color: '#EF4444', fontSize: 11, fontWeight: 600, padding: '8px 10px', cursor: 'pointer',
+              minHeight: 36
             }}
           >
             סיים
