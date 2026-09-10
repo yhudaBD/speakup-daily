@@ -1,7 +1,29 @@
+// Ordered best-first. These are free, built-in voices exposed by the browser/OS
+// via the Web Speech API — no API key or cost involved. Edge on Windows and
+// Safari on Apple devices expose the highest-quality ones; Chrome/Android
+// generally have fewer great options, which the scoring below accounts for.
 const VOICE_PREFERENCES = [
+  // Microsoft Edge "Online (Natural)" neural voices — best available for free
+  "Ava Online (Natural)",
+  "Andrew Online (Natural)",
+  "Emma Online (Natural)",
   "Jenny Online (Natural)",
   "Aria Online (Natural)",
   "Guy Online (Natural)",
+  "Christopher Online (Natural)",
+  "Steffan Online (Natural)",
+  "Michelle Online (Natural)",
+  // Apple "Enhanced"/"Premium" voices (Safari on macOS/iOS)
+  "Ava (Enhanced)",
+  "Ava (Premium)",
+  "Samantha (Enhanced)",
+  "Samantha (Premium)",
+  "Nicky (Enhanced)",
+  "Allison (Enhanced)",
+  "Susan (Enhanced)",
+  "Tom (Enhanced)",
+  "Evan (Enhanced)",
+  // Plain fallbacks, roughly best to worst
   "Microsoft Jenny",
   "Microsoft Aria",
   "Google US English",
@@ -29,10 +51,11 @@ function scoreVoice(voice) {
   if (!lang.startsWith("en")) return -100;
 
   VOICE_PREFERENCES.forEach((pref, i) => {
-    if (name.includes(pref)) score += 100 - i * 5;
+    if (name.includes(pref)) score += 100 - i * 3;
   });
 
   if (/natural|neural|online/i.test(name)) score += 40;
+  if (/enhanced|premium/i.test(name)) score += 35;
   if (voice.localService === false) score += 15;
   if (/en-us/i.test(lang)) score += 10;
   if (AVOID_VOICE_PATTERNS.some((p) => p.test(name))) score -= 80;
