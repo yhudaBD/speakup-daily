@@ -116,56 +116,56 @@ export const sentences = [
   { id: "w013", text: "We should establish a clear governance framework.", translation: "עלינו לקבוע מסגרת ממשל ברורה.", category: "work", difficulty: "advanced", phonetic_tips: "'governance' — GUV-er-nans" },
   { id: "w014", text: "The ROI on this initiative looks very promising.", translation: "ה-ROI ביוזמה הזאת נראה מבטיח מאוד.", category: "work", difficulty: "advanced", phonetic_tips: "'initiative' — ih-NISH-ee-ah-tiv" },
 
-  // ===== SERVICENOW — EASY =====
-  { id: "sn001", text: "I need to open a ticket for this issue.", translation: "אני צריך לפתוח טיקט לבעיה הזאת.", category: "work", difficulty: "easy", phonetic_tips: "'ticket' — TIK-et" },
-  { id: "sn002", text: "Please assign this ticket to the right team.", translation: "בבקשה הקצה את הטיקט לצוות הנכון.", category: "work", difficulty: "easy", phonetic_tips: "'assign' — ah-SINE" },
-  { id: "sn003", text: "What is the priority of this incident?", translation: "מה הפריוריטי של התקלה הזאת?", category: "work", difficulty: "easy", phonetic_tips: "'priority' — pry-OR-ih-tee" },
-  { id: "sn004", text: "The ticket has been resolved and closed.", translation: "הטיקט נפתר ונסגר.", category: "work", difficulty: "easy", phonetic_tips: "'resolved' — re-ZOLVD" },
-  { id: "sn005", text: "Can you check the status of my request?", translation: "אתה יכול לבדוק את הסטטוס של הבקשה שלי?", category: "work", difficulty: "easy", phonetic_tips: "'status' — STAY-tus" },
-  { id: "sn006", text: "I submitted a change request this morning.", translation: "הגשתי בקשת שינוי הבוקר.", category: "work", difficulty: "easy", phonetic_tips: "'submitted' — sub-MIT-ed" },
-  { id: "sn007", text: "The service is back up and running.", translation: "השירות חזר לעבוד.", category: "work", difficulty: "easy", phonetic_tips: "'running' — RUN-ing" },
-  { id: "sn008", text: "Please update the ticket with your findings.", translation: "בבקשה עדכן את הטיקט עם הממצאים שלך.", category: "work", difficulty: "easy", phonetic_tips: "'findings' — FIND-ingz" },
-  { id: "sn009", text: "Who is the owner of this incident?", translation: "מי הבעלים של התקלה הזאת?", category: "work", difficulty: "easy", phonetic_tips: "'owner' — OH-ner" },
-  { id: "sn010", text: "The user is reporting a login problem.", translation: "המשתמש מדווח על בעיית כניסה.", category: "work", difficulty: "easy", phonetic_tips: "'reporting' — re-PORT-ing" },
-  { id: "sn011", text: "I need access to the production environment.", translation: "אני צריך גישה לסביבת הפרודקשן.", category: "work", difficulty: "easy", phonetic_tips: "'environment' — en-VY-ern-ment" },
-  { id: "sn012", text: "Please attach the error log to the ticket.", translation: "בבקשה צרף את לוג השגיאה לטיקט.", category: "work", difficulty: "easy", phonetic_tips: "'attach' — ah-TACH" },
-  { id: "sn013", text: "The system was down for two hours.", translation: "המערכת הייתה מושבתת שעתיים.", category: "work", difficulty: "easy", phonetic_tips: "'system' — SIS-tem" },
-  { id: "sn014", text: "I need to reset my password.", translation: "אני צריך לאפס את הסיסמה שלי.", category: "work", difficulty: "easy", phonetic_tips: "'password' — PAS-werd" },
-  { id: "sn015", text: "Can you approve the change window?", translation: "אתה יכול לאשר את חלון השינוי?", category: "work", difficulty: "easy", phonetic_tips: "'approve' — ah-PROOV" },
+  // ===== TECH/IT — EASY =====
+  { id: "sn001", text: "I need to open a ticket for this issue.", translation: "אני צריך לפתוח טיקט לבעיה הזאת.", category: "tech", difficulty: "easy", phonetic_tips: "'ticket' — TIK-et" },
+  { id: "sn002", text: "Please assign this ticket to the right team.", translation: "בבקשה הקצה את הטיקט לצוות הנכון.", category: "tech", difficulty: "easy", phonetic_tips: "'assign' — ah-SINE" },
+  { id: "sn003", text: "What is the priority of this incident?", translation: "מה הפריוריטי של התקלה הזאת?", category: "tech", difficulty: "easy", phonetic_tips: "'priority' — pry-OR-ih-tee" },
+  { id: "sn004", text: "The ticket has been resolved and closed.", translation: "הטיקט נפתר ונסגר.", category: "tech", difficulty: "easy", phonetic_tips: "'resolved' — re-ZOLVD" },
+  { id: "sn005", text: "Can you check the status of my request?", translation: "אתה יכול לבדוק את הסטטוס של הבקשה שלי?", category: "tech", difficulty: "easy", phonetic_tips: "'status' — STAY-tus" },
+  { id: "sn006", text: "I submitted a change request this morning.", translation: "הגשתי בקשת שינוי הבוקר.", category: "tech", difficulty: "easy", phonetic_tips: "'submitted' — sub-MIT-ed" },
+  { id: "sn007", text: "The service is back up and running.", translation: "השירות חזר לעבוד.", category: "tech", difficulty: "easy", phonetic_tips: "'running' — RUN-ing" },
+  { id: "sn008", text: "Please update the ticket with your findings.", translation: "בבקשה עדכן את הטיקט עם הממצאים שלך.", category: "tech", difficulty: "easy", phonetic_tips: "'findings' — FIND-ingz" },
+  { id: "sn009", text: "Who is the owner of this incident?", translation: "מי הבעלים של התקלה הזאת?", category: "tech", difficulty: "easy", phonetic_tips: "'owner' — OH-ner" },
+  { id: "sn010", text: "The user is reporting a login problem.", translation: "המשתמש מדווח על בעיית כניסה.", category: "tech", difficulty: "easy", phonetic_tips: "'reporting' — re-PORT-ing" },
+  { id: "sn011", text: "I need access to the production environment.", translation: "אני צריך גישה לסביבת הפרודקשן.", category: "tech", difficulty: "easy", phonetic_tips: "'environment' — en-VY-ern-ment" },
+  { id: "sn012", text: "Please attach the error log to the ticket.", translation: "בבקשה צרף את לוג השגיאה לטיקט.", category: "tech", difficulty: "easy", phonetic_tips: "'attach' — ah-TACH" },
+  { id: "sn013", text: "The system was down for two hours.", translation: "המערכת הייתה מושבתת שעתיים.", category: "tech", difficulty: "easy", phonetic_tips: "'system' — SIS-tem" },
+  { id: "sn014", text: "I need to reset my password.", translation: "אני צריך לאפס את הסיסמה שלי.", category: "tech", difficulty: "easy", phonetic_tips: "'password' — PAS-werd" },
+  { id: "sn015", text: "Can you approve the change window?", translation: "אתה יכול לאשר את חלון השינוי?", category: "tech", difficulty: "easy", phonetic_tips: "'approve' — ah-PROOV" },
 
-  // ===== SERVICENOW — MEDIUM =====
-  { id: "sn016", text: "I need to escalate this to a P1 incident.", translation: "אני צריך לסלק את זה לתקלת P1.", category: "work", difficulty: "medium", phonetic_tips: "'escalate' — ES-kah-layt" },
-  { id: "sn017", text: "The SLA breach notification was triggered.", translation: "הופעלה התראת הפרת ה-SLA.", category: "work", difficulty: "medium", phonetic_tips: "'notification' — no-tih-fih-KAY-shun" },
-  { id: "sn018", text: "Can you merge these two incidents?", translation: "אתה יכול למזג את שתי התקלות האלה?", category: "work", difficulty: "medium", phonetic_tips: "'incidents' — IN-sih-dents" },
-  { id: "sn019", text: "The change advisory board needs to approve this.", translation: "ועדת השינויים צריכה לאשר את זה.", category: "work", difficulty: "medium", phonetic_tips: "'advisory' — ad-VY-zer-ee" },
-  { id: "sn020", text: "I'm seeing a recurring error in the logs.", translation: "אני רואה שגיאה חוזרת ביומנים.", category: "work", difficulty: "medium", phonetic_tips: "'recurring' — re-KUR-ing" },
-  { id: "sn021", text: "Please document the workaround in the knowledge base.", translation: "בבקשה תעד את הפתרון הזמני בבסיס הידע.", category: "work", difficulty: "medium", phonetic_tips: "'document' (verb) — DOK-yoo-ment" },
-  { id: "sn022", text: "The incident has been assigned to Tier 2 support.", translation: "התקלה הוקצתה לתמיכה ברמה 2.", category: "work", difficulty: "medium", phonetic_tips: "'assigned' — ah-SYND" },
-  { id: "sn023", text: "We need to perform a root cause analysis.", translation: "אנחנו צריכים לבצע ניתוח גורם שורש.", category: "work", difficulty: "medium", phonetic_tips: "'analysis' — ah-NAL-ih-sis" },
-  { id: "sn024", text: "The service catalog has been updated.", translation: "קטלוג השירותים עודכן.", category: "work", difficulty: "medium", phonetic_tips: "'catalog' — KAT-ah-log" },
-  { id: "sn025", text: "How long until we restore normal operations?", translation: "כמה זמן עד שנחזיר את הפעולות הרגילות?", category: "work", difficulty: "medium", phonetic_tips: "'operations' — op-er-AY-shunz" },
-  { id: "sn026", text: "The request has been pending for three days.", translation: "הבקשה ממתינה כבר שלושה ימים.", category: "work", difficulty: "medium", phonetic_tips: "'pending' — PEN-ding" },
-  { id: "sn027", text: "I need to run a workflow to handle this.", translation: "אני צריך להריץ תהליך עבודה כדי לטפל בזה.", category: "work", difficulty: "medium", phonetic_tips: "'workflow' — WERK-floh" },
-  { id: "sn028", text: "Let me check the configuration item in the CMDB.", translation: "תן לי לבדוק את פריט התצורה ב-CMDB.", category: "work", difficulty: "medium", phonetic_tips: "'configuration' — con-fig-yoor-AY-shun" },
-  { id: "sn029", text: "The on-call engineer has been notified.", translation: "המהנדס בתורנות הוא עודכן.", category: "work", difficulty: "medium", phonetic_tips: "'engineer' — en-jih-NEER" },
-  { id: "sn030", text: "We are monitoring the situation closely.", translation: "אנחנו עוקבים מקרוב אחר המצב.", category: "work", difficulty: "medium", phonetic_tips: "'monitoring' — MON-ih-ter-ing" },
+  // ===== TECH/IT — MEDIUM =====
+  { id: "sn016", text: "I need to escalate this to a P1 incident.", translation: "אני צריך לסלק את זה לתקלת P1.", category: "tech", difficulty: "medium", phonetic_tips: "'escalate' — ES-kah-layt" },
+  { id: "sn017", text: "The SLA breach notification was triggered.", translation: "הופעלה התראת הפרת ה-SLA.", category: "tech", difficulty: "medium", phonetic_tips: "'notification' — no-tih-fih-KAY-shun" },
+  { id: "sn018", text: "Can you merge these two incidents?", translation: "אתה יכול למזג את שתי התקלות האלה?", category: "tech", difficulty: "medium", phonetic_tips: "'incidents' — IN-sih-dents" },
+  { id: "sn019", text: "The change advisory board needs to approve this.", translation: "ועדת השינויים צריכה לאשר את זה.", category: "tech", difficulty: "medium", phonetic_tips: "'advisory' — ad-VY-zer-ee" },
+  { id: "sn020", text: "I'm seeing a recurring error in the logs.", translation: "אני רואה שגיאה חוזרת ביומנים.", category: "tech", difficulty: "medium", phonetic_tips: "'recurring' — re-KUR-ing" },
+  { id: "sn021", text: "Please document the workaround in the knowledge base.", translation: "בבקשה תעד את הפתרון הזמני בבסיס הידע.", category: "tech", difficulty: "medium", phonetic_tips: "'document' (verb) — DOK-yoo-ment" },
+  { id: "sn022", text: "The incident has been assigned to Tier 2 support.", translation: "התקלה הוקצתה לתמיכה ברמה 2.", category: "tech", difficulty: "medium", phonetic_tips: "'assigned' — ah-SYND" },
+  { id: "sn023", text: "We need to perform a root cause analysis.", translation: "אנחנו צריכים לבצע ניתוח גורם שורש.", category: "tech", difficulty: "medium", phonetic_tips: "'analysis' — ah-NAL-ih-sis" },
+  { id: "sn024", text: "The service catalog has been updated.", translation: "קטלוג השירותים עודכן.", category: "tech", difficulty: "medium", phonetic_tips: "'catalog' — KAT-ah-log" },
+  { id: "sn025", text: "How long until we restore normal operations?", translation: "כמה זמן עד שנחזיר את הפעולות הרגילות?", category: "tech", difficulty: "medium", phonetic_tips: "'operations' — op-er-AY-shunz" },
+  { id: "sn026", text: "The request has been pending for three days.", translation: "הבקשה ממתינה כבר שלושה ימים.", category: "tech", difficulty: "medium", phonetic_tips: "'pending' — PEN-ding" },
+  { id: "sn027", text: "I need to run a workflow to handle this.", translation: "אני צריך להריץ תהליך עבודה כדי לטפל בזה.", category: "tech", difficulty: "medium", phonetic_tips: "'workflow' — WERK-floh" },
+  { id: "sn028", text: "Let me check the configuration item in the CMDB.", translation: "תן לי לבדוק את פריט התצורה ב-CMDB.", category: "tech", difficulty: "medium", phonetic_tips: "'configuration' — con-fig-yoor-AY-shun" },
+  { id: "sn029", text: "The on-call engineer has been notified.", translation: "המהנדס בתורנות הוא עודכן.", category: "tech", difficulty: "medium", phonetic_tips: "'engineer' — en-jih-NEER" },
+  { id: "sn030", text: "We are monitoring the situation closely.", translation: "אנחנו עוקבים מקרוב אחר המצב.", category: "tech", difficulty: "medium", phonetic_tips: "'monitoring' — MON-ih-ter-ing" },
 
-  // ===== SERVICENOW — ADVANCED =====
-  { id: "sn031", text: "We need to implement automated remediation scripts.", translation: "אנחנו צריכים להטמיע סקריפטים לתיקון אוטומטי.", category: "work", difficulty: "advanced", phonetic_tips: "'remediation' — re-mee-dee-AY-shun" },
-  { id: "sn032", text: "The change freeze is in effect during the holiday period.", translation: "הקפאת השינויים בתוקף בתקופת החג.", category: "work", difficulty: "advanced", phonetic_tips: "'effective' — eh-FEK-tiv" },
-  { id: "sn033", text: "The post-incident review is scheduled for tomorrow.", translation: "סקירת לאחר התקלה מתוכננת למחר.", category: "work", difficulty: "advanced", phonetic_tips: "'scheduled' — SKED-yoold" },
-  { id: "sn034", text: "The integration between the two systems failed.", translation: "האינטגרציה בין שתי המערכות נכשלה.", category: "work", difficulty: "advanced", phonetic_tips: "'integration' — in-teh-GRAY-shun" },
-  { id: "sn035", text: "Please configure the business rule to trigger the notification.", translation: "בבקשה הגדר את כלל העסק להפעלת ההתראה.", category: "work", difficulty: "advanced", phonetic_tips: "'configure' — con-FIG-yer" },
-  { id: "sn036", text: "The service level agreement has been breached.", translation: "הסכם רמת השירות הופר.", category: "work", difficulty: "advanced", phonetic_tips: "'agreement' — ah-GREE-ment" },
-  { id: "sn037", text: "We need to update the CI relationships in the CMDB.", translation: "אנחנו צריכים לעדכן את קשרי ה-CI ב-CMDB.", category: "work", difficulty: "advanced", phonetic_tips: "'relationships' — re-LAY-shun-ships" },
-  { id: "sn038", text: "The approval workflow requires two levels of authorization.", translation: "תהליך האישור דורש שתי רמות הרשאה.", category: "work", difficulty: "advanced", phonetic_tips: "'authorization' — aw-thor-ih-ZAY-shun" },
-  { id: "sn039", text: "The automation script reduced resolution time by forty percent.", translation: "סקריפט האוטומציה הפחית את זמן הפתרון בארבעים אחוז.", category: "work", difficulty: "advanced", phonetic_tips: "'automation' — aw-toh-MAY-shun" },
-  { id: "sn040", text: "We should leverage the virtual agent to handle tier one inquiries.", translation: "עלינו לנצל את הסוכן הוירטואלי לטיפול בפניות ברמה ראשונה.", category: "work", difficulty: "advanced", phonetic_tips: "'virtual' — VER-choo-ul" },
-  { id: "sn041", text: "Please verify that the deployment was successful.", translation: "בבקשה וודא שההפצה הצליחה.", category: "work", difficulty: "advanced", phonetic_tips: "'deployment' — de-PLOY-ment" },
-  { id: "sn042", text: "The major incident commander is coordinating all response efforts.", translation: "מפקד התקלה הגדולה מתאם את כל מאמצי התגובה.", category: "work", difficulty: "advanced", phonetic_tips: "'coordinating' — koh-OR-din-ay-ting" },
-  { id: "sn043", text: "We identified a dependency between the network and the application layer.", translation: "זיהינו תלות בין הרשת לשכבת האפליקציה.", category: "work", difficulty: "advanced", phonetic_tips: "'dependency' — deh-PEN-den-see" },
-  { id: "sn044", text: "The change request was rejected due to insufficient testing.", translation: "בקשת השינוי נדחתה עקב בדיקות לא מספיקות.", category: "work", difficulty: "advanced", phonetic_tips: "'insufficient' — in-suf-FISH-ent" },
-  { id: "sn045", text: "I'll escalate to the vendor for a hotfix.", translation: "אני אעביר לספק לקבל תיקון חם.", category: "work", difficulty: "advanced", phonetic_tips: "'vendor' — VEN-der" },
+  // ===== TECH/IT — ADVANCED =====
+  { id: "sn031", text: "We need to implement automated remediation scripts.", translation: "אנחנו צריכים להטמיע סקריפטים לתיקון אוטומטי.", category: "tech", difficulty: "advanced", phonetic_tips: "'remediation' — re-mee-dee-AY-shun" },
+  { id: "sn032", text: "The change freeze is in effect during the holiday period.", translation: "הקפאת השינויים בתוקף בתקופת החג.", category: "tech", difficulty: "advanced", phonetic_tips: "'effective' — eh-FEK-tiv" },
+  { id: "sn033", text: "The post-incident review is scheduled for tomorrow.", translation: "סקירת לאחר התקלה מתוכננת למחר.", category: "tech", difficulty: "advanced", phonetic_tips: "'scheduled' — SKED-yoold" },
+  { id: "sn034", text: "The integration between the two systems failed.", translation: "האינטגרציה בין שתי המערכות נכשלה.", category: "tech", difficulty: "advanced", phonetic_tips: "'integration' — in-teh-GRAY-shun" },
+  { id: "sn035", text: "Please configure the business rule to trigger the notification.", translation: "בבקשה הגדר את כלל העסק להפעלת ההתראה.", category: "tech", difficulty: "advanced", phonetic_tips: "'configure' — con-FIG-yer" },
+  { id: "sn036", text: "The service level agreement has been breached.", translation: "הסכם רמת השירות הופר.", category: "tech", difficulty: "advanced", phonetic_tips: "'agreement' — ah-GREE-ment" },
+  { id: "sn037", text: "We need to update the CI relationships in the CMDB.", translation: "אנחנו צריכים לעדכן את קשרי ה-CI ב-CMDB.", category: "tech", difficulty: "advanced", phonetic_tips: "'relationships' — re-LAY-shun-ships" },
+  { id: "sn038", text: "The approval workflow requires two levels of authorization.", translation: "תהליך האישור דורש שתי רמות הרשאה.", category: "tech", difficulty: "advanced", phonetic_tips: "'authorization' — aw-thor-ih-ZAY-shun" },
+  { id: "sn039", text: "The automation script reduced resolution time by forty percent.", translation: "סקריפט האוטומציה הפחית את זמן הפתרון בארבעים אחוז.", category: "tech", difficulty: "advanced", phonetic_tips: "'automation' — aw-toh-MAY-shun" },
+  { id: "sn040", text: "We should leverage the virtual agent to handle tier one inquiries.", translation: "עלינו לנצל את הסוכן הוירטואלי לטיפול בפניות ברמה ראשונה.", category: "tech", difficulty: "advanced", phonetic_tips: "'virtual' — VER-choo-ul" },
+  { id: "sn041", text: "Please verify that the deployment was successful.", translation: "בבקשה וודא שההפצה הצליחה.", category: "tech", difficulty: "advanced", phonetic_tips: "'deployment' — de-PLOY-ment" },
+  { id: "sn042", text: "The major incident commander is coordinating all response efforts.", translation: "מפקד התקלה הגדולה מתאם את כל מאמצי התגובה.", category: "tech", difficulty: "advanced", phonetic_tips: "'coordinating' — koh-OR-din-ay-ting" },
+  { id: "sn043", text: "We identified a dependency between the network and the application layer.", translation: "זיהינו תלות בין הרשת לשכבת האפליקציה.", category: "tech", difficulty: "advanced", phonetic_tips: "'dependency' — deh-PEN-den-see" },
+  { id: "sn044", text: "The change request was rejected due to insufficient testing.", translation: "בקשת השינוי נדחתה עקב בדיקות לא מספיקות.", category: "tech", difficulty: "advanced", phonetic_tips: "'insufficient' — in-suf-FISH-ent" },
+  { id: "sn045", text: "I'll escalate to the vendor for a hotfix.", translation: "אני אעביר לספק לקבל תיקון חם.", category: "tech", difficulty: "advanced", phonetic_tips: "'vendor' — VEN-der" },
 
   // ===== MORE DAILY — MEDIUM =====
   { id: "d036", text: "I need to renew my subscription.", translation: "אני צריך לחדש את המנוי שלי.", category: "daily", difficulty: "medium", phonetic_tips: "'renew' — re-NYOO" },
@@ -223,20 +223,55 @@ export const sentences = [
   { id: "d063", text: "I'll handle that right away.", translation: "אני אטפל בזה מיד.", category: "daily", difficulty: "easy", phonetic_tips: "'handle' — HAN-dul" },
   { id: "d064", text: "Is there anything else I can help you with?", translation: "יש עוד משהו שאני יכול לעזור לך?", category: "daily", difficulty: "easy", phonetic_tips: "'anything' — EN-ee-thing" },
   { id: "d065", text: "I appreciate you taking the time to explain.", translation: "אני מעריך שלקחת את הזמן להסביר.", category: "daily", difficulty: "medium", phonetic_tips: "'appreciate' — ah-PREE-shee-ayt" },
+
+  // ===== MORE WORK — EASY/MEDIUM (generic, not IT-specific) =====
+  { id: "w021", text: "Can we push the meeting to tomorrow?", translation: "אפשר לדחות את הפגישה למחר?", category: "work", difficulty: "easy", phonetic_tips: "'push' — short 'u' sound" },
+  { id: "w022", text: "I'm still waiting for your feedback.", translation: "אני עדיין מחכה למשוב שלך.", category: "work", difficulty: "easy", phonetic_tips: "'waiting' — WAY-ting" },
+  { id: "w023", text: "Let's divide the tasks between us.", translation: "בואו נחלק את המשימות בינינו.", category: "work", difficulty: "easy", phonetic_tips: "'divide' — dih-VYD" },
+  { id: "w024", text: "I'm on annual leave next week.", translation: "אני בחופשה שנתית בשבוע הבא.", category: "work", difficulty: "easy", phonetic_tips: "'annual' — AN-yoo-ul" },
+  { id: "w025", text: "Can you cc me on that email?", translation: "אתה יכול להעתיק אותי במייל הזה?", category: "work", difficulty: "easy", phonetic_tips: "'cc' — say each letter" },
+  { id: "w026", text: "I'm new here, could you show me around?", translation: "אני חדש כאן, תוכל להראות לי את המקום?", category: "work", difficulty: "easy", phonetic_tips: "'around' — ah-ROWND" },
+  { id: "w027", text: "Who should I talk to about this?", translation: "עם מי כדאי לי לדבר על זה?", category: "work", difficulty: "easy", phonetic_tips: "'talk to' — smooth blend" },
+  { id: "w028", text: "We're hiring for two new positions.", translation: "אנחנו מגייסים לשני תפקידים חדשים.", category: "work", difficulty: "medium", phonetic_tips: "'positions' — poh-ZISH-unz" },
+  { id: "w029", text: "I'd like to negotiate my salary.", translation: "אני רוצה לנהל משא ומתן על השכר שלי.", category: "work", difficulty: "medium", phonetic_tips: "'negotiate' — neh-GOH-shee-ayt" },
+  { id: "w030", text: "Let's brainstorm some ideas before we decide.", translation: "בואו נעלה רעיונות לפני שנחליט.", category: "work", difficulty: "medium", phonetic_tips: "'brainstorm' — BRAYN-storm" },
+
+  // ===== HEALTH — EASY =====
+  { id: "h001", text: "I have an appointment with the doctor today.", translation: "יש לי תור לרופא היום.", category: "health", difficulty: "easy", phonetic_tips: "'appointment' — ah-POYNT-ment" },
+  { id: "h002", text: "I've had a headache since this morning.", translation: "יש לי כאב ראש מהבוקר.", category: "health", difficulty: "easy", phonetic_tips: "'headache' — HED-ayk" },
+  { id: "h003", text: "How often should I take this medicine?", translation: "כמה פעמים אני צריך לקחת את התרופה הזאת?", category: "health", difficulty: "easy", phonetic_tips: "'medicine' — MED-ih-sin" },
+  { id: "h004", text: "I go to the gym three times a week.", translation: "אני הולך לחדר כושר שלוש פעמים בשבוע.", category: "health", difficulty: "easy", phonetic_tips: "'gym' — soft 'j' sound" },
+  { id: "h005", text: "I need to drink more water every day.", translation: "אני צריך לשתות יותר מים כל יום.", category: "health", difficulty: "easy", phonetic_tips: "'water' — WAH-ter" },
+  { id: "h006", text: "I didn't sleep well last night.", translation: "לא ישנתי טוב אתמול בלילה.", category: "health", difficulty: "easy", phonetic_tips: "'sleep' — long 'ee' sound" },
+  { id: "h007", text: "Let's go for a walk after dinner.", translation: "בואו נצא להליכה אחרי ארוחת הערב.", category: "health", difficulty: "easy", phonetic_tips: "'walk' — silent 'l'" },
+
+  // ===== HEALTH — MEDIUM =====
+  { id: "h008", text: "I'm trying to eat healthier these days.", translation: "אני מנסה לאכול בריא יותר בתקופה האחרונה.", category: "health", difficulty: "medium", phonetic_tips: "'healthier' — HEL-thee-er" },
+  { id: "h009", text: "The doctor recommended I get more exercise.", translation: "הרופא המליץ שאעשה יותר פעילות גופנית.", category: "health", difficulty: "medium", phonetic_tips: "'exercise' — EK-ser-syz" },
+  { id: "h010", text: "I've been feeling stressed out lately.", translation: "אני מרגיש לחוץ לאחרונה.", category: "health", difficulty: "medium", phonetic_tips: "'stressed' — clear 'str' blend" },
+  { id: "h011", text: "Could you refer me to a specialist?", translation: "תוכל להפנות אותי למומחה?", category: "health", difficulty: "medium", phonetic_tips: "'specialist' — SPESH-ah-list" },
+  { id: "h012", text: "I'm allergic to certain medications.", translation: "אני אלרגי לתרופות מסוימות.", category: "health", difficulty: "medium", phonetic_tips: "'medications' — med-ih-KAY-shunz" },
+
+  // ===== HEALTH — ADVANCED =====
+  { id: "h013", text: "I've noticed some improvement since starting physical therapy.", translation: "שמתי לב לשיפור מאז שהתחלתי פיזיותרפיה.", category: "health", difficulty: "advanced", phonetic_tips: "'physical therapy' — FIZ-ih-kul THER-ah-pee" },
+  { id: "h014", text: "It's important to maintain a balanced lifestyle.", translation: "חשוב לשמור על אורח חיים מאוזן.", category: "health", difficulty: "advanced", phonetic_tips: "'balanced' — BAL-ansd" },
 ];
 
-export const categories = ["daily", "work", "food", "social", "travel", "shopping"];
+export const categories = ["daily", "work", "tech", "food", "social", "travel", "shopping", "health"];
 export const difficulties = ["easy", "medium", "advanced"];
 
 export const categoryMeta = {
   all: { emoji: "🎲", label: "מעורב", labelEn: "Mixed" },
   daily: { emoji: "☀️", label: "יומיומי", labelEn: "Daily" },
   work: { emoji: "💼", label: "עבודה", labelEn: "Work" },
+  tech: { emoji: "💻", label: "טכנולוגיה", labelEn: "Tech/IT" },
   food: { emoji: "🍽️", label: "אוכל", labelEn: "Food" },
   social: { emoji: "👋", label: "חברתי", labelEn: "Social" },
   travel: { emoji: "✈️", label: "טיולים", labelEn: "Travel" },
   shopping: { emoji: "🛍️", label: "קניות", labelEn: "Shopping" },
+  health: { emoji: "💪", label: "בריאות", labelEn: "Health" },
   wordbank: { emoji: "📚", label: "מילים שמורות", labelEn: "Saved Words" },
+  review: { emoji: "🎯", label: "חזרה", labelEn: "Review" },
 };
 
 export function countSentencesByCategory(difficulty, excludeIds = []) {
@@ -252,15 +287,28 @@ export function countSentencesByCategory(difficulty, excludeIds = []) {
   return counts;
 }
 
-export function getDailySentences({ difficulty = "easy", count = 5, excludeIds = [], category = "all" } = {}) {
+export function getDailySentences({ difficulty = "easy", count = 5, excludeIds = [], category = "all", weakIds = [] } = {}) {
   let pool = sentences.filter(
     (s) => s.difficulty === difficulty && !excludeIds.includes(s.id)
   );
   if (category && category !== "all") {
     pool = pool.filter((s) => s.category === category);
   }
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+
+  const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+  // Reserve up to half the daily set for sentences the user has struggled
+  // with before (a lightweight spaced-repetition behavior), fill the rest
+  // with fresh/random ones from the same pool.
+  const weakSet = new Set(weakIds);
+  const weakPool = pool.filter((s) => weakSet.has(s.id));
+  const freshPool = pool.filter((s) => !weakSet.has(s.id));
+
+  const weakCount = Math.min(weakPool.length, Math.ceil(count / 2));
+  const chosenWeak = shuffle(weakPool).slice(0, weakCount);
+  const chosenFresh = shuffle(freshPool).slice(0, count - chosenWeak.length);
+
+  return shuffle([...chosenWeak, ...chosenFresh]);
 }
 
 export function sentencesFromWordBank(words, count = 5) {

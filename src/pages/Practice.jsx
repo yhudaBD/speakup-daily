@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "../hooks/useSpeechSynthesis";
@@ -11,6 +11,7 @@ import {
   categories,
   categoryMeta,
 } from "../data/sentences";
+import { getWeakSentenceStats, sentencesFromWeakList } from "../utils/practiceHistory";
 import { aiService } from "../services/ai.service";
 
 function WaveAnimation() {
@@ -195,7 +196,7 @@ function AITopicPanel({ difficulty, dailyGoal, onStart, onBack }) {
   );
 }
 
-function TopicSetup({ difficulty, dailyGoal, wordBank, onStart, onStartAI, onBack }) {
+function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, onStart, onStartAI, onDeleteCustomTopic, onBack }) {
   const [selected, setSelected] = useState("all");
   const [showAIPanel, setShowAIPanel] = useState(false);
   const excludeIds = [];
@@ -203,6 +204,9 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, onStart, onStartAI, onBac
   const wordBankCount = wordBank.length;
 
   const topicOptions = [
+    ...(weakCount > 0 ? [{
+      id: "weak", emoji: "🎯", label: "הנקודות החלשות שלי", labelEn: "Weak Spots", count: weakCount,
+    }] : []),
     { id: "all", ...categoryMeta.all, count: counts.all },
     ...categories.map((cat) => ({
       id: cat,
@@ -214,11 +218,18 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, onStart, onStartAI, onBac
       ...categoryMeta.wordbank,
       count: wordBankCount,
     }] : []),
+    ...customTopics.map((t) => ({
+      id: t.id, emoji: "⭐", label: t.label, count: t.sentences.length, isCustom: true,
+    })),
   ];
 
   const canStart = selected === "wordbank"
     ? wordBankCount > 0
-    : (counts[selected] || 0) > 0;
+    : selected === "weak"
+      ? weakCount > 0
+      : customTopics.some((t) => t.id === selected)
+        ? true
+        : (counts[selected] || 0) > 0;
 
   if (showAIPanel) {
     return (
@@ -277,36 +288,52 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, onStart, onStartAI, onBac
             const isSelected = selected === opt.id;
             const disabled = opt.count === 0;
             return (
-              <button
-                key={opt.id}
-                type="button"
-                disabled={disabled}
-                onClick={() => setSelected(opt.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 16px",
-                  borderRadius: 14,
-                  border: isSelected ? "2px solid var(--color-primary)" : "1.5px solid #EEF0FF",
-                  background: isSelected ? "var(--color-primary-light)" : "#fff",
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  opacity: disabled ? 0.45 : 1,
-                  textAlign: "right",
-                  width: "100%",
-                }}
-              >
-                <span style={{ fontSize: 28 }}>{opt.emoji}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>{opt.label}</div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                    {opt.id === "wordbank"
-                      ? `${opt.count} מילים שמורות`
-                      : `${opt.count} משפטים זמינים`}
+              <div key={opt.id} style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setSelected(opt.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "14px 16px",
+                    borderRadius: 14,
+                    border: isSelected ? "2px solid var(--color-primary)" : "1.5px solid #EEF0FF",
+                    background: isSelected ? "var(--color-primary-light)" : "#fff",
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    opacity: disabled ? 0.45 : 1,
+                    textAlign: "right",
+                    width: "100%",
+                  }}
+                >
+                  <span style={{ fontSize: 28 }}>{opt.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>{opt.label}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                      {opt.id === "wordbank"
+                        ? `${opt.count} מילים שמורות`
+                        : opt.id === "weak"
+                          ? `${opt.count} משפטים לחזרה`
+                          : `${opt.count} משפטים זמינים`}
+                    </div>
                   </div>
-                </div>
-                {isSelected && <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>✓</span>}
-              </button>
+                  {isSelected && <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>✓</span>}
+                </button>
+                {opt.isCustom && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteCustomTopic(opt.id); }}
+                    title="מחק נושא שמור"
+                    style={{
+                      position: "absolute", top: 8, right: 8, background: "#FEE2E2",
+                      border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 13,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
@@ -323,7 +350,7 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, onStart, onStartAI, onBac
   );
 }
 
-function SessionSummary({ avg, sessionResults, summary, categoryLabel, onHome, onPracticeWords, onPracticeAgain }) {
+function SessionSummary({ avg, sessionResults, summary, categoryLabel, canSaveTopic, topicSaved, onSaveTopic, onHome, onPracticeWords, onPracticeAgain }) {
   return (
     <div className="page-enter" style={{ padding: "24px 0" }}>
       <div className="container desktop-center">
@@ -401,6 +428,15 @@ function SessionSummary({ avg, sessionResults, summary, categoryLabel, onHome, o
             📚 תרגל את המילים האלה
           </button>
         )}
+        {canSaveTopic && (
+          <button
+            className="btn btn-ghost btn-block mb-2"
+            onClick={onSaveTopic}
+            disabled={topicSaved}
+          >
+            {topicSaved ? "✅ הנושא נשמר לתרגול חוזר" : "💾 שמור נושא זה לתרגול עתידי"}
+          </button>
+        )}
         <button className="btn btn-ghost btn-block mb-2" onClick={onPracticeAgain}>
           🔄 תרגול נוסף
         </button>
@@ -415,8 +451,10 @@ function SessionSummary({ avg, sessionResults, summary, categoryLabel, onHome, o
 export default function Practice() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
-  const { settings, todayProgress, practice } = state;
+  const location = useLocation();
+  const { settings, todayProgress, practice, sessions } = state;
   const wordBank = practice?.wordBank || [];
+  const customTopics = practice?.customTopics || [];
 
   const [practiceState, setPracticeState] = useState("SETUP");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -428,33 +466,49 @@ export default function Practice() {
   const [showTranslation, setShowTranslation] = useState(settings.showTranslation);
   const [sessionSummary, setSessionSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [topicSaved, setTopicSaved] = useState(false);
 
   const { transcript, liveTranscript, isListening, isTranscribing, error, isSupported, start, stop } = useSpeechRecognition();
   const { speak } = useSpeechSynthesis();
 
+  const weakStats = getWeakSentenceStats(sessions);
+  const weakCount = Object.keys(weakStats).length;
+
   const categoryLabel = selectedCategory === "ai"
     ? (aiTopicLabel || "נושא AI")
-    : (categoryMeta[selectedCategory]?.label || "מעורב");
+    : selectedCategory === "weak"
+      ? "הנקודות החלשות שלי"
+      : (customTopics.find((t) => t.id === selectedCategory)?.label
+        || categoryMeta[selectedCategory]?.label
+        || "מעורב");
 
   const loadSentences = useCallback((category) => {
     const excludeIds = todayProgress.map((p) => p.sentenceId);
     const bank = practice?.wordBank || [];
+    const savedTopic = (practice?.customTopics || []).find((t) => t.id === category);
     let loaded;
 
     if (category === "wordbank") {
       loaded = sentencesFromWordBank(bank, settings.dailyGoal);
+    } else if (category === "weak") {
+      loaded = sentencesFromWeakList(getWeakSentenceStats(sessions), settings.dailyGoal);
+    } else if (savedTopic) {
+      loaded = savedTopic.sentences.slice(0, settings.dailyGoal);
     } else {
+      const weakIds = Object.keys(getWeakSentenceStats(sessions));
       loaded = getDailySentences({
         difficulty: settings.difficulty,
         count: settings.dailyGoal,
         excludeIds,
         category,
+        weakIds,
       });
       if (loaded.length < settings.dailyGoal) {
         loaded = getDailySentences({
           difficulty: settings.difficulty,
           count: settings.dailyGoal,
           category,
+          weakIds,
         });
       }
     }
@@ -464,13 +518,24 @@ export default function Practice() {
     setResult(null);
     setSessionResults([]);
     setSessionSummary(null);
+    setTopicSaved(false);
     setPracticeState(loaded.length > 0 ? "IDLE" : "SETUP");
-  }, [settings.difficulty, settings.dailyGoal, todayProgress, practice?.wordBank]);
+  }, [settings.difficulty, settings.dailyGoal, todayProgress, practice?.wordBank, practice?.customTopics, sessions]);
 
   const handleStartTopic = (category) => {
     setSelectedCategory(category);
+    const savedTopic = customTopics.find((t) => t.id === category);
+    if (savedTopic) setAiTopicLabel(savedTopic.label);
     loadSentences(category);
   };
+
+  // Deep-link from Home's "Practice your weak spots" card
+  useEffect(() => {
+    if (location.state?.autoCategory && practiceState === "SETUP") {
+      handleStartTopic(location.state.autoCategory);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const handleStartAITopic = async (topic) => {
     setSelectedCategory("ai");
@@ -563,6 +628,7 @@ export default function Practice() {
       sentenceId: currentSentence.id,
       text: currentSentence.text,
       translation: currentSentence.translation,
+      category: currentSentence.category || selectedCategory,
       score: result.score,
       attempts: 1,
       wordResults: result.wordResults,
@@ -586,14 +652,35 @@ export default function Practice() {
     setPracticeState("READY_TO_RECORD");
   };
 
+  const handleSaveTopic = useCallback(() => {
+    if (!aiTopicLabel || !sentences.length) return;
+    dispatch({
+      type: "ADD_CUSTOM_PRACTICE_TOPIC",
+      payload: {
+        id: `custom_practice_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        label: aiTopicLabel,
+        sentences,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    setTopicSaved(true);
+  }, [aiTopicLabel, sentences, dispatch]);
+
+  const handleDeleteCustomTopic = useCallback((id) => {
+    dispatch({ type: "DELETE_CUSTOM_PRACTICE_TOPIC", payload: id });
+  }, [dispatch]);
+
   if (practiceState === "SETUP") {
     return (
       <TopicSetup
         difficulty={settings.difficulty}
         dailyGoal={settings.dailyGoal}
         wordBank={wordBank}
+        weakCount={weakCount}
+        customTopics={customTopics}
         onStart={handleStartTopic}
         onStartAI={handleStartAITopic}
+        onDeleteCustomTopic={handleDeleteCustomTopic}
         onBack={() => navigate("/")}
       />
     );
@@ -619,6 +706,9 @@ export default function Practice() {
         sessionResults={sessionResults}
         summary={sessionSummary}
         categoryLabel={categoryLabel}
+        canSaveTopic={selectedCategory === "ai"}
+        topicSaved={topicSaved}
+        onSaveTopic={handleSaveTopic}
         onHome={() => navigate("/")}
         onPracticeWords={() => {
           setSelectedCategory("wordbank");
@@ -646,7 +736,10 @@ export default function Practice() {
         <div style={{ marginBottom: 16 }}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-muted" style={{ fontSize: 13 }}>
-              {selectedCategory === "ai" ? "🤖" : categoryMeta[selectedCategory]?.emoji} משפט {currentIdx + 1} מתוך {sentences.length}
+              {selectedCategory === "ai" ? "🤖"
+                : selectedCategory === "weak" ? "🎯"
+                : customTopics.some((t) => t.id === selectedCategory) ? "⭐"
+                : categoryMeta[selectedCategory]?.emoji} משפט {currentIdx + 1} מתוך {sentences.length}
             </span>
             <span style={{ fontWeight: 700, fontSize: 13, color: "var(--color-primary)" }}>{progress}%</span>
           </div>

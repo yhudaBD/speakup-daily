@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getGreeting, getTodayString, getLastNDays } from "../utils/dateHelpers";
+import { getWeakSentenceStats } from "../utils/practiceHistory";
 
 function WeeklyChart({ sessions }) {
   const days = getLastNDays(7);
@@ -47,6 +48,7 @@ export default function Home() {
   const pct = Math.min(100, Math.round((completed / goal) * 100));
   const todayChats = todaySession?.chats?.length || 0;
   const greeting = useMemo(() => getGreeting(user?.name || ""), [user]);
+  const weakCount = useMemo(() => Object.keys(getWeakSentenceStats(sessions)).length, [sessions]);
 
   const difficultyLabel = { easy: "🟢 Easy", medium: "🟡 Medium", advanced: "🔴 Advanced" };
 
@@ -101,6 +103,21 @@ export default function Home() {
             </button>
           )}
         </div>
+
+        {weakCount > 0 && (
+          <div
+            className="card mb-4"
+            onClick={() => navigate("/practice", { state: { autoCategory: "weak" } })}
+            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}
+          >
+            <span style={{ fontSize: 28 }}>🎯</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>תרגל את הנקודות החלשות שלך</div>
+              <div className="text-muted" style={{ fontSize: 13 }}>{weakCount} משפטים שכדאי לחזור עליהם</div>
+            </div>
+            <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>→</span>
+          </div>
+        )}
 
         {wordBankCount > 0 && (
           <div
