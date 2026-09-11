@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
+import { getWeakSentenceStats } from "../utils/practiceHistory";
 
 const ACHIEVEMENTS = [
   { id: "on-fire", icon: "🔥", title: "On Fire", desc: "7 days in a row", check: (state) => state.streak.current >= 7 },
@@ -9,14 +10,33 @@ const ACHIEVEMENTS = [
     const s = state.sessions[today];
     return s && s.sentences.every(x => x.score === 100);
   }},
-  { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%", check: (state) => {
-    const all = Object.values(state.sessions).flatMap(s => s.sentences || []);
-    return all.filter(x => x.score >= 90).length >= 10;
-  }},
+  { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%", check: (state) => state.lifetimeStats.sentencesAbove90 >= 10 },
   { id: "month-strong", icon: "📅", title: "Month Strong", desc: "30 days in a row", check: (state) => state.streak.longest >= 30 },
-  { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => Object.keys(state.sessions).length >= 1 },
-  { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => Object.keys(state.sessions).length >= 5 },
+  { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => state.lifetimeStats.daysActive >= 1 },
+  { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => state.lifetimeStats.daysActive >= 5 },
+  { id: "century", icon: "💯", title: "Century Club", desc: "100 sentences practiced", check: (state) => state.lifetimeStats.totalSentences >= 100 },
+  { id: "chatterbox", icon: "💬", title: "Chatterbox", desc: "10 conversations completed", check: (state) => state.lifetimeStats.totalChats >= 10 },
+  { id: "explorer", icon: "🗺️", title: "Category Explorer", desc: "Practiced 5+ different topics", check: (state) => {
+    const cats = new Set(
+      Object.values(state.sessions).flatMap(s => s.sentences || []).map(x => x.category).filter(Boolean)
+    );
+    return cats.size >= 5;
+  }},
+  { id: "wordsmith", icon: "📖", title: "Wordsmith", desc: "50 words saved for review", check: (state) => (state.practice?.wordBank?.length || 0) >= 50 },
+  { id: "night-owl", icon: "🦉", title: "Night Owl", desc: "Practiced after 10pm", check: (state) =>
+    Object.values(state.sessions).some(s => s.completedAt && new Date(s.completedAt).getHours() >= 22)
+  },
 ];
+
+function computeLevel(state) {
+  const xp = state.lifetimeStats.totalSentences * 10
+    + state.lifetimeStats.totalChats * 25
+    + state.streak.longest * 5;
+  const xpPerLevel = 200;
+  const level = Math.floor(xp / xpPerLevel) + 1;
+  const xpIntoLevel = xp % xpPerLevel;
+  return { xp, level, xpIntoLevel, xpPerLevel };
+}
 
 function TabButton({ label, active, onClick }) {
   return (
@@ -52,15 +72,8 @@ export default function Progress() {
     ? Math.round(allSentences.reduce((s, x) => s + x.score, 0) / allSentences.length)
     : 0;
 
-  const weakSentences = allSentences
-    .filter(x => x.score < 70)
-    .reduce((acc, x) => {
-      const key = x.sentenceId;
-      if (!acc[key]) acc[key] = { ...x, count: 0, bestScore: x.score };
-      acc[key].count++;
-      acc[key].bestScore = Math.max(acc[key].bestScore, x.score);
-      return acc;
-    }, {});
+  const weakSentences = getWeakSentenceStats(sessions);
+  const { level, xpIntoLevel, xpPerLevel } = computeLevel(state);
 
   const days = getLastNDays(7);
 
@@ -132,6 +145,16 @@ export default function Progress() {
         {/* ALL TIME TAB */}
         {tab === "alltime" && (
           <div style={{ display: "grid", gap: 12 }}>
+            <div className="card" style={{ background: "var(--color-primary-light)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 style={{ fontSize: 15, color: "var(--color-primary)" }}>⭐ Level {level}</h3>
+                <span className="text-muted" style={{ fontSize: 12 }}>{xpIntoLevel} / {xpPerLevel} XP</span>
+              </div>
+              <div className="progress-bar-track">
+                <div className="progress-bar-fill" style={{ width: `${(xpIntoLevel / xpPerLevel) * 100}%` }} />
+              </div>
+            </div>
+
             <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-primary)" }}>

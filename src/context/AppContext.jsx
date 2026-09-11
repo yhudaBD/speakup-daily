@@ -1,7 +1,9 @@
 import { createContext, useContext, useReducer, useEffect } from "react";
-import { getTodayString } from "../utils/dateHelpers";
+import { getTodayString, daysSince } from "../utils/dateHelpers";
 
 const STORAGE_KEY = "speakup_data";
+const SCHEMA_VERSION = 1;
+const SESSION_RETENTION_DAYS = 365;
 
 function createUserId() {
   return `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -37,6 +39,33 @@ function computeStreak(streak, today) {
   return { current, longest, lastPracticeDate: today };
 }
 
+function pruneOldSessions(sessions) {
+  const entries = Object.entries(sessions || {});
+  const kept = entries.filter(([date]) => daysSince(date) <= SESSION_RETENTION_DAYS);
+  if (kept.length === entries.length) return sessions;
+  return Object.fromEntries(kept);
+}
+
+// One-time backfill for users whose saved data predates lifetimeStats — derives
+// permanent counters from full history so achievements/XP stay accurate even
+// after old session day-buckets get pruned.
+function computeLifetimeStats(sessions, rolePlayChats) {
+  const allSentences = Object.values(sessions || {}).flatMap((s) => s.sentences || []);
+  return {
+    totalSentences: allSentences.length,
+    sentencesAbove90: allSentences.filter((s) => s.score >= 90).length,
+    daysActive: Object.keys(sessions || {}).length,
+    totalChats: (rolePlayChats || []).filter((c) => c.status === "completed").length,
+  };
+}
+
+const defaultLifetimeStats = {
+  totalSentences: 0,
+  sentencesAbove90: 0,
+  daysActive: 0,
+  totalChats: 0,
+};
+
 const initialState = {
   user: null,
   settings: { ...defaultSettings },
@@ -53,7 +82,9 @@ const initialState = {
   },
   practice: {
     wordBank: [],
+    customTopics: [],
   },
+  lifetimeStats: { ...defaultLifetimeStats },
 };
 
 function reducer(state, action) {
@@ -64,6 +95,7 @@ function reducer(state, action) {
       return { ...state, settings: { ...state.settings, ...action.payload } };
     case "SAVE_SESSION_RESULT": {
       const today = getTodayString();
+      const isNewDay = !state.sessions[today];
       const existing = state.sessions[today]?.sentences || [];
       const updated = [...existing, action.payload];
       const avg = Math.round(updated.reduce((s, x) => s + x.score, 0) / updated.length);
@@ -76,6 +108,12 @@ function reducer(state, action) {
         sessions: newSessions,
         todayProgress: updated,
         streak: computeStreak(state.streak, today),
+        lifetimeStats: {
+          ...state.lifetimeStats,
+          totalSentences: state.lifetimeStats.totalSentences + 1,
+          sentencesAbove90: state.lifetimeStats.sentencesAbove90 + (action.payload.score >= 90 ? 1 : 0),
+          daysActive: state.lifetimeStats.daysActive + (isNewDay ? 1 : 0),
+        },
       };
     }
     case "SAVE_ROLEPLAY_SESSION": {
@@ -91,6 +129,10 @@ function reducer(state, action) {
         ...state,
         sessions: newSessions,
         streak: computeStreak(state.streak, today),
+        lifetimeStats: {
+          ...state.lifetimeStats,
+          totalChats: state.lifetimeStats.totalChats + 1,
+        },
       };
     }
     case "UPDATE_ROLEPLAY_FEEDBACK": {
@@ -130,7 +172,12 @@ function reducer(state, action) {
         user,
         settings: { ...defaultSettings, ...action.payload.settings },
         rolePlay: action.payload.rolePlay || { chats: [], customTopics: [] },
-        practice: action.payload.practice || { wordBank: [] },
+        practice: {
+          wordBank: [],
+          customTopics: [],
+          ...action.payload.practice,
+        },
+        lifetimeStats: action.payload.lifetimeStats || defaultLifetimeStats,
       };
     }
     case "UPSERT_ROLEPLAY_CHAT": {
@@ -188,14 +235,31 @@ function reducer(state, action) {
       }
       return {
         ...state,
-        practice: { wordBank: [...byKey.values()].slice(0, 100) },
+        practice: { ...state.practice, wordBank: [...byKey.values()].slice(0, 100) },
       };
     }
     case "REMOVE_WORD_FROM_BANK":
       return {
         ...state,
         practice: {
+          ...state.practice,
           wordBank: (state.practice?.wordBank || []).filter((w) => w.id !== action.payload),
+        },
+      };
+    case "ADD_CUSTOM_PRACTICE_TOPIC":
+      return {
+        ...state,
+        practice: {
+          ...state.practice,
+          customTopics: [action.payload, ...(state.practice?.customTopics || [])].slice(0, 20),
+        },
+      };
+    case "DELETE_CUSTOM_PRACTICE_TOPIC":
+      return {
+        ...state,
+        practice: {
+          ...state.practice,
+          customTopics: (state.practice?.customTopics || []).filter((t) => t.id !== action.payload),
         },
       };
     default:
@@ -215,15 +279,24 @@ export function AppProvider({ children }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         const today = getTodayString();
-        const todayProgress = parsed.sessions?.[today]?.sentences || [];
+        const isPreVersioned = !parsed.schemaVersion || parsed.schemaVersion < SCHEMA_VERSION;
+        const prunedSessions = pruneOldSessions(parsed.sessions);
+        // Backfill lifetimeStats once for existing users from their full history
+        // (computed before pruning, so nothing already earned is lost).
+        const lifetimeStats = isPreVersioned
+          ? computeLifetimeStats(parsed.sessions, parsed.rolePlay?.chats)
+          : parsed.lifetimeStats || defaultLifetimeStats;
+        const todayProgress = prunedSessions?.[today]?.sentences || [];
         dispatch({
           type: "LOAD_DATA",
           payload: {
             ...parsed,
+            sessions: prunedSessions,
             todayProgress,
+            lifetimeStats,
             user: parsed.user || ensureUser(null),
             rolePlay: parsed.rolePlay || { chats: [], customTopics: [] },
-            practice: parsed.practice || { wordBank: [] },
+            practice: parsed.practice || { wordBank: [], customTopics: [] },
           },
         });
       }
@@ -236,18 +309,20 @@ export function AppProvider({ children }) {
   useEffect(() => {
     try {
       const toSave = {
+        schemaVersion: SCHEMA_VERSION,
         user: state.user,
         settings: state.settings,
         streak: state.streak,
-        sessions: state.sessions,
+        sessions: pruneOldSessions(state.sessions),
         rolePlay: state.rolePlay,
         practice: state.practice,
+        lifetimeStats: state.lifetimeStats,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch (e) {
       console.error("Failed to save data", e);
     }
-  }, [state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice]);
+  }, [state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
