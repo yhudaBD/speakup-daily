@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppProvider } from "./context/AppContext";
 import { preloadVoices } from "./utils/speechVoice";
 import BottomNav from "./components/layout/BottomNav";
+import OfflineBanner from "./components/layout/OfflineBanner";
 import Home from "./pages/Home";
 import Practice from "./pages/Practice";
 import RolePlay from "./pages/RolePlay";
@@ -19,6 +20,7 @@ export default function App() {
     <AppProvider>
       <BrowserRouter>
         <div className="app-shell">
+          <OfflineBanner />
           <BottomNav />
           <main className="page-content" role="main">
             <Routes>
