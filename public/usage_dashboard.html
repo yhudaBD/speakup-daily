@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>לוח בקרה — SpeakUp Daily</title>
+<style>
+  :root {
+    --bg: #F8F9FF;
+    --surface: #FFFFFF;
+    --border: #E5E7EB;
+    --ink: #1E1B4B;
+    --ink-muted: #6B7280;
+    --primary: #6C63FF;
+    --primary-light: #EEF0FF;
+    --good: #22C55E;
+    --warn: #F59E0B;
+    --bad: #EF4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--ink-muted); font-size: 13px; margin-bottom: 24px; }
+
+  /* Auth gate */
+  .gate {
+    max-width: 360px; margin: 80px auto; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 16px; padding: 28px; text-align: center;
+  }
+  .gate input {
+    width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid var(--border);
+    font-size: 15px; margin: 16px 0 12px; direction: ltr; text-align: center;
+  }
+  .gate button, .btn {
+    background: var(--primary); color: #fff; border: none; border-radius: 10px;
+    padding: 12px 20px; font-weight: 700; cursor: pointer; font-size: 14px;
+  }
+  .gate .err { color: var(--bad); font-size: 13px; margin-top: 8px; min-height: 18px; }
+
+  /* Summary cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; text-align: center; }
+  .card .num { font-size: 26px; font-weight: 900; color: var(--primary); }
+  .card .num.bad { color: var(--bad); }
+  .card .lbl { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+  section { margin-bottom: 28px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+
+  .table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+  table { width: 100%; border-collapse: collapse; min-width: 640px; }
+  th, td { padding: 10px 12px; font-size: 13px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--ink-muted); font-weight: 700; background: var(--primary-light); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: var(--primary-light); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+  .pill.ok { background: #DCFCE7; color: #166534; }
+  .pill.warn { background: #FEF3C7; color: #92400E; }
+  .pill.bad { background: #FEE2E2; color: #991B1B; }
+
+  .grid30 { display: flex; gap: 2px; direction: ltr; }
+  .grid30 .cell { width: 8px; height: 18px; border-radius: 2px; background: var(--border); }
+  .grid30 .cell.active { background: var(--primary); }
+
+  .topics-list, .inactive-list { list-style: none; margin: 0; padding: 0; }
+  .topics-list li, .inactive-list li {
+    display: flex; justify-content: space-between; padding: 8px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; font-size: 13px;
+  }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex;
+    align-items: center; justify-content: center; padding: 20px; z-index: 10;
+  }
+  .modal { background: var(--surface); border-radius: 16px; padding: 20px; max-width: 420px; width: 100%; max-height: 80vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 12px; }
+  .modal .close { float: left; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--ink-muted); }
+
+  [hidden] { display: none !important; }
+  .empty { text-align: center; color: var(--ink-muted); padding: 40px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="gate" class="gate">
+      <h1 style="font-size:18px">🔒 לוח בקרה פרטי</h1>
+      <p class="sub" style="margin-bottom:0">רק לך — הזן את הסיסמה שהגדרת ב-Netlify (ADMIN_SECRET)</p>
+      <input id="secretInput" type="password" placeholder="סיסמה" />
+      <button class="btn" onclick="tryLogin()">כניסה</button>
+      <div class="err" id="gateErr"></div>
+    </div>
+
+    <div id="dashboard" hidden>
+      <h1>📊 לוח בקרה — SpeakUp Daily</h1>
+      <p class="sub" id="generatedAt"></p>
+
+      <div class="cards">
+        <div class="card"><div class="num" id="totalUsers">–</div><div class="lbl">משתמשים</div></div>
+        <div class="card"><div class="num" id="weeklyActive">–</div><div class="lbl">פעילים השבוע</div></div>
+        <div class="card"><div class="num" id="totalCost">–</div><div class="lbl">עלות AI חודשית משוערת</div></div>
+        <div class="card"><div class="num" id="inactiveCount">–</div><div class="lbl">לא פעילים 3+ ימים</div></div>
+      </div>
+
+      <section>
+        <h2>👥 משתמשים</h2>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>שם</th><th>פעילות (30 יום)</th><th>רמה (התחלה→עכשיו)</th>
+                <th>עזרים ממוצע</th><th>עלות משוערת</th><th>פעילות אחרונה</th>
+              </tr>
+            </thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>🎭 נושאים פופולריים</h2>
+        <ul class="topics-list" id="topicsList"></ul>
+      </section>
+
+      <section>
+        <h2>⚠️ לא תרגלו 3+ ימים</h2>
+        <ul class="inactive-list" id="inactiveList"></ul>
+      </section>
+
+      <button class="btn" onclick="loadData()">🔄 רענן</button>
+    </div>
+  </div>
+
+  <div id="userModalBackdrop" class="modal-backdrop" hidden onclick="if(event.target===this) closeModal()">
+    <div class="modal">
+      <button class="close" onclick="closeModal()">✕</button>
+      <h3 id="modalName"></h3>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+<script>
+  const SECRET_KEY = 'speakup_admin_secret';
+  let currentData = null;
+
+  function tryLogin() {
+    const secret = document.getElementById('secretInput').value.trim();
+    if (!secret) return;
+    sessionStorage.setItem(SECRET_KEY, secret);
+    loadData();
+  }
+
+  async function loadData() {
+    const secret = sessionStorage.getItem(SECRET_KEY);
+    if (!secret) return;
+    try {
+      const res = await fetch('/api/get-dashboard-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+        body: JSON.stringify({}),
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem(SECRET_KEY);
+        document.getElementById('gateErr').textContent = 'סיסמה שגויה';
+        document.getElementById('gate').hidden = false;
+        document.getElementById('dashboard').hidden = true;
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      currentData = await res.json();
+      render(currentData);
+      document.getElementById('gate').hidden = true;
+      document.getElementById('dashboard').hidden = false;
+    } catch (err) {
+      document.getElementById('gateErr').textContent = 'שגיאה בטעינה: ' + err.message;
+    }
+  }
+
+  function last30Days() {
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }
+
+  function trendBadge(trend) {
+    if (trend === 'down') return '<span class="pill ok">📉 ירידה</span>';
+    if (trend === 'up') return '<span class="pill warn">📈 עלייה</span>';
+    return '';
+  }
+
+  function render(data) {
+    document.getElementById('generatedAt').textContent =
+      'עודכן: ' + new Date(data.generatedAt).toLocaleString('he-IL');
+    document.getElementById('totalUsers').textContent = data.summary.totalUsers;
+    document.getElementById('weeklyActive').textContent = data.summary.weeklyActiveUsers;
+    const costEl = document.getElementById('totalCost');
+    costEl.textContent = '$' + data.summary.totalCostUsd.toFixed(2);
+    costEl.className = 'num' + (data.summary.totalCostUsd >= 10 ? ' bad' : '');
+
+    const days = last30Days();
+    const inactive = data.users.filter(u => u.daysSinceActive !== null && u.daysSinceActive >= 3);
+    document.getElementById('inactiveCount').textContent = inactive.length;
+
+    const usersBody = document.getElementById('usersBody');
+    if (!data.users.length) {
+      usersBody.innerHTML = '<tr><td colspan="6" class="empty">אין עדיין נתונים — ברגע שמישהו ישתמש באפליקציה, הוא יופיע כאן.</td></tr>';
+    } else {
+      usersBody.innerHTML = data.users.map((u, i) => `
+        <tr class="clickable" onclick="openModal(${i})">
+          <td>${escapeHtml(u.userName)}</td>
+          <td><div class="grid30">${days.map(d => `<div class="cell${u.activeDates.includes(d) ? ' active' : ''}" title="${d}"></div>`).join('')}</div></td>
+          <td>${u.placementLevel || '—'} → ${u.currentLevel || '—'}</td>
+          <td>${u.avgHelpUsed !== null ? u.avgHelpUsed.toFixed(1) : '—'} ${trendBadge(u.helpTrend)}</td>
+          <td>$${u.estimatedCostUsd.toFixed(3)}</td>
+          <td>${u.daysSinceActive === 0 ? 'היום' : u.daysSinceActive === null ? '—' : `לפני ${u.daysSinceActive} ימים`}</td>
+        </tr>
+      `).join('');
+    }
+
+    const topicsList = document.getElementById('topicsList');
+    topicsList.innerHTML = data.summary.popularTopics.length
+      ? data.summary.popularTopics.map(t => `<li><span>${escapeHtml(t.topic)}</span><strong>${t.count}</strong></li>`).join('')
+      : '<li class="empty" style="border:none;background:none">אין עדיין נתונים</li>';
+
+    const inactiveList = document.getElementById('inactiveList');
+    inactiveList.innerHTML = inactive.length
+      ? inactive.map(u => `<li><span>${escapeHtml(u.userName)}</span><span>לפני ${u.daysSinceActive} ימים</span></li>`).join('')
+      : '<li class="empty" style="border:none;background:none">כולם פעילים 🎉</li>';
+  }
+
+  function openModal(index) {
+    const u = currentData.users[index];
+    document.getElementById('modalName').textContent = u.userName;
+    const topics = Object.entries(u.topicCounts || {}).sort((a, b) => b[1] - a[1]);
+    document.getElementById('modalBody').innerHTML = `
+      <p><strong>רמה:</strong> ${u.placementLevel || '—'} ← ${u.currentLevel || '—'}</p>
+      <p><strong>עלות משוערת:</strong> $${u.estimatedCostUsd.toFixed(3)}</p>
+      <p><strong>נושאים שתורגלו:</strong></p>
+      <ul class="topics-list">${topics.length ? topics.map(([t, c]) => `<li><span>${escapeHtml(t)}</span><strong>${c}</strong></li>`).join('') : '<li>אין עדיין</li>'}</ul>
+    `;
+    document.getElementById('userModalBackdrop').hidden = false;
+  }
+  function closeModal() { document.getElementById('userModalBackdrop').hidden = true; }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.getElementById('secretInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+  if (sessionStorage.getItem(SECRET_KEY)) loadData();
+</script>
+</body>
+</html>

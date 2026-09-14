@@ -2,8 +2,9 @@ import { useState, useCallback, useRef } from 'react';
 import { aiService } from '../services/ai.service';
 import { speakNaturally } from '../utils/speechVoice';
 import { PLACEMENT_MAX_TURNS } from '../data/placementPrompt';
+import { logEvent } from '../utils/analytics';
 
-export function usePlacementTest({ onComplete } = {}) {
+export function usePlacementTest({ userId, userName, onComplete } = {}) {
   const [messages, setMessages] = useState([]);
   const [phase, setPhase] = useState('IDLE'); // IDLE | AI_THINKING | USER_TURN | DONE | ERROR
   const [turnCount, setTurnCount] = useState(0);
@@ -30,10 +31,11 @@ export function usePlacementTest({ onComplete } = {}) {
       setResult(response.result);
       setPhase('DONE');
       onComplete?.(response.result);
+      logEvent(userId, userName, 'placement_completed', { level: response.result.overall_level });
     } else {
       setPhase('USER_TURN');
     }
-  }, [addMessage, onComplete]);
+  }, [addMessage, onComplete, userId, userName]);
 
   const startPlacement = useCallback(async () => {
     setPhase('AI_THINKING');

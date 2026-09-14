@@ -66,7 +66,7 @@ function DoneScreen({ result, onContinue }) {
 
 export default function PlacementTest() {
   const navigate = useNavigate();
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const chatBottomRef = useRef(null);
 
   const skipWithDefault = () => {
@@ -90,6 +90,8 @@ export default function PlacementTest() {
     messages, phase, isSpeaking, result,
     startPlacement, handleUserMessage, retry, replayMessage,
   } = usePlacementTest({
+    userId: state.user?.id,
+    userName: state.user?.name,
     onComplete: (placementResult) => {
       dispatch({ type: 'SET_PLACEMENT_RESULT', payload: placementResult });
     },
