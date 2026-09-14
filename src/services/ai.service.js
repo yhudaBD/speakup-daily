@@ -1,4 +1,5 @@
 import { systemInstruction } from "../data/rolePlayTopics";
+import { placementSystemPrompt } from "../data/placementPrompt";
 
 const PROXY_URL = "/api/groq-proxy";
 const CHAT_MODEL = "openai/gpt-oss-20b";
@@ -115,7 +116,39 @@ Return JSON only:
 Score 0-100 based on: fluency, grammar, vocabulary range, and appropriateness.
 Be encouraging but specific. Reference actual things the user said.`;
 
-async function groqChat({ model, messages, temperature = 0.7, json = true }) {
+// gpt-oss models on Groq occasionally fail to produce valid JSON-mode output —
+// observed in practice as three distinct 400 error codes:
+//   - tool_use_failed: model emits a phantom tool call; failed_generation is a
+//     JSON string wrapping {name, arguments} — the real content is .arguments.
+//   - json_validate_failed / output_parse_failed: model drifts into plain text
+//     or leaks its own reasoning instead of JSON.
+// All three are non-deterministic formatting hiccups, not real failures, so
+// retry the exact same request (see MAX_GROQ_ATTEMPTS below) before giving up.
+// tool_use_failed can also be recovered directly from failed_generation
+// without even retrying.
+const RECOVERABLE_ERROR_CODES = new Set(["tool_use_failed", "json_validate_failed", "output_parse_failed"]);
+
+function recoverFromToolUseFailure(errBody) {
+  try {
+    const parsed = JSON.parse(errBody);
+    const raw = parsed?.error?.failed_generation;
+    if (parsed?.error?.code !== "tool_use_failed" || !raw) return null;
+    const wrapped = JSON.parse(raw);
+    return wrapped?.arguments ? JSON.stringify(wrapped.arguments) : null;
+  } catch {
+    return null;
+  }
+}
+
+function isRecoverableGroqError(errText) {
+  try {
+    return RECOVERABLE_ERROR_CODES.has(JSON.parse(errText)?.error?.code);
+  } catch {
+    return false;
+  }
+}
+
+async function groqChatOnce({ model, messages, temperature, json }) {
   const response = await fetch(PROXY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -124,11 +157,30 @@ async function groqChat({ model, messages, temperature = 0.7, json = true }) {
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Groq API error: ${response.status} ${errText}`);
+    const recovered = recoverFromToolUseFailure(errText);
+    if (recovered) return { ok: true, content: recovered };
+    return { ok: false, status: response.status, errText };
   }
 
   const data = await response.json();
-  return data.choices[0].message.content;
+  return { ok: true, content: data.choices[0].message.content };
+}
+
+// This model fails JSON-mode validation surprisingly often in practice (observed
+// ~30-40% per call, occasionally two 400s in a row) — 3 attempts total keeps the
+// compounding failure chance low without noticeably slowing down a turn.
+const MAX_GROQ_ATTEMPTS = 3;
+
+async function groqChat({ model, messages, temperature = 0.7, json = true }) {
+  let result;
+  for (let attempt = 1; attempt <= MAX_GROQ_ATTEMPTS; attempt++) {
+    result = await groqChatOnce({ model, messages, temperature, json });
+    if (result.ok || !isRecoverableGroqError(result.errText)) break;
+  }
+  if (!result.ok) {
+    throw new Error(`Groq API error: ${result.status} ${result.errText}`);
+  }
+  return result.content;
 }
 
 async function blobToBase64(blob) {
@@ -166,12 +218,22 @@ async function translateToHebrew(texts) {
   return translations;
 }
 
+function buildProfileContext(placement) {
+  if (!placement) return "";
+  const parts = [`\nUSER PROFILE (use this to personalize your character's vocabulary and pacing — never mention it explicitly):`];
+  if (placement.overall_level) parts.push(`- English level: ${placement.overall_level}`);
+  if (placement.job_field) parts.push(`- Job: ${placement.job_field}`);
+  if (placement.gaps?.length) parts.push(`- Known trouble spots to reinforce naturally: ${placement.gaps.slice(-8).join(", ")}`);
+  return parts.length > 1 ? parts.join("\n") + "\n" : "";
+}
+
 export const aiService = {
-  async sendMessage({ systemPrompt, messages, chatDifficulty = "easy" }) {
+  async sendMessage({ systemPrompt, messages, chatDifficulty = "easy", placement = null }) {
     try {
       const difficultyExtra = DIFFICULTY_INSTRUCTIONS[chatDifficulty] || "";
+      const profileContext = buildProfileContext(placement);
       const groqMessages = [
-        { role: "system", content: systemPrompt + "\n" + systemInstruction + difficultyExtra },
+        { role: "system", content: systemPrompt + "\n" + systemInstruction + difficultyExtra + profileContext },
         ...messages,
       ];
 
@@ -344,12 +406,13 @@ export const aiService = {
     }
   },
 
-  async generatePracticeSentences({ topic, difficulty = "easy", count = 5 }) {
+  async generatePracticeSentences({ topic, difficulty = "easy", count = 5, placement = null }) {
     try {
+      const profileContext = buildProfileContext(placement);
       const raw = await groqChat({
         model: TRANSLATION_MODEL,
         messages: [
-          { role: "system", content: GENERATE_SENTENCES_SYSTEM },
+          { role: "system", content: GENERATE_SENTENCES_SYSTEM + profileContext },
           {
             role: "user",
             content: `Topic (in Hebrew or English): "${topic}"\nDifficulty: ${difficulty}\nNumber of sentences: ${count}\n\nGenerate ${count} natural English pronunciation practice sentences about this topic.`,
@@ -382,5 +445,30 @@ export const aiService = {
       ].slice(0, count);
       return { sentences: fallbackSentences, topicEn: topic };
     }
+  },
+
+  // No mock fallback here (unlike the other methods): a fabricated level result
+  // would be actively misleading since it drives personalization everywhere else.
+  // Let callers catch the error and offer the user a manual skip instead.
+  async runPlacementTurn({ messages }) {
+    const groqMessages = [
+      { role: "system", content: placementSystemPrompt },
+      ...messages,
+    ];
+
+    const responseText = await groqChat({
+      model: CHAT_MODEL,
+      messages: groqMessages,
+      temperature: 0.5, // lower than roleplay's 0.85 — steadier JSON-mode compliance for this model
+    });
+
+    const parsed = JSON.parse(responseText);
+    const complete = parsed.phase === "complete";
+    return {
+      phase: complete ? "complete" : "in_progress",
+      ai_reply: parsed.ai_reply || "",
+      ai_reply_he: parsed.ai_reply_he || "",
+      result: complete ? parsed.result || null : null,
+    };
   },
 };

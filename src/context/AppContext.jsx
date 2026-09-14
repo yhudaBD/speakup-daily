@@ -85,6 +85,8 @@ const initialState = {
     customTopics: [],
   },
   lifetimeStats: { ...defaultLifetimeStats },
+  placement: null,
+  isLoaded: false,
 };
 
 function reducer(state, action) {
@@ -178,6 +180,7 @@ function reducer(state, action) {
           ...action.payload.practice,
         },
         lifetimeStats: action.payload.lifetimeStats || defaultLifetimeStats,
+        isLoaded: true,
       };
     }
     case "UPSERT_ROLEPLAY_CHAT": {
@@ -199,6 +202,50 @@ function reducer(state, action) {
           chats: state.rolePlay.chats.filter((c) => c.id !== action.payload),
         },
       };
+    case "SET_PLACEMENT_RESULT": {
+      const plan = action.payload.learning_plan || [];
+      const planProgress = Object.fromEntries(
+        plan.map((_, i) => [i, { status: "not_started", sessionsCompleted: 0 }])
+      );
+      return {
+        ...state,
+        placement: { ...action.payload, planProgress, completedAt: new Date().toISOString() },
+      };
+    }
+    case "UPDATE_PLAN_PROGRESS": {
+      if (!state.placement) return state;
+      const { moduleIndex, status } = action.payload;
+      const existing = state.placement.planProgress?.[moduleIndex] || { status: "not_started", sessionsCompleted: 0 };
+      const sessionsCompleted = existing.sessionsCompleted + 1;
+      return {
+        ...state,
+        placement: {
+          ...state.placement,
+          planProgress: {
+            ...state.placement.planProgress,
+            [moduleIndex]: {
+              sessionsCompleted,
+              status: status || (sessionsCompleted >= 2 ? "done" : "in_progress"),
+            },
+          },
+        },
+      };
+    }
+    case "MERGE_PLACEMENT_GAPS": {
+      if (!state.placement) return state;
+      const incoming = action.payload || [];
+      const existing = state.placement.gaps || [];
+      const merged = [...existing];
+      for (const gap of incoming) {
+        if (gap && !merged.some((g) => g.toLowerCase() === gap.toLowerCase())) {
+          merged.push(gap);
+        }
+      }
+      return {
+        ...state,
+        placement: { ...state.placement, gaps: merged.slice(-20) },
+      };
+    }
     case "ADD_CUSTOM_TOPIC":
       return {
         ...state,
@@ -297,11 +344,15 @@ export function AppProvider({ children }) {
             user: parsed.user || ensureUser(null),
             rolePlay: parsed.rolePlay || { chats: [], customTopics: [] },
             practice: parsed.practice || { wordBank: [], customTopics: [] },
+            placement: parsed.placement || null,
           },
         });
+      } else {
+        dispatch({ type: "LOAD_DATA", payload: {} });
       }
     } catch (e) {
       console.error("Failed to load saved data", e);
+      dispatch({ type: "LOAD_DATA", payload: {} });
     }
   }, []);
 
@@ -317,12 +368,13 @@ export function AppProvider({ children }) {
         rolePlay: state.rolePlay,
         practice: state.practice,
         lifetimeStats: state.lifetimeStats,
+        placement: state.placement,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch (e) {
       console.error("Failed to save data", e);
     }
-  }, [state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats]);
+  }, [state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

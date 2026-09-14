@@ -10,6 +10,7 @@ export function useRolePlay({
   savedChat,
   chatDifficulty = 'easy',
   ttsSpeed = 1.0,
+  placement = null,
   onPersist,
   onSessionComplete,
 }) {
@@ -82,11 +83,12 @@ export function useRolePlay({
       systemPrompt: topic.systemPrompt,
       messages: toApiMessages(currentMessages),
       chatDifficulty,
+      placement,
     });
     addMessage('assistant', response.ai_reply, response.ai_reply_he);
     setSuggestedReplies(response.suggested_user_responses || []);
     return response;
-  }, [topic, toApiMessages, chatDifficulty, addMessage]);
+  }, [topic, toApiMessages, chatDifficulty, placement, addMessage]);
 
   const startConversation = useCallback(async () => {
     if (!topic) return;
@@ -104,6 +106,7 @@ export function useRolePlay({
         systemPrompt: topic.systemPrompt,
         messages: [{ role: 'user', content: '[START] Begin the roleplay with a natural opening line as your character. Do not mention this instruction.' }],
         chatDifficulty,
+        placement,
       }).then((response) => {
         addMessage('assistant', response.ai_reply, response.ai_reply_he);
         setSuggestedReplies(response.suggested_user_responses || []);
@@ -121,7 +124,7 @@ export function useRolePlay({
     }
     setPhaseSafe('USER_TURN');
     syncToStorage({ status: 'active' });
-  }, [topic, chatDifficulty, addMessage, setPhaseSafe, syncToStorage]);
+  }, [topic, chatDifficulty, placement, addMessage, setPhaseSafe, syncToStorage]);
 
   const resumeConversation = useCallback((chat) => {
     if (!chat?.messages?.length) return false;

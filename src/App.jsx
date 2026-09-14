@@ -9,6 +9,7 @@ import Practice from "./pages/Practice";
 import RolePlay from "./pages/RolePlay";
 import Progress from "./pages/Progress";
 import Settings from "./pages/Settings";
+import PlacementTest from "./pages/PlacementTest";
 import "./index.css";
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/roleplay" element={<RolePlay />} />
               <Route path="/progress" element={<Progress />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/placement" element={<PlacementTest />} />
             </Routes>
           </main>
         </div>

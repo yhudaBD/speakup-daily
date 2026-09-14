@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getAllTopics, getTopicById, createCustomTopic } from '../data/rolePlayTopics';
 import { useRolePlay } from '../hooks/useRolePlay';
-import { useVoiceInput } from '../hooks/useVoiceInput';
 import { useApp } from '../context/AppContext';
 import { aiService } from '../services/ai.service';
 import { ConversationBubble } from '../components/roleplay/ConversationBubble';
 import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
 import { SuggestedReplies } from '../components/roleplay/SuggestedReplies';
+import { MicButton } from '../components/roleplay/MicButton';
 
 function createSessionId() {
   return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -281,118 +281,6 @@ function RolePlayHome({ topics, chats, onSelectTopic, onResumeChat, onDeleteChat
   );
 }
 
-// ── Mic Button & Input ────────────────────────────────────────────────────────
-function MicButton({ phase, onSpoke, insertText, onInsertConsumed }) {
-  const [textInput, setTextInput] = useState('');
-  const isActive = phase === 'USER_TURN';
-
-  useEffect(() => {
-    if (insertText) {
-      setTextInput(insertText);
-      onInsertConsumed?.();
-    }
-  }, [insertText, onInsertConsumed]);
-
-  const handleVoiceResult = useCallback((text) => {
-    setTextInput(text);
-  }, []);
-
-  const {
-    isRecording,
-    isTranscribing,
-    liveTranscript,
-    error,
-    speechSupported,
-    startRecording,
-    stopRecording,
-    clearError,
-  } = useVoiceInput({ onResult: handleVoiceResult, enabled: isActive });
-
-  const displayValue = isRecording
-    ? liveTranscript
-    : isTranscribing
-      ? (liveTranscript || textInput)
-      : textInput;
-  const micBusy = isRecording || isTranscribing;
-  const canSend = !micBusy && displayValue.trim();
-
-  const handleSend = () => {
-    if (!canSend) return;
-    onSpoke(displayValue.trim());
-    setTextInput('');
-  };
-
-  return (
-    <div className="mic-bar">
-      {error && (
-        <p style={{
-          fontSize: 12, color: '#EF4444', textAlign: 'center', margin: '0 0 6px',
-          padding: '8px 12px', background: '#FFF5F5', borderRadius: 8
-        }}>
-          {error}
-          <button
-            type="button"
-            onClick={clearError}
-            style={{ marginRight: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#6B7280', padding: '6px 8px' }}
-          >
-            ✕
-          </button>
-        </p>
-      )}
-      <div className="mic-bar-row">
-        <input
-          value={displayValue}
-          onChange={e => { if (!micBusy) setTextInput(e.target.value); }}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && canSend) {
-              handleSend();
-            }
-          }}
-          placeholder={
-            isTranscribing ? 'מתמלל...' :
-            isRecording ? 'מדבר...' :
-            'הקלד או השתמש במיקרופון...'
-          }
-          disabled={!isActive || isTranscribing}
-          className={`mic-bar-input${isRecording ? ' recording' : ''}`}
-        />
-        {speechSupported && (
-          <button
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={!isActive || isTranscribing}
-            className={`mic-bar-btn mic${isRecording ? ' recording' : ''}`}
-            aria-label={isRecording ? 'עצור הקלטה' : 'התחל הקלטה'}
-            style={!isActive ? { opacity: 0.5 } : undefined}
-          >
-            {isRecording ? '⏹️' : '🎤'}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={!isActive || !canSend}
-          className="mic-bar-btn send"
-          aria-label="שלח"
-        >
-          <span className="mic-send-label">שלח</span>
-          <span className="mic-send-icon" aria-hidden="true">➤</span>
-        </button>
-      </div>
-      {isRecording && (
-        <p style={{ fontSize: 12, color: '#EF4444', textAlign: 'center', margin: 0 }}>
-          🎤 מדבר... הטקסט מופיע בזמן אמת · לחץ ⏹️ לסיום
-        </p>
-      )}
-      {isTranscribing && (
-        <p style={{ fontSize: 12, color: '#6C63FF', textAlign: 'center', margin: 0 }}>
-          ⏳ מסיים תמלול...
-        </p>
-      )}
-    </div>
-  );
-}
-
 // ── Analysis Screen ───────────────────────────────────────────────────────────
 function AnalysisScreen({ feedback, topic, onBack, onHome }) {
   const scoreColor = feedback.overall_score >= 80 ? '#16A34A' : feedback.overall_score >= 60 ? '#D97706' : '#EF4444';
@@ -605,6 +493,7 @@ function SavedChatReview({ messages, topic, savedChat, showTranslation, onReplay
 // ── Main RolePlay Page ───────────────────────────────────────────────────────
 export default function RolePlay() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { state, dispatch } = useApp();
   const { chats, customTopics } = state.rolePlay;
   const { chatDifficulty, showChatTranslation, ttsSpeed } = state.settings;
@@ -619,6 +508,16 @@ export default function RolePlay() {
     setShowTranslation(showChatTranslation);
   }, [showChatTranslation]);
 
+  // Arriving from a "My Plan" module (Progress.jsx) auto-starts its scenario.
+  useEffect(() => {
+    const { autoTopic, planModuleIndex } = location.state || {};
+    if (autoTopic) {
+      setActiveSession({ id: createSessionId(), topic: autoTopic, initialChat: null, planModuleIndex });
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const savedChat = activeSession
     ? chats.find((c) => c.id === activeSession.id)
     : null;
@@ -629,10 +528,17 @@ export default function RolePlay() {
 
   const handleSessionComplete = useCallback((record) => {
     dispatch({ type: 'SAVE_ROLEPLAY_SESSION', payload: record });
-  }, [dispatch]);
+    if (activeSession?.planModuleIndex != null) {
+      dispatch({ type: 'UPDATE_PLAN_PROGRESS', payload: { moduleIndex: activeSession.planModuleIndex } });
+    }
+  }, [dispatch, activeSession]);
 
   const handleFeedbackSaved = useCallback((chatId, feedback) => {
     dispatch({ type: 'UPDATE_ROLEPLAY_FEEDBACK', payload: { chatId, feedback } });
+    const newGaps = [...(feedback.grammar_notes || []), ...(feedback.improvements || [])];
+    if (newGaps.length) {
+      dispatch({ type: 'MERGE_PLACEMENT_GAPS', payload: newGaps });
+    }
   }, [dispatch]);
 
   const {
@@ -644,6 +550,7 @@ export default function RolePlay() {
     savedChat: savedChat || activeSession?.initialChat,
     chatDifficulty,
     ttsSpeed,
+    placement: state.placement,
     onPersist: handlePersist,
     onSessionComplete: handleSessionComplete,
   });
