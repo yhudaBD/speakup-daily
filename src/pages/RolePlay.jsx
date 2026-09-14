@@ -34,6 +34,71 @@ const difficultyStyle = (difficulty) => ({
 });
 
 // ── Custom Topic Form ─────────────────────────────────────────────────────────
+// ── "How do you say...?" helper ─────────────────────────────────────────────
+function HowDoYouSay({ onTranslated, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleTranslate = async () => {
+    if (!text.trim() || loading) return;
+    setLoading(true);
+    const result = await aiService.translateToEnglish(text.trim());
+    setLoading(false);
+    if (result) {
+      onTranslated(result);
+      setText('');
+      setOpen(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        style={{
+          background: 'none', border: 'none', color: '#6C63FF', fontSize: 12,
+          fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', padding: '6px 12px 0',
+          opacity: disabled ? 0.5 : 1, width: '100%', textAlign: 'center',
+        }}
+      >
+        🗣️ איך אומרים...?
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: '0 12px 8px' }}>
+      <input
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleTranslate()}
+        placeholder="כתוב בעברית..."
+        autoFocus
+        disabled={loading}
+        className="mic-bar-input"
+      />
+      <button
+        type="button"
+        onClick={handleTranslate}
+        disabled={loading || !text.trim()}
+        style={{ background: '#6C63FF', color: '#fff', border: 'none', borderRadius: 99, padding: '0 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+      >
+        {loading ? '…' : 'תרגם'}
+      </button>
+      <button
+        type="button"
+        onClick={() => { setOpen(false); setText(''); }}
+        style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: 18, cursor: 'pointer', padding: '0 4px' }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function AddTopicForm({ onAdd, onCancel }) {
   const [emoji, setEmoji] = useState('💬');
   const [title, setTitle] = useState('');
@@ -539,11 +604,14 @@ export default function RolePlay() {
     if (newGaps.length) {
       dispatch({ type: 'MERGE_PLACEMENT_GAPS', payload: newGaps });
     }
+    if (typeof feedback.overall_score === 'number') {
+      dispatch({ type: 'ADJUST_LEVEL', payload: { score: feedback.overall_score } });
+    }
   }, [dispatch]);
 
   const {
     messages, suggestedReplies, phase, turnCount, MAX_TURNS,
-    isSpeaking, handleUserMessage, endConversation, replayMessage,
+    isSpeaking, handleUserMessage, endConversation, replayMessage, logHelpUsed,
   } = useRolePlay({
     topic: activeSession?.topic,
     sessionId: activeSession?.id,
@@ -708,7 +776,7 @@ export default function RolePlay() {
             key={i}
             message={msg}
             topicEmoji={topic.emoji}
-            onReplay={replayMessage}
+            onReplay={(text) => { logHelpUsed(); replayMessage(text); }}
             showTranslation={showTranslation}
             isSpeaking={isSpeaking}
           />
@@ -720,13 +788,17 @@ export default function RolePlay() {
       {phase === 'USER_TURN' && suggestedReplies.length > 0 && (
         <SuggestedReplies
           replies={suggestedReplies}
-          onSelect={handleUserMessage}
+          onSelect={(text) => { logHelpUsed(); handleUserMessage(text); }}
           disabled={phase !== 'USER_TURN'}
           showTranslation={showTranslation}
         />
       )}
 
       <div className="chat-shell-footer">
+        <HowDoYouSay
+          disabled={phase !== 'USER_TURN'}
+          onTranslated={(text) => { logHelpUsed(); setInsertText(text); }}
+        />
         <MicButton
           phase={phase}
           onSpoke={handleUserMessage}

@@ -98,6 +98,21 @@ export default function Progress() {
     ? Math.round(allSentences.reduce((s, x) => s + x.score, 0) / allSentences.length)
     : 0;
 
+  const helpTrend = (() => {
+    const withCounts = allChats
+      .filter(c => typeof c.helpUsedCount === "number")
+      .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+    if (withCounts.length < 2) return null;
+    const avg = (arr) => arr.reduce((s, c) => s + c.helpUsedCount, 0) / arr.length;
+    const overall = avg(withCounts);
+    if (withCounts.length < 6) return { overall, direction: null };
+    const half = Math.floor(withCounts.length / 2);
+    const earlier = avg(withCounts.slice(0, half));
+    const recent = avg(withCounts.slice(-half));
+    const direction = recent < earlier - 0.2 ? "down" : recent > earlier + 0.2 ? "up" : "flat";
+    return { overall, direction };
+  })();
+
   const weakSentences = getWeakSentenceStats(sessions);
   const { level, xpIntoLevel, xpPerLevel } = computeLevel(state);
 
@@ -183,6 +198,20 @@ export default function Progress() {
                 <div className="progress-bar-fill" style={{ width: `${(xpIntoLevel / xpPerLevel) * 100}%` }} />
               </div>
             </div>
+
+            {helpTrend && (
+              <div className="card" style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                  שימוש ממוצע בעזרים לשיחה
+                  {helpTrend.direction === "down" && <span style={{ color: "var(--color-success)", fontWeight: 700 }}> · במגמת ירידה 📉</span>}
+                  {helpTrend.direction === "up" && <span style={{ color: "var(--color-warning)", fontWeight: 700 }}> · במגמת עלייה 📈</span>}
+                </div>
+                <div style={{ fontSize: "1.8rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-primary)" }}>
+                  {helpTrend.overall.toFixed(1)}
+                </div>
+                <div className="text-muted" style={{ fontSize: 12 }}>פחות עזרים = יותר ביטחון עצמי</div>
+              </div>
+            )}
 
             <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="card" style={{ textAlign: "center" }}>

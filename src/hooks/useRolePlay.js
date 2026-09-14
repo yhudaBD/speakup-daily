@@ -24,10 +24,18 @@ export function useRolePlay({
   const phaseRef = useRef('IDLE');
   const initializedRef = useRef(false);
   const sessionSavedRef = useRef(false);
+  const helpUsedCountRef = useRef(0);
 
   const setPhaseSafe = useCallback((next) => {
     phaseRef.current = next;
     setPhase(next);
+  }, []);
+
+  // Called by the UI whenever a help wheel is used (suggested reply, slow
+  // replay, "how do you say?") so Progress.jsx can show the trend of fewer
+  // taps needed over time — a proxy for growing confidence (brief 5.4).
+  const logHelpUsed = useCallback(() => {
+    helpUsedCountRef.current += 1;
   }, []);
 
   const syncToStorage = useCallback((overrides = {}) => {
@@ -62,6 +70,7 @@ export function useRolePlay({
       topicTitle: topic?.title,
       emoji: topic?.emoji,
       turnCount: finalTurnCount,
+      helpUsedCount: helpUsedCountRef.current,
       completedAt: new Date().toISOString(),
     });
   }, [sessionId, topic, onSessionComplete]);
@@ -100,6 +109,7 @@ export function useRolePlay({
     turnCountRef.current = 0;
     setTurnCount(0);
     sessionSavedRef.current = false;
+    helpUsedCountRef.current = 0;
 
     try {
       await aiService.sendMessage({
@@ -249,5 +259,6 @@ export function useRolePlay({
     replayMessage,
     resetConversation,
     resumeConversation,
+    logHelpUsed,
   };
 };

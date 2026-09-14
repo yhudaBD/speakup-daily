@@ -15,6 +15,38 @@ function ensureUser(user) {
   return user;
 }
 
+const CEFR_LEVELS = ["Pre-A1", "A1", "A2", "B1", "B2", "C1"];
+
+// A single strong/weak conversation shouldn't whipsaw the level, but two in a
+// row without a mixed result in between is a real signal — nudge one CEFR
+// step and reset both streaks so the next adjustment needs fresh evidence.
+function adjustLevel(placement, score) {
+  const currentIdx = CEFR_LEVELS.indexOf(placement.overall_level);
+  if (currentIdx === -1) return placement;
+
+  const strong = score >= 85;
+  const weak = score < 45;
+  const highStreak = strong ? (placement.highStreak || 0) + 1 : 0;
+  const lowStreak = weak ? (placement.lowStreak || 0) + 1 : 0;
+
+  let overall_level = placement.overall_level;
+  let resetStreaks = false;
+  if (highStreak >= 2 && currentIdx < CEFR_LEVELS.length - 1) {
+    overall_level = CEFR_LEVELS[currentIdx + 1];
+    resetStreaks = true;
+  } else if (lowStreak >= 2 && currentIdx > 0) {
+    overall_level = CEFR_LEVELS[currentIdx - 1];
+    resetStreaks = true;
+  }
+
+  return {
+    ...placement,
+    overall_level,
+    highStreak: resetStreaks ? 0 : highStreak,
+    lowStreak: resetStreaks ? 0 : lowStreak,
+  };
+}
+
 const defaultSettings = {
   dailyGoal: 5,
   difficulty: "easy",
@@ -230,6 +262,10 @@ function reducer(state, action) {
           },
         },
       };
+    }
+    case "ADJUST_LEVEL": {
+      if (!state.placement) return state;
+      return { ...state, placement: adjustLevel(state.placement, action.payload.score) };
     }
     case "MERGE_PLACEMENT_GAPS": {
       if (!state.placement) return state;

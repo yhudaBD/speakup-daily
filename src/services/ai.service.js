@@ -126,7 +126,7 @@ Be encouraging but specific. Reference actual things the user said.`;
 // retry the exact same request (see MAX_GROQ_ATTEMPTS below) before giving up.
 // tool_use_failed can also be recovered directly from failed_generation
 // without even retrying.
-const RECOVERABLE_ERROR_CODES = new Set(["tool_use_failed", "json_validate_failed", "output_parse_failed"]);
+const RECOVERABLE_ERROR_CODES = new Set(["tool_use_failed", "json_validate_failed", "output_parse_failed", "empty_completion"]);
 
 function recoverFromToolUseFailure(errBody) {
   try {
@@ -163,7 +163,16 @@ async function groqChatOnce({ model, messages, temperature, json }) {
   }
 
   const data = await response.json();
-  return { ok: true, content: data.choices[0].message.content };
+  const choice = data.choices[0];
+  // A reasoning model can burn its entire output budget on its own chain of
+  // thought and hit the token ceiling before ever writing the real answer —
+  // that comes back as a "successful" 200 with empty content. Treat it the
+  // same as the other recoverable formatting failures rather than returning
+  // an empty string to the caller.
+  if (!choice.message.content?.trim() && choice.finish_reason === "length") {
+    return { ok: false, status: 200, errText: JSON.stringify({ error: { code: "empty_completion" } }) };
+  }
+  return { ok: true, content: choice.message.content };
 }
 
 // This model fails JSON-mode validation surprisingly often in practice (observed
@@ -470,5 +479,30 @@ export const aiService = {
       ai_reply_he: parsed.ai_reply_he || "",
       result: complete ? parsed.result || null : null,
     };
+  },
+
+  // "How do you say...?" helper: translate a Hebrew phrase to natural spoken
+  // English without it counting as the user's conversation turn. Plain-text
+  // mode (json: false) — no schema to satisfy, so it's naturally more
+  // reliable than the JSON-mode calls above.
+  async translateToEnglish(hebrewText) {
+    try {
+      const raw = await groqChat({
+        model: CHAT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "Translate the given Hebrew text to natural, casual spoken English. Reply with ONLY the English translation — no quotes, no explanation, no Hebrew.",
+          },
+          { role: "user", content: hebrewText },
+        ],
+        temperature: 0.3,
+        json: false,
+      });
+      return raw.trim();
+    } catch (error) {
+      console.warn("translateToEnglish failed:", error);
+      return "";
+    }
   },
 };
