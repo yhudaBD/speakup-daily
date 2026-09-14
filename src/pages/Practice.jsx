@@ -548,6 +548,7 @@ export default function Practice() {
       topic,
       difficulty: settings.difficulty,
       count: settings.dailyGoal,
+      placement: state.placement,
     });
     setAiTopicLabel(topicEn || topic);
     setSentences(aiSentences);

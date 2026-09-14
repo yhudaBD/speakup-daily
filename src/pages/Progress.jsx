@@ -1,7 +1,19 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
+import { createCustomTopic } from "../data/rolePlayTopics";
+
+const LEVEL_TO_DIFFICULTY = {
+  "Pre-A1": "easy", A1: "easy", A2: "medium", B1: "medium", B2: "advanced", C1: "advanced",
+};
+
+const PLAN_STATUS_LABEL = {
+  not_started: { label: "טרם התחיל", color: "var(--color-text-muted)" },
+  in_progress: { label: "בתהליך", color: "var(--color-warning)" },
+  done: { label: "הושלם", color: "var(--color-success)" },
+};
 
 const ACHIEVEMENTS = [
   { id: "on-fire", icon: "🔥", title: "On Fire", desc: "7 days in a row", check: (state) => state.streak.current >= 7 },
@@ -63,8 +75,22 @@ function TabButton({ label, active, onClick }) {
 
 export default function Progress() {
   const { state } = useApp();
+  const navigate = useNavigate();
   const [tab, setTab] = useState("weekly");
-  const { sessions, streak } = state;
+  const { sessions, streak, placement } = state;
+  const plan = placement?.learning_plan || [];
+
+  const startPlanModule = (module, index) => {
+    const difficulty = LEVEL_TO_DIFFICULTY[placement?.overall_level] || "medium";
+    const topic = createCustomTopic({
+      emoji: "📘",
+      title: module.title_he,
+      description: module.why_he,
+      difficulty,
+      scenario: module.focus_en,
+    });
+    navigate('/roleplay', { state: { autoTopic: topic, planModuleIndex: index } });
+  };
 
   const allSentences = Object.values(sessions).flatMap(s => s.sentences || []);
   const allChats = Object.values(sessions).flatMap(s => s.chats || []);
@@ -94,6 +120,9 @@ export default function Progress() {
           <TabButton label="📆 Weekly" active={tab === "weekly"} onClick={() => setTab("weekly")} />
           <TabButton label="🏆 All Time" active={tab === "alltime"} onClick={() => setTab("alltime")} />
           <TabButton label="🔁 Review" active={tab === "review"} onClick={() => setTab("review")} />
+          {plan.length > 0 && (
+            <TabButton label="🗺️ התוכנית שלי" active={tab === "plan"} onClick={() => setTab("plan")} />
+          )}
         </div>
 
         {/* WEEKLY TAB */}
@@ -241,6 +270,38 @@ export default function Progress() {
                 }
               </div>
             )}
+          </div>
+        )}
+
+        {/* MY PLAN TAB */}
+        {tab === "plan" && (
+          <div style={{ display: "grid", gap: 10 }}>
+            {placement?.summary_he && (
+              <div className="card" style={{ background: "var(--color-primary-light)", textAlign: "right", direction: "rtl" }}>
+                <p style={{ fontSize: 13, color: "var(--color-primary)", margin: 0, lineHeight: 1.6 }}>{placement.summary_he}</p>
+              </div>
+            )}
+            {plan.map((module, i) => {
+              const progress = placement?.planProgress?.[i] || { status: "not_started", sessionsCompleted: 0 };
+              const statusInfo = PLAN_STATUS_LABEL[progress.status];
+              return (
+                <div key={i} className="card" style={{ textAlign: "right", direction: "rtl" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 style={{ fontSize: 15 }}>{i + 1}. {module.title_he}</h3>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
+                  </div>
+                  {module.why_he && (
+                    <p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>{module.why_he}</p>
+                  )}
+                  <button
+                    className="btn btn-primary btn-sm btn-block"
+                    onClick={() => startPlanModule(module, i)}
+                  >
+                    {progress.status === "not_started" ? "🎙️ התחל תרגול" : "🎙️ תרגל שוב"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

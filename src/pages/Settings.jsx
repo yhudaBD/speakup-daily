@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 
 function Toggle({ checked, onChange, id }) {
@@ -32,7 +33,8 @@ function RadioGroup({ options, value, onChange }) {
 
 export default function Settings() {
   const { state, dispatch } = useApp();
-  const { settings, user } = state;
+  const navigate = useNavigate();
+  const { settings, user, placement } = state;
   const [name, setName] = useState(user?.name || "");
   const [saved, setSaved] = useState(false);
 
@@ -76,6 +78,26 @@ export default function Settings() {
                 {saved ? "✅ Saved" : "Save"}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Level */}
+        <div className="card mb-4">
+          <h3 style={{ marginBottom: 16 }}>🧭 Level</h3>
+          <div className="settings-item">
+            <div>
+              <p style={{ fontWeight: 600, marginBottom: 2 }}>
+                {placement ? `רמה נוכחית: ${placement.overall_level}` : "עדיין לא נבדקה רמה"}
+              </p>
+              <p className="text-muted">
+                {placement
+                  ? "בדוק מחדש כל חודש-חודשיים כדי לראות את ההתקדמות שלך"
+                  : "שיחת היכרות קצרה שמתאימה את התרגול בשבילך"}
+              </p>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate("/placement")}>
+              {placement ? "בדוק מחדש" : "התחל"}
+            </button>
           </div>
         </div>
 

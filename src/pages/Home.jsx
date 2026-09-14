@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getGreeting, getTodayString, getLastNDays } from "../utils/dateHelpers";
@@ -39,7 +39,7 @@ function WeeklyChart({ sessions }) {
 export default function Home() {
   const { state } = useApp();
   const navigate = useNavigate();
-  const { settings, streak, sessions, todayProgress, user, practice } = state;
+  const { settings, streak, sessions, todayProgress, user, practice, placement, lifetimeStats, isLoaded } = state;
   const wordBankCount = practice?.wordBank?.length || 0;
   const today = getTodayString();
   const todaySession = sessions[today];
@@ -51,6 +51,18 @@ export default function Home() {
   const weakCount = useMemo(() => Object.keys(getWeakSentenceStats(sessions)).length, [sessions]);
 
   const difficultyLabel = { easy: "🟢 Easy", medium: "🟡 Medium", advanced: "🔴 Advanced" };
+
+  // First-ever launch: send brand-new profiles straight to the placement
+  // conversation, once data has actually finished loading from localStorage
+  // (isLoaded guards against a false "fresh" flash for returning users).
+  useEffect(() => {
+    if (!isLoaded || placement) return;
+    const isFreshProfile = Object.keys(sessions).length === 0
+      && (lifetimeStats?.totalChats || 0) === 0
+      && (lifetimeStats?.totalSentences || 0) === 0;
+    if (isFreshProfile) navigate('/placement');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
 
   return (
     <div className="page-enter" style={{ padding: "20px 0 8px" }}>
@@ -66,6 +78,24 @@ export default function Home() {
             🔥 {streak.current} day streak
           </div>
         </div>
+
+        {!placement && (
+          <div
+            className="card mb-4"
+            onClick={() => navigate('/placement')}
+            style={{
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+              border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-light)',
+            }}
+          >
+            <span style={{ fontSize: 28 }}>🧭</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-primary)' }}>גלה את הרמה שלך</div>
+              <div className="text-muted" style={{ fontSize: 13 }}>שיחה קצרה של 3 דקות שמתאימה את התרגול בשבילך</div>
+            </div>
+            <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>→</span>
+          </div>
+        )}
 
         {/* Today's Mission */}
         <div className="card mb-4">
