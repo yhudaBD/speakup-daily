@@ -2,6 +2,14 @@
 // No secret required to write — these are low-sensitivity usage pings keyed by
 // the caller's local device id, never chat content. Reading them back (get-
 // dashboard-data.js) is what's actually locked down.
+//
+// Written as a v2 function (export default (req, context) =>) rather than the
+// classic v1 handler(event) style used elsewhere in this project: Netlify's
+// automatic Blobs credential injection (getStore() with no explicit siteID/
+// token) only worked reliably in production with the v2 signature during
+// testing - the v1 style hit MissingBlobsEnvironmentError even when getStore()
+// was called inside the handler (not at module scope, which is the usual
+// cause of that error).
 import { getStore } from "@netlify/blobs";
 
 const ALLOWED_TYPES = new Set(["placement_completed", "session_started", "session_ended"]);
@@ -15,24 +23,24 @@ function corsHeaders() {
   };
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: corsHeaders(), body: "" };
+export default async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("", { status: 204, headers: corsHeaders() });
   }
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers: corsHeaders(), body: JSON.stringify({ error: "Method not allowed" }) };
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders() });
   }
 
   let payload;
   try {
-    payload = JSON.parse(event.body || "{}");
+    payload = await req.json();
   } catch {
-    return { statusCode: 400, headers: corsHeaders(), body: JSON.stringify({ error: "Invalid JSON body" }) };
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: corsHeaders() });
   }
 
   const { userId, userName, type, details } = payload;
   if (!userId || !ALLOWED_TYPES.has(type)) {
-    return { statusCode: 400, headers: corsHeaders(), body: JSON.stringify({ error: "Missing userId or unknown type" }) };
+    return new Response(JSON.stringify({ error: "Missing userId or unknown type" }), { status: 400, headers: corsHeaders() });
   }
 
   try {
@@ -45,8 +53,8 @@ export const handler = async (event) => {
       details: details && typeof details === "object" ? details : {},
       ts: new Date().toISOString(),
     });
-    return { statusCode: 200, headers: corsHeaders(), body: JSON.stringify({ ok: true }) };
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders() });
   } catch (error) {
-    return { statusCode: 502, headers: corsHeaders(), body: JSON.stringify({ error: error.message || "Storage error" }) };
+    return new Response(JSON.stringify({ error: error.message || "Storage error" }), { status: 502, headers: corsHeaders() });
   }
 };
