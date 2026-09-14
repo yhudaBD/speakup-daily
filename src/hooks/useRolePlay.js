@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { aiService } from '../services/ai.service';
 import { speakNaturally, getBestEnglishVoice, preloadVoices } from '../utils/speechVoice';
+import { logEvent } from '../utils/analytics';
 
 const MAX_TURNS = 10;
 
@@ -11,6 +12,8 @@ export function useRolePlay({
   chatDifficulty = 'easy',
   ttsSpeed = 1.0,
   placement = null,
+  userId,
+  userName,
   onPersist,
   onSessionComplete,
 }) {
@@ -73,7 +76,15 @@ export function useRolePlay({
       helpUsedCount: helpUsedCountRef.current,
       completedAt: new Date().toISOString(),
     });
-  }, [sessionId, topic, onSessionComplete]);
+    logEvent(userId, userName, 'session_ended', {
+      kind: 'roleplay',
+      topicId: topic?.id,
+      topicTitle: topic?.title,
+      turnCount: finalTurnCount,
+      helpUsedCount: helpUsedCountRef.current,
+      currentLevel: placement?.overall_level || null,
+    });
+  }, [sessionId, topic, onSessionComplete, userId, userName, placement]);
 
   const addMessage = useCallback((role, content, he) => {
     const msg = { role, content, ...(he ? { he } : {}) };
@@ -110,6 +121,11 @@ export function useRolePlay({
     setTurnCount(0);
     sessionSavedRef.current = false;
     helpUsedCountRef.current = 0;
+    logEvent(userId, userName, 'session_started', {
+      kind: 'roleplay',
+      topicId: topic.id,
+      currentLevel: placement?.overall_level || null,
+    });
 
     try {
       await aiService.sendMessage({
@@ -134,7 +150,7 @@ export function useRolePlay({
     }
     setPhaseSafe('USER_TURN');
     syncToStorage({ status: 'active' });
-  }, [topic, chatDifficulty, placement, addMessage, setPhaseSafe, syncToStorage]);
+  }, [topic, chatDifficulty, placement, addMessage, setPhaseSafe, syncToStorage, userId, userName]);
 
   const resumeConversation = useCallback((chat) => {
     if (!chat?.messages?.length) return false;

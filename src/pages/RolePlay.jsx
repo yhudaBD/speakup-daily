@@ -619,6 +619,8 @@ export default function RolePlay() {
     chatDifficulty,
     ttsSpeed,
     placement: state.placement,
+    userId: state.user?.id,
+    userName: state.user?.name,
     onPersist: handlePersist,
     onSessionComplete: handleSessionComplete,
   });
