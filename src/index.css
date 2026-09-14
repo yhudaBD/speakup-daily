@@ -722,7 +722,10 @@ h3 { font-size: clamp(1rem, 3vw, 1.25rem); }
 }
 
 .chart-bar.today { background: linear-gradient(180deg, var(--color-success), #4ade80); }
-.chart-bar.empty { background: var(--color-surface-2); }
+.chart-bar.empty {
+  background: var(--color-surface-2);
+  border: 1.5px dashed var(--color-border);
+}
 
 .chart-label { font-size: 11px; color: var(--color-text-muted); font-weight: 600; }
 .chart-score { font-size: 10px; color: var(--color-text-muted); }

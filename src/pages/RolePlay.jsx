@@ -768,7 +768,7 @@ export default function RolePlay() {
           }} />
         </div>
         <p style={{ fontSize: 11, color: '#6B7280', textAlign: 'right', marginTop: 4, marginBottom: 0 }}>
-          {turnCount}/{MAX_TURNS} תורות
+          <span dir="ltr">{turnCount}/{MAX_TURNS}</span> תורות
         </p>
       </div>
 

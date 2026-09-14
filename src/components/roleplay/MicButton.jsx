@@ -60,6 +60,7 @@ export function MicButton({ phase, onSpoke, insertText, onInsertConsumed }) {
       )}
       <div className="mic-bar-row">
         <input
+          dir="ltr"
           value={displayValue}
           onChange={e => { if (!micBusy) setTextInput(e.target.value); }}
           onKeyDown={e => {

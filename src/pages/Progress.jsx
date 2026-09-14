@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
@@ -76,7 +76,8 @@ function TabButton({ label, active, onClick }) {
 export default function Progress() {
   const { state } = useApp();
   const navigate = useNavigate();
-  const [tab, setTab] = useState("weekly");
+  const location = useLocation();
+  const [tab, setTab] = useState(location.state?.initialTab || "weekly");
   const { sessions, streak, placement } = state;
   const plan = placement?.learning_plan || [];
 
@@ -192,7 +193,7 @@ export default function Progress() {
             <div className="card" style={{ background: "var(--color-primary-light)" }}>
               <div className="flex items-center justify-between mb-2">
                 <h3 style={{ fontSize: 15, color: "var(--color-primary)" }}>⭐ Level {level}</h3>
-                <span className="text-muted" style={{ fontSize: 12 }}>{xpIntoLevel} / {xpPerLevel} XP</span>
+                <span dir="ltr" className="text-muted" style={{ fontSize: 12 }}>{xpIntoLevel} / {xpPerLevel} XP</span>
               </div>
               <div className="progress-bar-track">
                 <div className="progress-bar-fill" style={{ width: `${(xpIntoLevel / xpPerLevel) * 100}%` }} />

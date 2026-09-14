@@ -32,7 +32,7 @@ export function SuggestedReplies({ replies, onSelect, disabled, showTranslation 
               width: '100%',
             }}
           >
-            <span style={{ wordBreak: 'break-word' }}>
+            <span dir="ltr" style={{ wordBreak: 'break-word', textAlign: 'left' }}>
               {textEn}
             </span>
             {showTranslation && textHe && (

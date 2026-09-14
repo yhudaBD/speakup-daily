@@ -14,7 +14,7 @@ export function ConversationBubble({ message, topicEmoji, onReplay, showTranslat
           color: isAI ? '#1E1B4B' : '#ffffff',
         }}
       >
-        <div>{message.content}</div>
+        <div dir="ltr" style={{ textAlign: "left" }}>{message.content}</div>
         {isAI && showTranslation && message.he && (
           <div className="chat-bubble-he">{message.he}</div>
         )}

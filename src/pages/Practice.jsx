@@ -55,9 +55,9 @@ function ScoreDisplay({ score, wordResults }) {
         style={{ "--score-color": bg, "--score-pct": `${score * 3.6}deg` }}
       >
         <span className={`score-number ${colorClass}`}>{score}</span>
-        <span className="score-label" style={{ color: "var(--color-text-muted)" }}>/ 100</span>
+        <span dir="ltr" className="score-label" style={{ color: "var(--color-text-muted)" }}>/ 100</span>
       </div>
-      <p style={{ fontSize: "1.2rem", fontWeight: 800, marginTop: 12, fontFamily: "var(--font-display)" }}>
+      <p dir="ltr" style={{ fontSize: "1.2rem", fontWeight: 800, marginTop: 12, fontFamily: "var(--font-display)", textAlign: "center" }}>
         {label}
       </p>
       <WordHighlight wordResults={wordResults} />
@@ -411,7 +411,7 @@ function SessionSummary({ avg, sessionResults, summary, categoryLabel, canSaveTo
                         </p>
                       )}
                       {v.example && (
-                        <p style={{ fontSize: 13, fontStyle: "italic", margin: "6px 0 0", color: "var(--color-text)" }}>
+                        <p dir="ltr" style={{ fontSize: 13, fontStyle: "italic", margin: "6px 0 0", color: "var(--color-text)", textAlign: "left" }}>
                           "{v.example}"
                         </p>
                       )}
@@ -730,6 +730,7 @@ export default function Practice() {
   }
 
   const progress = Math.round(((currentIdx + (practiceState === "RESULT" ? 1 : 0)) / sentences.length) * 100);
+  const isBriefLoadingState = (practiceState === "RECORDING" && isTranscribing) || practiceState === "ANALYZING";
 
   return (
     <div className="page-enter" style={{ padding: "20px 0 8px" }}>
@@ -764,13 +765,14 @@ export default function Practice() {
             </button>
           </div>
 
-          <p style={{
+          <p dir="ltr" style={{
             fontSize: "clamp(1.2rem, 4vw, 1.6rem)",
             fontFamily: "var(--font-display)",
             fontWeight: 800,
             lineHeight: 1.5,
             marginBottom: 12,
             color: "var(--color-text)",
+            textAlign: "left",
           }}>
             {currentSentence.text}
           </p>
@@ -796,7 +798,7 @@ export default function Practice() {
           )}
         </div>
 
-        <div className="card" style={{ textAlign: "center", minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
+        <div className="card" style={{ textAlign: "center", minHeight: isBriefLoadingState ? 160 : 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
           {practiceState === "IDLE" && (
             <>
               <div style={{ fontSize: 48 }}>🎧</div>
@@ -837,7 +839,7 @@ export default function Practice() {
             <>
               <p style={{ fontWeight: 700, color: "var(--color-error)" }}>מקשיב… נעצר אוטומטית כשאתה מפסיק</p>
               {liveTranscript && (
-                <p style={{ fontSize: "1rem", fontStyle: "italic", color: "var(--color-text-muted)", padding: "0 12px", lineHeight: 1.5 }}>
+                <p dir="ltr" style={{ fontSize: "1rem", fontStyle: "italic", color: "var(--color-text-muted)", padding: "0 12px", lineHeight: 1.5, textAlign: "center" }}>
                   "{liveTranscript}"
                 </p>
               )}
@@ -859,7 +861,7 @@ export default function Practice() {
               <ScoreDisplay score={result.score} wordResults={result.wordResults} />
               {result.spoken && (
                 <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                  שמע: "<em>{result.spoken}</em>"
+                  שמע: "<em dir="ltr">{result.spoken}</em>"
                 </p>
               )}
               <div className="flex gap-3" style={{ width: "100%" }}>

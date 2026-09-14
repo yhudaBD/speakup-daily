@@ -18,7 +18,7 @@ function WeeklyChart({ sessions }) {
           const isToday = day === getTodayString();
           const date = new Date(day);
           const label = dayLabels[date.getDay()];
-          const heightPct = score > 0 ? `${score}%` : "4px";
+          const heightPct = score > 0 ? `${score}%` : "14px";
           return (
             <div key={day} className="chart-bar-wrap">
               <div
@@ -73,8 +73,8 @@ export default function Home() {
           <p style={{ fontSize: 14, opacity: 0.85, marginBottom: 4 }}>
             {difficultyLabel[settings.difficulty]}
           </p>
-          <h1 style={{ color: "#fff", marginBottom: 8 }}>{greeting}</h1>
-          <div className="streak-badge" style={{ display: "inline-flex" }}>
+          <h1 dir="ltr" style={{ color: "#fff", marginBottom: 8, textAlign: "right" }}>{greeting}</h1>
+          <div dir="ltr" className="streak-badge" style={{ display: "inline-flex" }}>
             🔥 {streak.current} day streak
           </div>
         </div>
@@ -101,7 +101,7 @@ export default function Home() {
         <div className="card mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3>🎯 Today's Mission</h3>
-            <span style={{
+            <span dir="ltr" style={{
               fontFamily: "var(--font-display)",
               fontWeight: 800,
               fontSize: "1.1rem",
@@ -116,7 +116,7 @@ export default function Home() {
           {pct >= 100 ? (
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
-              <p style={{ fontWeight: 700, color: "var(--color-success)", marginBottom: 12 }}>
+              <p dir="ltr" style={{ fontWeight: 700, color: "var(--color-success)", marginBottom: 12 }}>
                 Daily goal complete! Average: {todaySession?.averageScore || 0}%
               </p>
               <button className="btn btn-ghost btn-block" onClick={() => navigate("/practice")}>
@@ -176,7 +176,7 @@ export default function Home() {
           }}
         >
           <span style={{ fontSize: 36 }}>💬</span>
-          <div>
+          <div dir="ltr" style={{ textAlign: "left" }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 17, marginBottom: 4 }}>
               Try a Conversation!
             </div>
@@ -210,7 +210,7 @@ export default function Home() {
 
         {/* Quick tip */}
         <div className="card" style={{ background: "var(--color-primary-light)", border: "1.5px solid rgba(108,99,255,0.25)" }}>
-          <p style={{ fontSize: 14, color: "var(--color-primary)", fontWeight: 600 }}>
+          <p dir="ltr" style={{ fontSize: 14, color: "var(--color-primary)", fontWeight: 600, textAlign: "left" }}>
             💡 <strong>Tip:</strong> Listen to the sentence first, then try to match the rhythm and intonation — not just the words!
           </p>
         </div>

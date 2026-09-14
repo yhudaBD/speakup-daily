@@ -46,19 +46,35 @@ function ErrorScreen({ onRetry, onSkip }) {
 }
 
 function DoneScreen({ result, onContinue }) {
+  const plan = result?.learning_plan || [];
   return (
     <div style={{ padding: '32px 20px', maxWidth: 420, margin: '0 auto', textAlign: 'center' }}>
       <div style={{ fontSize: 56, marginBottom: 16 }}>🎉</div>
       <h2 style={{ marginBottom: 12 }}>מעולה, סיימנו!</h2>
       {result?.summary_he && (
-        <div className="card" style={{ textAlign: 'right', direction: 'rtl', marginBottom: 24 }}>
+        <div className="card" style={{ textAlign: 'right', direction: 'rtl', marginBottom: 16 }}>
           <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.6, margin: 0 }}>
             {result.summary_he}
           </p>
         </div>
       )}
+      {plan.length > 0 && (
+        <div className="card" style={{ textAlign: 'right', direction: 'rtl', marginBottom: 24, border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-light)' }}>
+          <h3 style={{ fontSize: 15, marginBottom: 10, color: 'var(--color-primary)' }}>🗺️ בנינו לך תוכנית לימוד אישית</h3>
+          {plan.slice(0, 3).map((step, i) => (
+            <p key={i} style={{ fontSize: 13, color: 'var(--color-text)', margin: '4px 0' }}>
+              {i + 1}. {step.title_he}
+            </p>
+          ))}
+          {plan.length > 3 && (
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
+              ועוד {plan.length - 3} שלבים ב"התוכנית שלי"
+            </p>
+          )}
+        </div>
+      )}
       <button className="btn btn-primary btn-lg btn-block" onClick={onContinue}>
-        בוא נתחיל לתרגל! 🚀
+        {plan.length > 0 ? 'לתוכנית שלי 🗺️' : 'בוא נתחיל לתרגל! 🚀'}
       </button>
     </div>
   );
@@ -97,6 +113,14 @@ export default function PlacementTest() {
     },
   });
 
+  const handleContinueAfterPlacement = () => {
+    if (result?.learning_plan?.length) {
+      navigate('/progress', { state: { initialTab: 'plan' } });
+    } else {
+      navigate('/');
+    }
+  };
+
   useEffect(() => {
     if (phase !== 'IDLE') {
       document.documentElement.classList.add('immersive-chat');
@@ -117,7 +141,7 @@ export default function PlacementTest() {
   }
 
   if (phase === 'DONE') {
-    return <DoneScreen result={result} onContinue={() => navigate('/')} />;
+    return <DoneScreen result={result} onContinue={handleContinueAfterPlacement} />;
   }
 
   return (
