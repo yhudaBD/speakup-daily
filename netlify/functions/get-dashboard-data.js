@@ -3,6 +3,10 @@
 // environment variable, same pattern as GROQ_API_KEY) to match exactly, or it
 // refuses to return anything. If ADMIN_SECRET isn't configured at all, this
 // fails closed (returns 500) rather than silently serving data to anyone.
+//
+// v2 function (export default (req) =>), not the classic handler(event)
+// style — see log-event.js for why: Netlify's automatic Blobs credential
+// injection needed the v2 signature to work in production during testing.
 import { getStore } from "@netlify/blobs";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
@@ -24,27 +28,27 @@ function dateOf(ts) {
   return (ts || "").slice(0, 10);
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: corsHeaders(), body: "" };
+export default async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("", { status: 204, headers: corsHeaders() });
   }
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, headers: corsHeaders(), body: JSON.stringify({ error: "Method not allowed" }) };
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders() });
   }
 
   if (!ADMIN_SECRET) {
-    return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: "Server misconfigured: ADMIN_SECRET is not set" }) };
+    return new Response(JSON.stringify({ error: "Server misconfigured: ADMIN_SECRET is not set" }), { status: 500, headers: corsHeaders() });
   }
 
   let payload;
   try {
-    payload = JSON.parse(event.body || "{}");
+    payload = await req.json();
   } catch {
     payload = {};
   }
-  const providedSecret = event.headers["x-admin-secret"] || payload.secret;
+  const providedSecret = req.headers.get("x-admin-secret") || payload.secret;
   if (providedSecret !== ADMIN_SECRET) {
-    return { statusCode: 401, headers: corsHeaders(), body: JSON.stringify({ error: "Unauthorized" }) };
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders() });
   }
 
   try {
@@ -131,16 +135,12 @@ export const handler = async (event) => {
       .sort((a, b) => b.count - a.count);
     const totalCostUsd = Math.round(users.reduce((s, u) => s + u.estimatedCostUsd, 0) * 10000) / 10000;
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders(),
-      body: JSON.stringify({
-        users: users.sort((a, b) => (b.lastActiveTs || "").localeCompare(a.lastActiveTs || "")),
-        summary: { totalUsers: users.length, weeklyActiveUsers, popularTopics, totalCostUsd },
-        generatedAt: new Date().toISOString(),
-      }),
-    };
+    return new Response(JSON.stringify({
+      users: users.sort((a, b) => (b.lastActiveTs || "").localeCompare(a.lastActiveTs || "")),
+      summary: { totalUsers: users.length, weeklyActiveUsers, popularTopics, totalCostUsd },
+      generatedAt: new Date().toISOString(),
+    }), { status: 200, headers: corsHeaders() });
   } catch (error) {
-    return { statusCode: 502, headers: corsHeaders(), body: JSON.stringify({ error: error.message || "Aggregation error" }) };
+    return new Response(JSON.stringify({ error: error.message || "Aggregation error" }), { status: 502, headers: corsHeaders() });
   }
 };
