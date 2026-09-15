@@ -92,6 +92,7 @@ input, textarea, select {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-top: var(--safe-top);
   padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 12px);
   -webkit-overflow-scrolling: touch;
 }
