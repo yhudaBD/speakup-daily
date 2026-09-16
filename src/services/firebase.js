@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 // Firebase's web config identifies which project to talk to — it is not a
@@ -35,13 +35,28 @@ const googleProvider = new GoogleAuthProvider();
 // Sign-in is now mandatory (AuthGate) and each account's history is mirrored
 // to Firestore (see loadCloudProfile/saveCloudProfile) so it follows the
 // person across devices/browsers instead of staying stuck in one browser's
-// localStorage. The caller still merges the returned profile into the local
-// user record too — see AuthGate.jsx / Settings.jsx.
-export async function signInWithGoogle() {
+// localStorage. Uses a full-page redirect rather than a popup: popups are
+// unreliable on mobile (Safari's cross-site tracking protections in
+// particular can block the popup from ever reporting its result back to the
+// opener tab), which is what a friend hit testing on a phone. AppContext's
+// own onAuthStateChanged listener picks up the signed-in user once Google
+// redirects back — see getGoogleRedirectError below for surfacing failures.
+export function signInWithGoogle() {
   if (!auth) throw new Error("Firebase is not configured (missing VITE_FIREBASE_* env vars)");
-  const result = await signInWithPopup(auth, googleProvider);
-  const { displayName, email, photoURL } = result.user;
-  return { displayName, email, photoURL };
+  return signInWithRedirect(auth, googleProvider);
+}
+
+// Call once on load to surface a redirect sign-in that failed (e.g. the
+// account picker was dismissed) — onAuthStateChanged alone stays silent
+// about *why* no user came back, just that none did.
+export async function getGoogleRedirectError() {
+  if (!auth) return null;
+  try {
+    await getRedirectResult(auth);
+    return null;
+  } catch (err) {
+    return err;
+  }
 }
 
 export function signOutOfGoogle() {

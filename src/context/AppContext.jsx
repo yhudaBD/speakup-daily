@@ -127,6 +127,14 @@ function reducer(state, action) {
   switch (action.type) {
     case "SET_USER":
       return { ...state, user: ensureUser(action.payload) };
+    // Dispatched from AppProvider's onAuthStateChanged listener rather than
+    // from wherever sign-in was triggered — signInWithRedirect navigates
+    // away and back, so nothing at the call site is still around to receive
+    // a result. Reads state.user at reducer time (always current, unlike a
+    // value captured in the effect's closure) so the existing local id and
+    // any other fields survive.
+    case "SET_GOOGLE_PROFILE":
+      return { ...state, user: ensureUser({ ...state.user, ...action.payload }) };
     case "UPDATE_SETTINGS":
       return { ...state, settings: { ...state.settings, ...action.payload } };
     case "SAVE_SESSION_RESULT": {
@@ -400,12 +408,24 @@ export function AppProvider({ children }) {
   // Track the signed-in Firebase account, if any. AuthGate reads authReady
   // (below) from context instead of subscribing to this itself, so there is
   // exactly one source of truth for "is it safe to render the real app yet".
+  // Also the one place that copies the Google profile (name/photo/email)
+  // into local state — fires for every path into a signed-in state (popup,
+  // redirect-then-reload, or an already-persisted session), so it doesn't
+  // matter which one actually signed the person in.
   useEffect(() => {
     if (!auth) {
       setFirebaseUser(null);
       return;
     }
-    return onAuthStateChanged(auth, setFirebaseUser);
+    return onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        dispatch({
+          type: "SET_GOOGLE_PROFILE",
+          payload: { name: user.displayName, email: user.email, photoURL: user.photoURL },
+        });
+      }
+    });
   }, []);
 
   // Load from localStorage on mount
