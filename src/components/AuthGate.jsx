@@ -15,6 +15,15 @@ function describeAuthError(err) {
       return "ההתחברות בוטלה. נסה שוב.";
     case "auth/network-request-failed":
       return "בעיית רשת. בדוק חיבור לאינטרנט ונסה שוב.";
+    case "auth/internal-error": {
+      // internal-error is Firebase's catch-all for an unexpected response
+      // from the server — the useful part (if any) is the raw server reason
+      // Firebase sometimes attaches, not the code itself.
+      const serverReason = err?.customData?._tokenResponse?.error?.message;
+      return serverReason
+        ? `ההתחברות נכשלה (auth/internal-error: ${serverReason}). נסה שוב.`
+        : `ההתחברות נכשלה (auth/internal-error). נסה שוב.`;
+    }
     default:
       if (err?.code) return `ההתחברות נכשלה (${err.code}). נסה שוב.`;
       // No .code at all means this isn't a normal Firebase auth error (those
