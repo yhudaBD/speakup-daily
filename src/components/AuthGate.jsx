@@ -16,7 +16,12 @@ function describeAuthError(err) {
     case "auth/network-request-failed":
       return "בעיית רשת. בדוק חיבור לאינטרנט ונסה שוב.";
     default:
-      return err?.code ? `ההתחברות נכשלה (${err.code}). נסה שוב.` : "ההתחברות נכשלה. נסה שוב.";
+      if (err?.code) return `ההתחברות נכשלה (${err.code}). נסה שוב.`;
+      // No .code at all means this isn't a normal Firebase auth error (those
+      // always carry one) — it's some other exception (e.g. a blocked
+      // request/storage access). Show the raw message so a failure like this
+      // is diagnosable from the screen itself instead of needing devtools.
+      return err?.message ? `ההתחברות נכשלה: ${err.message}` : "ההתחברות נכשלה. נסה שוב.";
   }
 }
 
