@@ -1,5 +1,7 @@
-import { createContext, useContext, useReducer, useEffect } from "react";
+import { createContext, useContext, useReducer, useEffect, useState, useRef } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { getTodayString, daysSince } from "../utils/dateHelpers";
+import { auth, loadCloudProfile, saveCloudProfile } from "../services/firebase";
 
 const STORAGE_KEY = "speakup_data";
 const SCHEMA_VERSION = 1;
@@ -345,15 +347,66 @@ function reducer(state, action) {
           customTopics: (state.practice?.customTopics || []).filter((t) => t.id !== action.payload),
         },
       };
+    // Runs once right after sign-in, when a cloud copy of this account's data
+    // already exists (e.g. signing in on a new device). Sessions merge by
+    // date with this device's local entries winning on an exact-date clash
+    // (nothing just done here gets lost); the rest comes from the cloud,
+    // since it represents the account's real history over time rather than
+    // whatever happens to be in this particular browser right now.
+    case "MERGE_CLOUD_DATA": {
+      const cloud = action.payload;
+      if (!cloud) return state;
+      return {
+        ...state,
+        settings: cloud.settings || state.settings,
+        streak: cloud.streak || state.streak,
+        sessions: { ...(cloud.sessions || {}), ...state.sessions },
+        rolePlay: cloud.rolePlay || state.rolePlay,
+        practice: cloud.practice || state.practice,
+        lifetimeStats: cloud.lifetimeStats || state.lifetimeStats,
+        placement: cloud.placement || state.placement,
+      };
+    }
     default:
       return state;
   }
+}
+
+// The shape persisted to both localStorage and, once signed in, this
+// account's Firestore document — kept as one function so the two never drift.
+function snapshotForSync(state) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    user: state.user,
+    settings: state.settings,
+    streak: state.streak,
+    sessions: pruneOldSessions(state.sessions),
+    rolePlay: state.rolePlay,
+    practice: state.practice,
+    lifetimeStats: state.lifetimeStats,
+    placement: state.placement,
+  };
 }
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // undefined = still checking Firebase; null = confirmed signed out.
+  const [firebaseUser, setFirebaseUser] = useState(undefined);
+  const [synced, setSynced] = useState(false);
+  const mergedForUidRef = useRef(null);
+
+  // Track the signed-in Firebase account, if any. AuthGate reads authReady
+  // (below) from context instead of subscribing to this itself, so there is
+  // exactly one source of truth for "is it safe to render the real app yet".
+  useEffect(() => {
+    if (!auth) {
+      setFirebaseUser(null);
+      return;
+    }
+    return onAuthStateChanged(auth, setFirebaseUser);
+  }, []);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -392,28 +445,57 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Persist to localStorage whenever state changes
+  // Once signed in (and local data has finished loading), pull this
+  // account's cloud copy and merge it in — or seed the cloud with what's
+  // already on this device if this account has never synced before. Runs
+  // once per uid (mergedForUidRef guards re-firing on unrelated re-renders).
+  // AuthGate waits for `synced` before showing the real app, specifically so
+  // Home's "first-ever launch" check never runs against pre-merge, still-empty
+  // local state and wrongly sends a returning user (on a new device) to the
+  // placement flow as if they were brand new.
   useEffect(() => {
+    const uid = firebaseUser?.uid;
+    if (!uid || !state.isLoaded || mergedForUidRef.current === uid) return;
+    mergedForUidRef.current = uid;
+    setSynced(false);
+    (async () => {
+      try {
+        const cloud = await loadCloudProfile(uid);
+        if (cloud) {
+          dispatch({ type: "MERGE_CLOUD_DATA", payload: cloud });
+        } else {
+          await saveCloudProfile(uid, snapshotForSync(state));
+        }
+      } catch (e) {
+        console.error("Cloud sync failed", e);
+      } finally {
+        setSynced(true);
+      }
+    })();
+  }, [firebaseUser, state.isLoaded]);
+
+  // Persist to localStorage whenever state changes, and — once the
+  // one-time merge/seed above has run for this account — mirror the same
+  // snapshot to Firestore so it follows the account across devices.
+  useEffect(() => {
+    const toSave = snapshotForSync(state);
     try {
-      const toSave = {
-        schemaVersion: SCHEMA_VERSION,
-        user: state.user,
-        settings: state.settings,
-        streak: state.streak,
-        sessions: pruneOldSessions(state.sessions),
-        rolePlay: state.rolePlay,
-        practice: state.practice,
-        lifetimeStats: state.lifetimeStats,
-        placement: state.placement,
-      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch (e) {
       console.error("Failed to save data", e);
     }
-  }, [state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
+    const uid = firebaseUser?.uid;
+    if (uid && mergedForUidRef.current === uid) {
+      saveCloudProfile(uid, toSave).catch((e) => console.error("Cloud save failed", e));
+    }
+  }, [firebaseUser, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
+
+  const authReady = firebaseUser === undefined ? "checking"
+    : firebaseUser === null ? "signed-out"
+    : synced ? "ready" : "syncing";
 
   return (
-    <AppContext.Provider value={{ state, dispatch }}>
+    <AppContext.Provider value={{ state, dispatch, firebaseUser, authReady }}>
       {children}
     </AppContext.Provider>
   );

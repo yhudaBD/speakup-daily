@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { AppProvider } from "./context/AppContext";
 import { preloadVoices } from "./utils/speechVoice";
+import AuthGate from "./components/AuthGate";
 import BottomNav from "./components/layout/BottomNav";
 import OfflineBanner from "./components/layout/OfflineBanner";
 import Home from "./pages/Home";
@@ -20,20 +21,22 @@ export default function App() {
   return (
     <AppProvider>
       <BrowserRouter>
-        <div className="app-shell">
-          <OfflineBanner />
-          <BottomNav />
-          <main className="page-content" role="main">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/practice" element={<Practice />} />
-              <Route path="/roleplay" element={<RolePlay />} />
-              <Route path="/progress" element={<Progress />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/placement" element={<PlacementTest />} />
-            </Routes>
-          </main>
-        </div>
+        <AuthGate>
+          <div className="app-shell">
+            <OfflineBanner />
+            <BottomNav />
+            <main className="page-content" role="main">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/practice" element={<Practice />} />
+                <Route path="/roleplay" element={<RolePlay />} />
+                <Route path="/progress" element={<Progress />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/placement" element={<PlacementTest />} />
+              </Routes>
+            </main>
+          </div>
+        </AuthGate>
       </BrowserRouter>
     </AppProvider>
   );
