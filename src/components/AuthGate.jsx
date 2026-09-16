@@ -1,6 +1,24 @@
-import { useState } from "react";
-import { auth, signInWithGoogle } from "../services/firebase";
+import { useState, useEffect } from "react";
+import { auth, signInWithGoogle, getGoogleRedirectError } from "../services/firebase";
 import { useApp } from "../context/AppContext";
+
+// Maps the Firebase error codes actually worth telling apart to a Hebrew
+// message — everything else falls back to the code itself, since "it failed"
+// with no detail is exactly what made the last two reports hard to diagnose.
+function describeAuthError(err) {
+  switch (err?.code) {
+    case "auth/unauthorized-domain":
+      return "הדומיין הזה לא מאושר ב-Firebase (Authentication → Settings → Authorized domains).";
+    case "auth/popup-blocked":
+    case "auth/cancelled-popup-request":
+    case "auth/popup-closed-by-user":
+      return "ההתחברות בוטלה. נסה שוב.";
+    case "auth/network-request-failed":
+      return "בעיית רשת. בדוק חיבור לאינטרנט ונסה שוב.";
+    default:
+      return err?.code ? `ההתחברות נכשלה (${err.code}). נסה שוב.` : "ההתחברות נכשלה. נסה שוב.";
+  }
+}
 
 const LOGO = (
   <svg viewBox="0 0 512 512" fill="none" style={{ width: 88, height: 88 }}>
@@ -30,23 +48,31 @@ function GateScreen({ children }) {
 }
 
 export default function AuthGate({ children }) {
-  const { dispatch, authReady } = useApp();
+  const { authReady } = useApp();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // signInWithRedirect navigates away and back — check once on load whether
+  // that round trip just failed (e.g. the account picker was dismissed).
+  // A successful sign-in needs no handling here: AppContext's own
+  // onAuthStateChanged listener already picks up the new user on its own.
+  useEffect(() => {
+    getGoogleRedirectError().then((err) => {
+      if (err) {
+        console.error("Google sign-in failed:", err);
+        setError(describeAuthError(err));
+      }
+    });
+  }, []);
 
   const handleSignIn = async () => {
     setError("");
     setBusy(true);
     try {
-      const profile = await signInWithGoogle();
-      dispatch({
-        type: "SET_USER",
-        payload: { name: profile.displayName, email: profile.email, photoURL: profile.photoURL },
-      });
+      await signInWithGoogle();
     } catch (err) {
       console.error("Google sign-in failed:", err);
-      setError("ההתחברות עם Google נכשלה. נסה שוב.");
-    } finally {
+      setError(describeAuthError(err));
       setBusy(false);
     }
   };
