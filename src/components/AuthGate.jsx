@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { auth, signInWithGoogle, getGoogleRedirectError } from "../services/firebase";
+import { auth, signInWithGoogle, getGoogleRedirectOutcome } from "../services/firebase";
 import { useApp } from "../context/AppContext";
 
 // Maps the Firebase error codes actually worth telling apart to a Hebrew
@@ -66,15 +66,22 @@ export default function AuthGate({ children }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // signInWithRedirect navigates away and back — check once on load whether
-  // that round trip just failed (e.g. the account picker was dismissed).
-  // A successful sign-in needs no handling here: AppContext's own
-  // onAuthStateChanged listener already picks up the new user on its own.
+  // signInWithRedirect navigates away and back — check once on load how that
+  // round trip went. A successful sign-in needs no handling here: AppContext's
+  // own onAuthStateChanged listener already picks up the new user on its own.
   useEffect(() => {
-    getGoogleRedirectError().then((err) => {
-      if (err) {
-        console.error("Google sign-in failed:", err);
-        setError(describeAuthError(err));
+    getGoogleRedirectOutcome().then((outcome) => {
+      if (!outcome) return;
+      if (outcome.kind === "error") {
+        console.error("Google sign-in failed:", outcome.error);
+        setError(describeAuthError(outcome.error));
+      } else {
+        console.error(
+          "Google sign-in came back with no user and no error — the auth helper " +
+            "under /__/auth/ was probably unreachable. Check the proxy rule in " +
+            "netlify.toml and the service worker's navigateFallbackDenylist.",
+        );
+        setError("ההתחברות לא הושלמה. נסה שוב — אם זה חוזר, רענן את הדף.");
       }
     });
   }, []);

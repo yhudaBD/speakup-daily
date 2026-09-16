@@ -10,6 +10,31 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+# Firebase Auth's redirect flow hands its result back through an iframe at
+# <authDomain>/__/auth/iframe. With authDomain on firebaseapp.com that iframe
+# is cross-origin, so Chrome 115+/Safari 16.1+/Firefox 109+ give it a
+# partitioned storage bucket, it finds no auth event, and getRedirectResult
+# resolves to null with no error — sign-in silently bounces back to the login
+# screen. Proxying /__/auth/* here (status 200 = transparent, NOT a 302) lets
+# authDomain be our own domain, making the whole flow same-origin.
+# See https://firebase.google.com/docs/auth/web/redirect-best-practices.
+# Must stay ahead of the SPA catch-all below: Netlify applies the first match.
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://speakup-daily-88d5a.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
+
+# The auth handler falls back to /__/firebase/init.json for its config. That
+# path 404s on this project (no Firebase Hosting site), which is harmless —
+# but without this rule the SPA catch-all would answer it with index.html,
+# turning a clean 404 into a JSON parse error.
+[[redirects]]
+  from = "/__/firebase/*"
+  to = "https://speakup-daily-88d5a.firebaseapp.com/__/firebase/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -21,7 +46,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://speakup-daily-88d5a.firebaseapp.com; frame-src 'self' https://accounts.google.com https://speakup-daily-88d5a.firebaseapp.com; base-uri 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://speakup-daily-88d5a.firebaseapp.com; frame-src 'self' https://apis.google.com https://accounts.google.com https://speakup-daily-88d5a.firebaseapp.com; base-uri 'self'; frame-ancestors 'none'"
 
 # Always revalidate the service worker itself so updates are picked up promptly.
 [[headers]]

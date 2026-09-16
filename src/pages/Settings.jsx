@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
 import { useApp } from "../context/AppContext";
-import { auth, signInWithGoogle, signOutOfGoogle } from "../services/firebase";
+import { signOutOfGoogle } from "../services/firebase";
 
 function Toggle({ checked, onChange, id }) {
   return (
@@ -34,19 +33,11 @@ function RadioGroup({ options, value, onChange }) {
 }
 
 export default function Settings() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, firebaseUser } = useApp();
   const navigate = useNavigate();
   const { settings, user, placement } = state;
   const [name, setName] = useState(user?.name || "");
   const [saved, setSaved] = useState(false);
-  const [googleUser, setGoogleUser] = useState(null);
-  const [googleError, setGoogleError] = useState("");
-  const [googleBusy, setGoogleBusy] = useState(false);
-
-  useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, setGoogleUser);
-  }, []);
 
   const update = (key, value) => {
     dispatch({ type: "UPDATE_SETTINGS", payload: { [key]: value } });
@@ -56,24 +47,6 @@ export default function Settings() {
     dispatch({ type: "SET_USER", payload: { ...(user || {}), name } });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleGoogleSignIn = async () => {
-    setGoogleError("");
-    setGoogleBusy(true);
-    try {
-      const profile = await signInWithGoogle();
-      dispatch({
-        type: "SET_USER",
-        payload: { ...(user || {}), name: profile.displayName || name, email: profile.email, photoURL: profile.photoURL },
-      });
-      setName(profile.displayName || name);
-    } catch (err) {
-      console.error("Google sign-in failed:", err);
-      setGoogleError("ההתחברות עם Google נכשלה. נסה שוב.");
-    } finally {
-      setGoogleBusy(false);
-    }
   };
 
   const handleGoogleSignOut = async () => {
@@ -112,45 +85,26 @@ export default function Settings() {
             </div>
           </div>
 
-          <div className="settings-item" style={{ borderBottom: "none" }}>
-            {googleUser ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {googleUser.photoURL && (
-                    <img
-                      src={googleUser.photoURL}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      style={{ width: 32, height: 32, borderRadius: "50%" }}
-                    />
-                  )}
-                  <div>
-                    <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>מחובר עם Google</p>
-                    <p className="text-muted" dir="ltr" style={{ fontSize: 12, textAlign: "right" }}>{googleUser.email}</p>
-                  </div>
-                </div>
-                <button className="btn btn-ghost btn-sm" onClick={handleGoogleSignOut}>
-                  התנתק
-                </button>
-              </>
-            ) : (
-              <>
+          {firebaseUser && (
+            <div className="settings-item" style={{ borderBottom: "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {firebaseUser.photoURL && (
+                  <img
+                    src={firebaseUser.photoURL}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    style={{ width: 32, height: 32, borderRadius: "50%" }}
+                  />
+                )}
                 <div>
-                  <p style={{ fontWeight: 600, marginBottom: 2 }}>התחברות עם Google</p>
-                  <p className="text-muted" style={{ fontSize: 13 }}>
-                    {auth ? "לזיהוי מהיר — הנתונים שלך נשארים במכשיר הזה" : (
-                      <>טרם הוגדר Firebase (ראה <span dir="ltr">.env.example</span>)</>
-                    )}
-                  </p>
+                  <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>מחובר עם Google</p>
+                  <p className="text-muted" dir="ltr" style={{ fontSize: 12, textAlign: "right" }}>{firebaseUser.email}</p>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={handleGoogleSignIn} disabled={googleBusy || !auth}>
-                  {googleBusy ? "מתחבר..." : "התחבר"}
-                </button>
-              </>
-            )}
-          </div>
-          {googleError && (
-            <p style={{ color: "var(--color-error)", fontSize: 13, marginTop: 4 }}>{googleError}</p>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={handleGoogleSignOut}>
+                התנתק
+              </button>
+            </div>
           )}
         </div>
 
