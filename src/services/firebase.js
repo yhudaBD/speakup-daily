@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 // Firebase's web config identifies which project to talk to — it is not a
 // secret (unlike GROQ_API_KEY, see PROJECT_OVERVIEW.md §2) and is safe to
@@ -18,10 +19,12 @@ const firebaseConfig = {
 // keeps working, and only the Google sign-in button itself is unavailable.
 let app = null;
 export let auth = null;
+export let db = null;
 try {
   if (firebaseConfig.apiKey) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
+    db = getFirestore(app);
   }
 } catch (err) {
   console.warn("Firebase not configured — Google sign-in is disabled:", err);
@@ -29,9 +32,11 @@ try {
 
 const googleProvider = new GoogleAuthProvider();
 
-// Identify-only sign-in: no Firestore, no server-side session. The caller
-// is responsible for merging the returned profile into the existing local
-// (localStorage) user record — see Settings.jsx.
+// Sign-in is now mandatory (AuthGate) and each account's history is mirrored
+// to Firestore (see loadCloudProfile/saveCloudProfile) so it follows the
+// person across devices/browsers instead of staying stuck in one browser's
+// localStorage. The caller still merges the returned profile into the local
+// user record too — see AuthGate.jsx / Settings.jsx.
 export async function signInWithGoogle() {
   if (!auth) throw new Error("Firebase is not configured (missing VITE_FIREBASE_* env vars)");
   const result = await signInWithPopup(auth, googleProvider);
@@ -42,4 +47,17 @@ export async function signInWithGoogle() {
 export function signOutOfGoogle() {
   if (!auth) return Promise.resolve();
   return signOut(auth);
+}
+
+// One document per account at users/{uid}, mirroring the exact shape already
+// persisted to localStorage (see AppContext.jsx) — no separate schema.
+export async function loadCloudProfile(uid) {
+  if (!db) return null;
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+export function saveCloudProfile(uid, data) {
+  if (!db) return Promise.resolve();
+  return setDoc(doc(db, "users", uid), data, { merge: true });
 }
