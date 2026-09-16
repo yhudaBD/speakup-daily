@@ -41,21 +41,41 @@ const googleProvider = new GoogleAuthProvider();
 // opener tab), which is what a friend hit testing on a phone. AppContext's
 // own onAuthStateChanged listener picks up the signed-in user once Google
 // redirects back — see getGoogleRedirectError below for surfacing failures.
+const REDIRECT_PENDING_KEY = "speakup_google_redirect_pending";
+
 export function signInWithGoogle() {
   if (!auth) throw new Error("Firebase is not configured (missing VITE_FIREBASE_* env vars)");
+  try {
+    sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
+  } catch {
+    // Private mode / storage blocked: we lose the "came back empty" detection
+    // below, but sign-in itself is unaffected, so don't fail the attempt.
+  }
   return signInWithRedirect(auth, googleProvider);
 }
 
-// Call once on load to surface a redirect sign-in that failed (e.g. the
-// account picker was dismissed) — onAuthStateChanged alone stays silent
-// about *why* no user came back, just that none did.
-export async function getGoogleRedirectError() {
+// Call once on load to find out how the redirect round trip went. Returns
+// { kind: "error" } when Firebase reported one, { kind: "empty" } when we came
+// back from Google with neither a user nor an error, or null when there is
+// nothing to report. That middle case is the one worth naming: it is what a
+// blocked cross-origin auth iframe looks like, and treating it the same as
+// "never tried to sign in" is what made this failure invisible.
+export async function getGoogleRedirectOutcome() {
   if (!auth) return null;
+  let wasPending = false;
   try {
-    await getRedirectResult(auth);
-    return null;
+    wasPending = sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
+    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+  } catch {
+    // Same as above — absence of the flag just means we can't tell "empty"
+    // apart from a normal cold load.
+  }
+  try {
+    const credential = await getRedirectResult(auth);
+    if (credential) return null;
+    return wasPending ? { kind: "empty" } : null;
   } catch (err) {
-    return err;
+    return { kind: "error", error: err };
   }
 }
 

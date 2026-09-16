@@ -17,6 +17,12 @@ export default defineConfig({
         // intentionally NOT cached — they should fail fast offline, not serve stale
         // data, and OfflineBanner tells the user why.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        // /__/* is proxied to Firebase (see netlify.toml) so the sign-in flow
+        // is same-origin. Both the auth handler and its relay iframe are
+        // navigation requests, so without this denylist the fallback would
+        // answer them with our cached index.html instead of Firebase's auth
+        // pages — breaking sign-in all over again, and silently.
+        navigateFallbackDenylist: [/^\/__\//],
       },
     }),
   ],
