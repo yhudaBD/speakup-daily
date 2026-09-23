@@ -1,8 +1,10 @@
 # SpeakUp Daily
 
 A daily English speaking-practice app for Hebrew-speaking adults — pronunciation drills,
-AI roleplay conversations, an AI-run placement conversation that builds a personal learning
-plan, and a private usage dashboard for running a friend beta before pricing anything.
+sentence-completion practice, AI roleplay conversations, an AI-run placement conversation
+that builds a personal learning plan (shown as a visual progress path), and a private usage
+dashboard for running a friend beta before pricing anything. Sign-in is with Google, and
+history syncs across devices for the same account.
 
 Live: https://admirable-cassata-5ac5ae.netlify.app
 Dashboard (owner-only, password-gated): `/usage_dashboard.html`
@@ -14,8 +16,9 @@ conversation's system prompt and the Groq reliability quirks it works around.
 ## Stack
 
 React 19 + Vite 8, no backend framework — Netlify Functions for anything that needs a secret
-(Groq API key) or shared storage (Netlify Blobs for usage analytics). State lives in
-`localStorage` per device; there is no login/account system.
+(Groq API key) or shared storage (Netlify Blobs for usage analytics). Auth is Firebase
+(Google sign-in, required); state lives in `localStorage` per device and syncs to Firestore
+per account once signed in.
 
 ## Local development
 
@@ -49,6 +52,16 @@ project is linked to a real Netlify site (`netlify link`, requires login) — ex
 The Netlify site is connected to this repo's `main` branch — every push deploys automatically.
 Required environment variables (Site settings → Environment variables on Netlify, never
 committed to the repo): `GROQ_API_KEY`, `ADMIN_SECRET`.
+
+**Netlify Free build-minute cap**: the account is on Netlify's free tier, capped at 300 build
+minutes/month account-wide (not per site) on a fixed monthly anchor date — not the calendar
+month. Every push to `main` **and every open PR's deploy preview** consumes this same pool.
+When it runs out, builds silently stop (no error — the tell is the latest commit on `main`
+having zero GitHub commit statuses instead of a `netlify/...` context). It resets automatically
+next cycle (check the exact date under Netlify's Team settings → Billing → Usage), but a build
+that was skipped while the quota was exhausted does **not** run automatically once it resets —
+trigger it manually from the Netlify UI ("Trigger deploy") or push again. See
+PROJECT_OVERVIEW.md §9 for the full incident writeup from September 2026.
 
 ## Workflow
 

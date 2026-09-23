@@ -10,7 +10,8 @@
 - **Routing**: `react-router-dom` v7
 - **Bundler / Dev server**: Vite 8 (+ `vite-plugin-pwa` ליצירת ה-Service Worker)
 - **Styling**: Custom CSS (`src/index.css`), CSS variables + media queries (no Tailwind / MUI)
-- **State management**: Custom React Context + `useReducer` (`src/context/AppContext.jsx`), נשמר כולו ב-`localStorage` — **אין חשבון משתמש/אימות, אין סנכרון בין מכשירים**
+- **State management**: Custom React Context + `useReducer` (`src/context/AppContext.jsx`), נשמר תחילה ב-`localStorage` ומסונכרן ל-Firestore לאחר כניסה (ראה למטה)
+- **חשבון/אימות**: כניסה עם Google (Firebase Auth) **חובה** להשתמש באפליקציה (`AuthGate.jsx`) — flow מבוסס redirect (לא popup) כדי לשרוד partitioned storage בדפדפנים מודרניים; `netlify.toml` מפנה `/__/auth/*` ו-`/__/firebase/*` ל-authDomain כדי שכל ה-flow יהיה same-origin. לאחר כניסה, הדאטה המקומי מסונכרן/ממוזג עם עותק בענן לפי `uid` (`MERGE_CLOUD_DATA`, `loadCloudProfile`/`saveCloudProfile` ב-`services/firebase.js`) — כך שהיסטוריה עוברת בין מכשירים לאותו חשבון
 - **Linting**: `oxlint`
 - **Backend**: אין שרת אפליקציה — רק **Netlify Functions** נקודתיות לכל דבר שדורש סוד (מפתח API) או אחסון משותף (Netlify Blobs)
 - **AI**: Groq (chat + Whisper transcription), דרך proxy בצד שרת בלבד — המפתח **לעולם לא** מגיע לדפדפן
@@ -20,7 +21,7 @@
 
 #### package.json (בקצרה)
 
-- **dependencies**: `react`, `react-dom`, `react-router-dom`, `@netlify/blobs`
+- **dependencies**: `react`, `react-dom`, `react-router-dom`, `@netlify/blobs`, `firebase`
 - **devDependencies**: `vite`, `@vitejs/plugin-react`, `vite-plugin-pwa`, `oxlint`, `sharp`, `netlify-cli`
 
 ---
@@ -92,21 +93,24 @@
   - `manifest.json` — הגדרות PWA
   - `usage_dashboard.html` — לוח בקרה פרטי (סיסמה מול `ADMIN_SECRET`), **לא** מקושר מתוך ניווט האפליקציה
 
-- `src/App.jsx` — Router, `BottomNav`, `OfflineBanner`, טעינת כל הדפים כולל `/placement`
+- `src/App.jsx` — Router, `AuthGate`, `BottomNav`, `OfflineBanner`, `UpdateBanner`, טעינת כל הדפים כולל `/placement` ו-`/practice/cloze`
 
 - `src/context/AppContext.jsx` — ראה סעיף 3 למעלה
 
 - `src/pages/`
   - `Home.jsx` — greeting + streak, כרטיס "גלה את הרמה שלך" (אם אין `placement`), Today's Mission, כרטיס נקודות חלשות, כרטיס RolePlay, גרף שבועי, סטטיסטיקות. מפנה אוטומטית ל-`/placement` בפעם הראשונה שהאפליקציה נפתחת (פרופיל ריק לגמרי, אחרי `isLoaded`)
-  - `Practice.jsx` — תרגול הגייה: משפטים סטטיים (`data/sentences.js`, משוקללים לכיוון נקודות חלשות) או נושא AI חופשי (עם הקשר מפרופיל ה-placement), הקלטה, ניקוד, שמירת מילים, ניתוח AI בסוף session
+  - `Practice.jsx` — תרגול הגייה: משפטים סטטיים (`data/sentences.js`, 321 משפטים ב-8 קטגוריות, משוקללים לכיוון נקודות חלשות) או נושא AI חופשי (עם הקשר מפרופיל ה-placement), הקלטה, ניקוד, שמירת מילים, ניתוח AI בסוף session. מספר המשפטים הזמינים בכל קטגוריה **לא** מוצג למשתמש (רק ל-wordbank/weak, ששם המספר משמעותי — התקדמות אישית, לא גודל מאגר תוכן). כולל כפתור כניסה למצב "השלמת משפטים" (`ClozePractice.jsx`)
+  - `ClozePractice.jsx` — מצב תרגול חדש, **ללא AI בכלל**: מחסיר מילת תוכן ממשפט קיים מ-`sentences.js`, בונה 3 מסיחים ממאגר המילים הרחב יותר (כל `sentences.js`), ומציג בחירה מרובה. תוצאות נכתבות דרך אותו `SAVE_SESSION_RESULT` כמו תרגול רגיל — נספר ב-streak/XP/Review בדיוק כמו תרגול הגייה
   - `RolePlay.jsx` — שיחות AI: נושאים מובנים + מותאמים אישית, כפתור **"🗣️ איך אומרים...?"**, הצעות תשובה, השמעה חוזרת, ניתוח שיחה בסוף + auto-leveling
   - `PlacementTest.jsx` — שיחת ההיכרות/קביעת רמה (ראה סעיף 5)
-  - `Progress.jsx` — טאבים: Weekly, All Time (כולל Level/XP, הישגים, מגמת שימוש בעזרים), Review (משפטים חלשים), **"🗺️ התוכנית שלי"** (אם יש `learning_plan`)
+  - `Progress.jsx` — טאבים: Weekly, All Time (כולל Level/XP, הישגים, מגמת שימוש בעזרים), Review (משפטים חלשים), **"🗺️ התוכנית שלי"** (אם יש `learning_plan`) — מוצגת כמסלול ויזואלי אנכי (`components/progress/LearningPath.jsx`) עם עיגולי done/current/upcoming, לא רשימת כרטיסים שטוחה
   - `Settings.jsx` — פרופיל, הגדרות תרגול/צ'אט/תצוגה, **"🧭 Level"** (בדיקת רמה מחדש), Reset
 
 - `src/components/`
-  - `layout/BottomNav.jsx`, `layout/OfflineBanner.jsx`
+  - `layout/BottomNav.jsx`, `layout/OfflineBanner.jsx`, `layout/UpdateBanner.jsx` — מציג באנר "יש גרסה חדשה" כשיש Service Worker חדש ממתין (ראה סעיף 9), מבוסס `virtual:pwa-register/react`
+  - `progress/LearningPath.jsx` — רינדור המסלול הוויזואלי בטאב "התוכנית שלי"; לא state חדש, רק תצוגה אחרת על `placement.learning_plan` + `placement.planProgress` הקיימים
   - `roleplay/ConversationBubble.jsx`, `SuggestedReplies.jsx`, `ThinkingBubble.jsx`, `MicButton.jsx` (משותף גם ל-Placement)
+  - `AuthGate.jsx` — שער כניסה: חוסם את שאר האפליקציה עד שיש משתמש מחובר + סנכרון ענן ראשוני הושלם
 
 - `src/hooks/`
   - `useRolePlay.js` — state machine של הצ'אט, כולל `logHelpUsed()` (מונה שימוש בעזרים לשיחה) ורישום אירועים ל-analytics
@@ -173,9 +177,29 @@ Blobs — קשורים למזהה מכשיר אנונימי (`user.id`), **לא*
 ### 8. מה **לא** נבנה (הוחלט במפורש לדחות)
 
 - ניקוד הגייה פונטי אמיתי (נשאר Levenshtein) — הוחלט פעמיים לא לתעדף
-- חשבונות משתמש / סנכרון בין מכשירים — הכל local-only
 - תשלומים/Stripe — לא הותחל
 - פיצ'רים חברתיים בין חברים — לא בעדיפות
+- הגבלת שימוש בצד שרת (rate limiting/quota per user) על `groq-proxy.js` — עדיין אין; ה-CORS פתוח (`Access-Control-Allow-Origin: "*"`), כך שזו נקודה לטפל בה לפני שיש משתמשים משלמים
 
-לפרטי ההיסטוריה המלאה (מה נבנה בכל שלב, אילו באגים נמצאו ותוקנו, ולמה) — `git log --oneline`
-על `main` הוא המקור הכי מהימן; כל הודעת commit בפרויקט הזה נכתבה כדי לעמוד בפני עצמה.
+(חשבונות משתמש/סנכרון בין מכשירים **כן** נבנו — ראה סעיף 1; זה היה כאן ברשימה בגרסה קודמת של המסמך)
+
+---
+
+### 9. Deploy ותקרת Netlify Free — לקח מהשטח (ספטמבר 2026)
+
+Netlify Free (Starter) מוגבל ל-**300 דקות build בחודש** ברמת כל החשבון (לא לכל site בנפרד), על
+מחזור חודשי שמעוגן לתאריך קבוע (לא לתחילת חודש קלנדרי). כל push ל-`main` **וכל** deploy preview
+של PR צורכים מהמכסה הזו בנפרד — פתיחת כמה PRs ברצף (גם בלי למזג) יכולה לרוקן אותה מהר יותר
+משצפוי.
+
+כשהמכסה נגמרת, Netlify **לא בונה בכלל** ולא מחזיר שגיאה גלויה — הסימן היחיד מבחוץ הוא שלקומיט
+האחרון על `main` אין שום commit status (`GET /repos/.../commits/main/status` מחזיר
+`total_count: 0`), בשונה ממצב תקין שבו תמיד יש context בשם `netlify/<site>/...`.
+
+**אם זה קורה שוב:**
+- זה לא "נגמר לתמיד" — המכסה מתאפסת אוטומטית במחזור הבא (בדוק תאריך מדויק ב-Netlify: Team
+  settings → Billing → Usage).
+- דיפלוי שפוספס **לא** נבנה אוטומטית כשהמכסה מתאפסת — צריך "Trigger deploy" ידני מה-Netlify UI,
+  או push חדש.
+- כדי לצמצם צריכה: לשקול לכבות Deploy Previews (Site configuration → Build & deploy → Deploy
+  contexts) אם בטא/פיתוח כולל הרבה PRs נפתחים/נסגרים בלי להתכוון למזג את כולם.
