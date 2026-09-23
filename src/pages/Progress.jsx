@@ -4,15 +4,10 @@ import { useApp } from "../context/AppContext";
 import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
 import { createCustomTopic } from "../data/rolePlayTopics";
+import LearningPath from "../components/progress/LearningPath";
 
 const LEVEL_TO_DIFFICULTY = {
   "Pre-A1": "easy", A1: "easy", A2: "medium", B1: "medium", B2: "advanced", C1: "advanced",
-};
-
-const PLAN_STATUS_LABEL = {
-  not_started: { label: "טרם התחיל", color: "var(--color-text-muted)" },
-  in_progress: { label: "בתהליך", color: "var(--color-warning)" },
-  done: { label: "הושלם", color: "var(--color-success)" },
 };
 
 const ACHIEVEMENTS = [
@@ -311,27 +306,11 @@ export default function Progress() {
                 <p style={{ fontSize: 13, color: "var(--color-primary)", margin: 0, lineHeight: 1.6 }}>{placement.summary_he}</p>
               </div>
             )}
-            {plan.map((module, i) => {
-              const progress = placement?.planProgress?.[i] || { status: "not_started", sessionsCompleted: 0 };
-              const statusInfo = PLAN_STATUS_LABEL[progress.status];
-              return (
-                <div key={i} className="card" style={{ textAlign: "right", direction: "rtl" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 style={{ fontSize: 15 }}>{i + 1}. {module.title_he}</h3>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: statusInfo.color }}>{statusInfo.label}</span>
-                  </div>
-                  {module.why_he && (
-                    <p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>{module.why_he}</p>
-                  )}
-                  <button
-                    className="btn btn-primary btn-sm btn-block"
-                    onClick={() => startPlanModule(module, i)}
-                  >
-                    {progress.status === "not_started" ? "🎙️ התחל תרגול" : "🎙️ תרגל שוב"}
-                  </button>
-                </div>
-              );
-            })}
+            <LearningPath
+              plan={plan}
+              planProgress={placement?.planProgress}
+              onModuleClick={startPlanModule}
+            />
           </div>
         )}
       </div>
