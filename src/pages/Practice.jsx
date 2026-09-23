@@ -310,13 +310,11 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, 
                   <span style={{ fontSize: 28 }}>{opt.emoji}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>{opt.label}</div>
-                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                      {opt.id === "wordbank"
-                        ? `${opt.count} מילים שמורות`
-                        : opt.id === "weak"
-                          ? `${opt.count} משפטים לחזרה`
-                          : `${opt.count} משפטים זמינים`}
-                    </div>
+                    {(opt.id === "wordbank" || opt.id === "weak") && (
+                      <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        {opt.id === "wordbank" ? `${opt.count} מילים שמורות` : `${opt.count} משפטים לחזרה`}
+                      </div>
+                    )}
                   </div>
                   {isSelected && <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>✓</span>}
                 </button>
