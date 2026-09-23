@@ -7,7 +7,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      // We register the service worker ourselves via the React hook
+      // (UpdateBanner.jsx, virtual:pwa-register/react) so we can show the
+      // user a "new version available" banner instead of silently swapping
+      // the app out from under an open tab — the plugin's auto-injected
+      // register script would double-register alongside it.
+      injectRegister: false,
       // manifest.json is already hand-written and linked in index.html — don't generate a second one.
       manifest: false,
       workbox: {

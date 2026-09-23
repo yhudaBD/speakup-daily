@@ -196,7 +196,7 @@ function AITopicPanel({ difficulty, dailyGoal, onStart, onBack }) {
   );
 }
 
-function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, onStart, onStartAI, onDeleteCustomTopic, onBack }) {
+function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, onStart, onStartAI, onStartCloze, onDeleteCustomTopic, onBack }) {
   const [selected, setSelected] = useState("all");
   const [showAIPanel, setShowAIPanel] = useState(false);
   const excludeIds = [];
@@ -275,6 +275,31 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, 
             <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>כתוב כל נושא וה-AI יייצר משפטים בהתאם</div>
           </div>
           <span style={{ color: "var(--color-primary)", fontSize: 18 }}>➨</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onStartCloze}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "16px",
+            borderRadius: 16,
+            border: "1.5px solid #EEF0FF",
+            background: "#fff",
+            cursor: "pointer",
+            textAlign: "right",
+            width: "100%",
+            marginBottom: 16,
+          }}
+        >
+          <span style={{ fontSize: 28 }}>✍️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>השלמת משפטים</div>
+            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>בחר את המילה החסרה במשפט — בלי הקלטה</div>
+          </div>
+          <span style={{ color: "var(--color-text-muted)", fontSize: 18 }}>➨</span>
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -679,6 +704,7 @@ export default function Practice() {
         customTopics={customTopics}
         onStart={handleStartTopic}
         onStartAI={handleStartAITopic}
+        onStartCloze={() => navigate("/practice/cloze")}
         onDeleteCustomTopic={handleDeleteCustomTopic}
         onBack={() => navigate("/")}
       />

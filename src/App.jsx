@@ -5,8 +5,10 @@ import { preloadVoices } from "./utils/speechVoice";
 import AuthGate from "./components/AuthGate";
 import BottomNav from "./components/layout/BottomNav";
 import OfflineBanner from "./components/layout/OfflineBanner";
+import UpdateBanner from "./components/layout/UpdateBanner";
 import Home from "./pages/Home";
 import Practice from "./pages/Practice";
+import ClozePractice from "./pages/ClozePractice";
 import RolePlay from "./pages/RolePlay";
 import Progress from "./pages/Progress";
 import Settings from "./pages/Settings";
@@ -24,11 +26,13 @@ export default function App() {
         <AuthGate>
           <div className="app-shell">
             <OfflineBanner />
+            <UpdateBanner />
             <BottomNav />
             <main className="page-content" role="main">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/practice" element={<Practice />} />
+                <Route path="/practice/cloze" element={<ClozePractice />} />
                 <Route path="/roleplay" element={<RolePlay />} />
                 <Route path="/progress" element={<Progress />} />
                 <Route path="/settings" element={<Settings />} />
