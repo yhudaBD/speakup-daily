@@ -255,6 +255,156 @@ export const sentences = [
   // ===== HEALTH — ADVANCED =====
   { id: "h013", text: "I've noticed some improvement since starting physical therapy.", translation: "שמתי לב לשיפור מאז שהתחלתי פיזיותרפיה.", category: "health", difficulty: "advanced", phonetic_tips: "'physical therapy' — FIZ-ih-kul THER-ah-pee" },
   { id: "h014", text: "It's important to maintain a balanced lifestyle.", translation: "חשוב לשמור על אורח חיים מאוזן.", category: "health", difficulty: "advanced", phonetic_tips: "'balanced' — BAL-ansd" },
+
+  // ===== MORE WORK — ADVANCED =====
+  { id: "w031", text: "We need to mitigate the risks before moving forward.", translation: "אנחנו צריכים להפחית את הסיכונים לפני שממשיכים.", category: "work", difficulty: "advanced", phonetic_tips: "'mitigate' — MIT-ih-gayt" },
+  { id: "w032", text: "The merger will significantly impact our department.", translation: "המיזוג ישפיע משמעותית על המחלקה שלנו.", category: "work", difficulty: "advanced", phonetic_tips: "'significantly' — sig-NIF-ih-kant-lee" },
+  { id: "w033", text: "Let's align our objectives with the overall strategy.", translation: "בואו ניישר את המטרות שלנו עם האסטרטגיה הכוללת.", category: "work", difficulty: "advanced", phonetic_tips: "'objectives' — ob-JEK-tivz" },
+  { id: "w034", text: "We're restructuring the team to improve efficiency.", translation: "אנחנו מבנים מחדש את הצוות כדי לשפר יעילות.", category: "work", difficulty: "advanced", phonetic_tips: "'restructuring' — ree-STRUK-cher-ing" },
+  { id: "w035", text: "The board approved the budget unanimously.", translation: "הדירקטוריון אישר את התקציב פה אחד.", category: "work", difficulty: "advanced", phonetic_tips: "'unanimously' — yoo-NAN-ih-mus-lee" },
+  { id: "w036", text: "I'd like to delegate this task to someone else.", translation: "אני רוצה להאציל את המשימה הזאת למישהו אחר.", category: "work", difficulty: "advanced", phonetic_tips: "'delegate' — DEL-ih-gayt" },
+
+  // ===== MORE FOOD — EASY =====
+  { id: "f030", text: "Can I get some water, please?", translation: "אפשר לקבל מים, בבקשה?", category: "food", difficulty: "easy", phonetic_tips: "'water' — WAH-ter" },
+  { id: "f031", text: "This tastes really good!", translation: "זה ממש טעים!", category: "food", difficulty: "easy", phonetic_tips: "'tastes' — TAYSTS" },
+  { id: "f032", text: "Do you have a kids' menu?", translation: "יש לכם תפריט ילדים?", category: "food", difficulty: "easy", phonetic_tips: "'menu' — MEN-yoo" },
+  { id: "f033", text: "I'll have the same as him, please.", translation: "אני אקח את אותו דבר כמוהו, בבקשה.", category: "food", difficulty: "easy", phonetic_tips: "'same' — long 'ay'" },
+  { id: "f034", text: "Is the coffee here good?", translation: "הקפה כאן טוב?", category: "food", difficulty: "easy", phonetic_tips: "'coffee' — KAW-fee" },
+  { id: "f035", text: "Can we sit outside?", translation: "אפשר לשבת בחוץ?", category: "food", difficulty: "easy", phonetic_tips: "'outside' — owt-SYD" },
+
+  // ===== MORE FOOD — MEDIUM =====
+  { id: "f017", text: "Could I substitute the fries for a salad?", translation: "אפשר להחליף את הצ'יפס בסלט?", category: "food", difficulty: "medium", phonetic_tips: "'substitute' — SUB-stih-toot" },
+  { id: "f018", text: "Is this dish spicy?", translation: "המנה הזאת חריפה?", category: "food", difficulty: "medium", phonetic_tips: "'spicy' — SPY-see" },
+  { id: "f019", text: "We'd like to order some appetizers first.", translation: "נרצה להזמין כמה מנות ראשונות קודם.", category: "food", difficulty: "medium", phonetic_tips: "'appetizers' — AP-eh-ty-zerz" },
+  { id: "f020", text: "Can you recommend a good wine to go with this?", translation: "אתה יכול להמליץ על יין טוב שמתאים לזה?", category: "food", difficulty: "medium", phonetic_tips: "'recommend' — rek-ah-MEND" },
+  { id: "f021", text: "I'd like it well done, not rare.", translation: "אני רוצה את זה עשוי היטב, לא נא.", category: "food", difficulty: "medium", phonetic_tips: "'well done' — clear stress on 'done'" },
+
+  // ===== FOOD — ADVANCED =====
+  { id: "f022", text: "The chef prepared a tasting menu for special occasions.", translation: "השף הכין תפריט טעימות לאירועים מיוחדים.", category: "food", difficulty: "advanced", phonetic_tips: "'occasions' — oh-KAY-zhunz" },
+  { id: "f023", text: "This restaurant sources its ingredients locally.", translation: "המסעדה הזאת מקבלת את המרכיבים שלה ממקורות מקומיים.", category: "food", difficulty: "advanced", phonetic_tips: "'ingredients' — in-GREE-dee-ents" },
+  { id: "f024", text: "The presentation and flavor complemented each other perfectly.", translation: "ההגשה והטעם השלימו זה את זה בצורה מושלמת.", category: "food", difficulty: "advanced", phonetic_tips: "'complemented' — KOM-pleh-ment-ed" },
+  { id: "f025", text: "We're accommodating a few dietary restrictions tonight.", translation: "אנחנו מתחשבים בכמה הגבלות תזונתיות הערב.", category: "food", difficulty: "advanced", phonetic_tips: "'accommodating' — ah-KOM-oh-day-ting" },
+  { id: "f026", text: "The sommelier suggested a pairing for the main course.", translation: "מומחה היינות הציע שילוב למנה העיקרית.", category: "food", difficulty: "advanced", phonetic_tips: "'sommelier' — som-el-YAY" },
+  { id: "f027", text: "This dish has a rich, complex flavor profile.", translation: "למנה הזאת יש פרופיל טעמים עשיר ומורכב.", category: "food", difficulty: "advanced", phonetic_tips: "'profile' — PROH-fyl" },
+  { id: "f028", text: "Could you tell me about the origin of this dish?", translation: "תוכל לספר לי על מקור המנה הזאת?", category: "food", difficulty: "advanced", phonetic_tips: "'origin' — OR-ih-jin" },
+  { id: "f029", text: "We try to minimize food waste in the kitchen.", translation: "אנחנו משתדלים למזער בזבוז מזון במטבח.", category: "food", difficulty: "advanced", phonetic_tips: "'minimize' — MIN-ih-myz" },
+
+  // ===== MORE SOCIAL — EASY =====
+  { id: "s018", text: "Nice to meet you!", translation: "נעים להכיר!", category: "social", difficulty: "easy", phonetic_tips: "'meet' — long 'ee'" },
+  { id: "s019", text: "Have a great weekend!", translation: "שיהיה לך סוף שבוע נהדר!", category: "social", difficulty: "easy", phonetic_tips: "'weekend' — WEEK-end" },
+  { id: "s020", text: "What have you been up to lately?", translation: "מה שלומך לאחרונה?", category: "social", difficulty: "easy", phonetic_tips: "'lately' — LAYT-lee" },
+  { id: "s021", text: "Let's grab a coffee sometime.", translation: "בואו נשתה קפה מתישהו.", category: "social", difficulty: "easy", phonetic_tips: "'sometime' — SUM-tym" },
+  { id: "s022", text: "I hope you feel better soon.", translation: "אני מקווה שתרגיש טוב יותר בקרוב.", category: "social", difficulty: "easy", phonetic_tips: "'better' — BET-er" },
+  { id: "s023", text: "Take care of yourself.", translation: "תשמור על עצמך.", category: "social", difficulty: "easy", phonetic_tips: "'care' — long 'air'" },
+  { id: "s024", text: "It's been too long since we last talked.", translation: "עבר יותר מדי זמן מאז שדיברנו.", category: "social", difficulty: "easy", phonetic_tips: "'since' — SINS" },
+
+  // ===== MORE SOCIAL — MEDIUM =====
+  { id: "s025", text: "I wanted to check in and see how you're doing.", translation: "רציתי לבדוק מה שלומך.", category: "social", difficulty: "medium", phonetic_tips: "'check in' — smooth phrase" },
+  { id: "s026", text: "Let me know if there's anything I can do.", translation: "תגיד לי אם יש משהו שאני יכול לעשות.", category: "social", difficulty: "medium", phonetic_tips: "'anything' — EN-ee-thing" },
+  { id: "s027", text: "I've been meaning to reach out to you.", translation: "רציתי ליצור איתך קשר כבר זמן מה.", category: "social", difficulty: "medium", phonetic_tips: "'reach out' — REECH owt" },
+  { id: "s028", text: "We should plan something for the holidays.", translation: "כדאי שנתכנן משהו לחגים.", category: "social", difficulty: "medium", phonetic_tips: "'holidays' — HOL-ih-dayz" },
+
+  // ===== SOCIAL — ADVANCED =====
+  { id: "s029", text: "I genuinely value your friendship.", translation: "אני באמת מעריך את החברות שלנו.", category: "social", difficulty: "advanced", phonetic_tips: "'genuinely' — JEN-yoo-in-lee" },
+  { id: "s030", text: "Let's not let this misunderstanding affect our relationship.", translation: "בואו לא ניתן לאי ההבנה הזאת להשפיע על הקשר שלנו.", category: "social", difficulty: "advanced", phonetic_tips: "'relationship' — ree-LAY-shun-ship" },
+  { id: "s031", text: "I appreciate you being so understanding about this.", translation: "אני מעריך שאתה כל כך מבין לגבי זה.", category: "social", difficulty: "advanced", phonetic_tips: "'understanding' — un-der-STAND-ing" },
+  { id: "s032", text: "It means a lot that you showed up for me.", translation: "זה אומר המון שהיית שם בשבילי.", category: "social", difficulty: "advanced", phonetic_tips: "'showed up' — SHOHD up" },
+  { id: "s033", text: "I want to acknowledge how hard this must be for you.", translation: "אני רוצה להכיר בכך שזה בטח קשה בשבילך.", category: "social", difficulty: "advanced", phonetic_tips: "'acknowledge' — ak-NOL-ij" },
+  { id: "s034", text: "Let's have an honest conversation about where we stand.", translation: "בואו נשוחח בכנות על איפה אנחנו עומדים.", category: "social", difficulty: "advanced", phonetic_tips: "'honest' — ON-ist (silent h)" },
+  { id: "s035", text: "I don't want any tension between us.", translation: "אני לא רוצה מתח בינינו.", category: "social", difficulty: "advanced", phonetic_tips: "'tension' — TEN-shun" },
+
+  // ===== MORE TRAVEL — EASY =====
+  { id: "t010", text: "Where can I exchange currency?", translation: "איפה אפשר להחליף מטבע?", category: "travel", difficulty: "easy", phonetic_tips: "'currency' — KUR-en-see" },
+  { id: "t011", text: "How do I get to the city center?", translation: "איך מגיעים למרכז העיר?", category: "travel", difficulty: "easy", phonetic_tips: "'center' — SEN-ter" },
+  { id: "t012", text: "Is breakfast included?", translation: "ארוחת בוקר כלולה?", category: "travel", difficulty: "easy", phonetic_tips: "'included' — in-KLOO-ded" },
+  { id: "t013", text: "Can you call me a taxi?", translation: "תוכל להזמין לי מונית?", category: "travel", difficulty: "easy", phonetic_tips: "'taxi' — TAK-see" },
+  { id: "t014", text: "What time is check-out?", translation: "מה שעת הצ'ק-אאוט?", category: "travel", difficulty: "easy", phonetic_tips: "'check-out' — CHEK owt" },
+  { id: "t015", text: "Do you have a map of the area?", translation: "יש לכם מפה של האזור?", category: "travel", difficulty: "easy", phonetic_tips: "'area' — AIR-ee-ah" },
+  { id: "t016", text: "I'd like to book a room for two nights.", translation: "אני רוצה להזמין חדר לשני לילות.", category: "travel", difficulty: "easy", phonetic_tips: "'book' — long 'oo'" },
+  { id: "t017", text: "Is this seat taken?", translation: "המקום הזה תפוס?", category: "travel", difficulty: "easy", phonetic_tips: "'taken' — TAY-ken" },
+  { id: "t018", text: "Where is passport control?", translation: "איפה ביקורת הדרכונים?", category: "travel", difficulty: "easy", phonetic_tips: "'passport' — PASS-port" },
+
+  // ===== MORE TRAVEL — MEDIUM =====
+  { id: "t019", text: "I need to reschedule my connecting flight.", translation: "אני צריך לתזמן מחדש את טיסת ההמשך שלי.", category: "travel", difficulty: "medium", phonetic_tips: "'connecting' — kah-NEK-ting" },
+  { id: "t020", text: "Could you recommend a good area to stay in?", translation: "אתה יכול להמליץ על אזור טוב להתארח בו?", category: "travel", difficulty: "medium", phonetic_tips: "'recommend' — rek-ah-MEND" },
+  { id: "t021", text: "My luggage didn't arrive with me.", translation: "המזוודה שלי לא הגיעה איתי.", category: "travel", difficulty: "medium", phonetic_tips: "'luggage' — LUG-ij" },
+  { id: "t022", text: "Is there a shuttle to the airport?", translation: "יש הסעה לשדה התעופה?", category: "travel", difficulty: "medium", phonetic_tips: "'shuttle' — SHUT-ul" },
+  { id: "t023", text: "I'd like to upgrade my seat if possible.", translation: "אני רוצה לשדרג את המושב שלי אם אפשר.", category: "travel", difficulty: "medium", phonetic_tips: "'upgrade' — up-GRAYD" },
+  { id: "t024", text: "The tour starts at nine in the lobby.", translation: "הסיור מתחיל בתשע בלובי.", category: "travel", difficulty: "medium", phonetic_tips: "'lobby' — LOB-ee" },
+  { id: "t025", text: "Do I need a visa for this country?", translation: "אני צריך ויזה למדינה הזאת?", category: "travel", difficulty: "medium", phonetic_tips: "'visa' — VEE-zah" },
+  { id: "t026", text: "We got a bit lost trying to find the station.", translation: "קצת הלכנו לאיבוד בניסיון למצוא את התחנה.", category: "travel", difficulty: "medium", phonetic_tips: "'station' — STAY-shun" },
+  { id: "t027", text: "Could you explain how the local transport works?", translation: "תוכל להסביר איך עובדת התחבורה המקומית?", category: "travel", difficulty: "medium", phonetic_tips: "'transport' — TRANS-port" },
+
+  // ===== TRAVEL — ADVANCED =====
+  { id: "t028", text: "We had to navigate a fairly complicated visa process.", translation: "היינו צריכים לנווט תהליך ויזה מסובך למדי.", category: "travel", difficulty: "advanced", phonetic_tips: "'navigate' — NAV-ih-gayt" },
+  { id: "t029", text: "The itinerary includes a full day of sightseeing.", translation: "מסלול הטיול כולל יום שלם של סיורים.", category: "travel", difficulty: "advanced", phonetic_tips: "'itinerary' — eye-TIN-er-air-ee" },
+  { id: "t030", text: "Our flight got rerouted due to bad weather.", translation: "הטיסה שלנו הופנתה מחדש בגלל מזג אוויר גרוע.", category: "travel", difficulty: "advanced", phonetic_tips: "'rerouted' — ree-ROOT-ed" },
+  { id: "t031", text: "I'd like to file a complaint about the delayed baggage.", translation: "אני רוצה להגיש תלונה על המזוודה המעוכבת.", category: "travel", difficulty: "advanced", phonetic_tips: "'complaint' — kom-PLAYNT" },
+  { id: "t032", text: "The customs process took longer than expected.", translation: "תהליך המכס לקח יותר זמן מהצפוי.", category: "travel", difficulty: "advanced", phonetic_tips: "'customs' — KUS-tumz" },
+  { id: "t033", text: "We're trying to immerse ourselves in the local culture.", translation: "אנחנו מנסים להשתקע בתרבות המקומית.", category: "travel", difficulty: "advanced", phonetic_tips: "'immerse' — ih-MERS" },
+  { id: "t034", text: "The layover gave us just enough time to explore.", translation: "העצירה בדרך נתנה לנו בדיוק מספיק זמן לחקור.", category: "travel", difficulty: "advanced", phonetic_tips: "'layover' — LAY-oh-ver" },
+  { id: "t035", text: "This destination is known for being off the beaten path.", translation: "היעד הזה ידוע כלא שגרתי ופחות מתויר.", category: "travel", difficulty: "advanced", phonetic_tips: "'destination' — des-tih-NAY-shun" },
+
+  // ===== MORE SHOPPING — EASY =====
+  { id: "sh008", text: "Where is the fitting room?", translation: "איפה חדר המדידה?", category: "shopping", difficulty: "easy", phonetic_tips: "'fitting' — FIT-ing" },
+  { id: "sh009", text: "Do you have this in a different color?", translation: "יש לכם את זה בצבע אחר?", category: "shopping", difficulty: "easy", phonetic_tips: "'color' — KUL-er" },
+  { id: "sh010", text: "Is this on sale?", translation: "זה במבצע?", category: "shopping", difficulty: "easy", phonetic_tips: "'sale' — long 'ay'" },
+  { id: "sh011", text: "Can you gift wrap this for me?", translation: "תוכל לעטוף את זה כמתנה בשבילי?", category: "shopping", difficulty: "easy", phonetic_tips: "'wrap' — RAP" },
+  { id: "sh012", text: "What's your return policy?", translation: "מה מדיניות ההחזרות שלכם?", category: "shopping", difficulty: "easy", phonetic_tips: "'policy' — POL-ih-see" },
+  { id: "sh013", text: "I'm just browsing, thanks.", translation: "אני רק מסתכל, תודה.", category: "shopping", difficulty: "easy", phonetic_tips: "'browsing' — BROW-zing" },
+  { id: "sh014", text: "Do you take Apple Pay?", translation: "אתם מקבלים Apple Pay?", category: "shopping", difficulty: "easy", phonetic_tips: "'take' — TAYK" },
+  { id: "sh015", text: "Can I get a receipt, please?", translation: "אפשר לקבל קבלה, בבקשה?", category: "shopping", difficulty: "easy", phonetic_tips: "'receipt' — re-SEET (silent p)" },
+  { id: "sh016", text: "Is there a discount for students?", translation: "יש הנחה לסטודנטים?", category: "shopping", difficulty: "easy", phonetic_tips: "'discount' — DIS-kownt" },
+  { id: "sh017", text: "Where can I find the checkout?", translation: "איפה הקופה?", category: "shopping", difficulty: "easy", phonetic_tips: "'checkout' — CHEK-owt" },
+
+  // ===== MORE SHOPPING — MEDIUM =====
+  { id: "sh018", text: "I'm comparing prices before I decide.", translation: "אני משווה מחירים לפני שאני מחליט.", category: "shopping", difficulty: "medium", phonetic_tips: "'comparing' — kom-PAIR-ing" },
+  { id: "sh019", text: "Does this come with a warranty?", translation: "זה מגיע עם אחריות?", category: "shopping", difficulty: "medium", phonetic_tips: "'warranty' — WOR-an-tee" },
+  { id: "sh020", text: "I'd like to exchange this for a different size.", translation: "אני רוצה להחליף את זה במידה אחרת.", category: "shopping", difficulty: "medium", phonetic_tips: "'exchange' — eks-CHAYNJ" },
+  { id: "sh021", text: "Can you hold this item for me until tomorrow?", translation: "תוכל לשמור לי את הפריט הזה עד מחר?", category: "shopping", difficulty: "medium", phonetic_tips: "'hold' — HOHLD" },
+  { id: "sh022", text: "I noticed a defect in this product.", translation: "שמתי לב לפגם במוצר הזה.", category: "shopping", difficulty: "medium", phonetic_tips: "'defect' — DEE-fekt" },
+  { id: "sh023", text: "Do you offer price matching?", translation: "אתם מציעים התאמת מחיר?", category: "shopping", difficulty: "medium", phonetic_tips: "'matching' — MATCH-ing" },
+  { id: "sh024", text: "I'd like to speak to a manager about this.", translation: "אני רוצה לדבר עם מנהל בנוגע לזה.", category: "shopping", difficulty: "medium", phonetic_tips: "'manager' — MAN-ih-jer" },
+  { id: "sh025", text: "Can I pay in installments?", translation: "אני יכול לשלם בתשלומים?", category: "shopping", difficulty: "medium", phonetic_tips: "'installments' — in-STAWL-ments" },
+  { id: "sh026", text: "This item seems overpriced compared to others.", translation: "הפריט הזה נראה יקר מדי בהשוואה לאחרים.", category: "shopping", difficulty: "medium", phonetic_tips: "'overpriced' — OH-ver-pryst" },
+  { id: "sh027", text: "I'd like to track my order status.", translation: "אני רוצה לעקוב אחר סטטוס ההזמנה שלי.", category: "shopping", difficulty: "medium", phonetic_tips: "'track' — TRAK" },
+
+  // ===== SHOPPING — ADVANCED =====
+  { id: "sh028", text: "I'd like to dispute this charge on my card.", translation: "אני רוצה לערער על החיוב הזה בכרטיס שלי.", category: "shopping", difficulty: "advanced", phonetic_tips: "'dispute' — dis-PYOOT" },
+  { id: "sh029", text: "The store's return policy is quite restrictive.", translation: "מדיניות ההחזרות של החנות די מגבילה.", category: "shopping", difficulty: "advanced", phonetic_tips: "'restrictive' — re-STRIK-tiv" },
+  { id: "sh030", text: "We're negotiating a bulk discount for this order.", translation: "אנחנו מנהלים משא ומתן על הנחת כמות להזמנה הזאת.", category: "shopping", difficulty: "advanced", phonetic_tips: "'negotiating' — neh-GOH-shee-ay-ting" },
+  { id: "sh031", text: "This brand has a reputation for quality craftsmanship.", translation: "למותג הזה יש מוניטין של איכות יצור.", category: "shopping", difficulty: "advanced", phonetic_tips: "'craftsmanship' — KRAFTS-man-ship" },
+  { id: "sh032", text: "I'd like clarification on the warranty terms.", translation: "אני רוצה הבהרה לגבי תנאי האחריות.", category: "shopping", difficulty: "advanced", phonetic_tips: "'clarification' — klar-ih-fih-KAY-shun" },
+  { id: "sh033", text: "The store is offering a limited-time promotion.", translation: "החנות מציעה מבצע לזמן מוגבל.", category: "shopping", difficulty: "advanced", phonetic_tips: "'promotion' — proh-MOH-shun" },
+  { id: "sh034", text: "I want to make sure this purchase is worth the investment.", translation: "אני רוצה לוודא שהרכישה הזאת שווה את ההשקעה.", category: "shopping", difficulty: "advanced", phonetic_tips: "'investment' — in-VEST-ment" },
+  { id: "sh035", text: "Could you itemize this receipt for me?", translation: "תוכל לפרט לי את הקבלה הזאת?", category: "shopping", difficulty: "advanced", phonetic_tips: "'itemize' — EYE-tem-yz" },
+
+  // ===== MORE HEALTH — EASY =====
+  { id: "h015", text: "I have a cold today.", translation: "יש לי הצטננות היום.", category: "health", difficulty: "easy", phonetic_tips: "'cold' — long 'oh'" },
+  { id: "h016", text: "I need to book a dentist appointment.", translation: "אני צריך לקבוע תור לרופא שיניים.", category: "health", difficulty: "easy", phonetic_tips: "'dentist' — DEN-tist" },
+  { id: "h017", text: "My back hurts a little.", translation: "הגב שלי כואב קצת.", category: "health", difficulty: "easy", phonetic_tips: "'hurts' — HERTS" },
+  { id: "h018", text: "I take vitamins every morning.", translation: "אני לוקח ויטמינים כל בוקר.", category: "health", difficulty: "easy", phonetic_tips: "'vitamins' — VY-tah-minz" },
+  { id: "h019", text: "Can you recommend a good pharmacy nearby?", translation: "אתה יכול להמליץ על בית מרקחת טוב בסביבה?", category: "health", difficulty: "easy", phonetic_tips: "'pharmacy' — FAR-mah-see" },
+  { id: "h020", text: "I try to get eight hours of sleep.", translation: "אני משתדל לישון שמונה שעות.", category: "health", difficulty: "easy", phonetic_tips: "'hours' — OWERZ" },
+  { id: "h021", text: "I feel much better today.", translation: "אני מרגיש הרבה יותר טוב היום.", category: "health", difficulty: "easy", phonetic_tips: "'better' — BET-er" },
+  { id: "h022", text: "Do I need an appointment or can I walk in?", translation: "אני צריך תור או שאפשר להגיע בלי?", category: "health", difficulty: "easy", phonetic_tips: "'appointment' — ah-POYNT-ment" },
+
+  // ===== MORE HEALTH — MEDIUM =====
+  { id: "h023", text: "I've been having trouble sleeping lately.", translation: "יש לי קושי לישון לאחרונה.", category: "health", difficulty: "medium", phonetic_tips: "'trouble' — TRUB-ul" },
+  { id: "h024", text: "The doctor prescribed antibiotics for the infection.", translation: "הרופא רשם אנטיביוטיקה לזיהום.", category: "health", difficulty: "medium", phonetic_tips: "'prescribed' — pre-SKRYBD" },
+  { id: "h025", text: "I'm trying to cut back on sugar.", translation: "אני מנסה להפחית סוכר.", category: "health", difficulty: "medium", phonetic_tips: "'cut back' — smooth phrase" },
+  { id: "h026", text: "I've been going through a stressful period at work.", translation: "אני עובר תקופה לחוצה בעבודה.", category: "health", difficulty: "medium", phonetic_tips: "'stressful' — STRES-ful" },
+  { id: "h027", text: "My blood pressure has been a bit high recently.", translation: "לחץ הדם שלי היה קצת גבוה לאחרונה.", category: "health", difficulty: "medium", phonetic_tips: "'pressure' — PRESH-er" },
+  { id: "h028", text: "I need a follow-up appointment next month.", translation: "אני צריך תור המשך בחודש הבא.", category: "health", difficulty: "medium", phonetic_tips: "'follow-up' — FOL-oh up" },
+  { id: "h029", text: "I'm recovering well from the surgery.", translation: "אני מחלים היטב מהניתוח.", category: "health", difficulty: "medium", phonetic_tips: "'recovering' — re-KUV-er-ing" },
+
+  // ===== MORE HEALTH — ADVANCED =====
+  { id: "h030", text: "I've been managing a chronic condition for years.", translation: "אני מתמודד עם מצב כרוני כבר שנים.", category: "health", difficulty: "advanced", phonetic_tips: "'chronic' — KRON-ik" },
+  { id: "h031", text: "The specialist recommended a change in medication.", translation: "המומחה המליץ על שינוי בתרופה.", category: "health", difficulty: "advanced", phonetic_tips: "'medication' — med-ih-KAY-shun" },
+  { id: "h032", text: "I'm trying to maintain a consistent exercise routine.", translation: "אני מנסה לשמור על שגרת פעילות גופנית עקבית.", category: "health", difficulty: "advanced", phonetic_tips: "'consistent' — kon-SIS-tent" },
+  { id: "h033", text: "It's important to address symptoms early.", translation: "חשוב לטפל בתסמינים מוקדם.", category: "health", difficulty: "advanced", phonetic_tips: "'symptoms' — SIMP-tumz" },
+  { id: "h034", text: "I underwent a full checkup last week.", translation: "עברתי בדיקה מקיפה בשבוע שעבר.", category: "health", difficulty: "advanced", phonetic_tips: "'underwent' — un-der-WENT" },
+  { id: "h035", text: "The therapy has significantly improved my mobility.", translation: "הטיפול שיפר משמעותית את הניידות שלי.", category: "health", difficulty: "advanced", phonetic_tips: "'mobility' — moh-BIL-ih-tee" },
 ];
 
 export const categories = ["daily", "work", "tech", "food", "social", "travel", "shopping", "health"];
