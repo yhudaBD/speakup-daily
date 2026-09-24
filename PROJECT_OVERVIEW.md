@@ -94,7 +94,7 @@
 - `netlify/functions/`
   - `groq-proxy.js` — כל קריאות ה-AI (chat/translation/analysis/placement/transcription), מפתח מוסתר בצד שרת, דורש משתמש מחובר ומוגבל במכסה יומית
   - `_shared/` — קוד משותף לפונקציות (אימות token, עזרי HTTP, מכסה). זו לא פונקציה בעצמה
-  - `log-event.js` — כתיבת אירועי שימוש אנונימיים (v2, Netlify Blobs)
+  - `log-event.js` — כתיבת אירועי שימוש (v2, Netlify Blobs). דורש משתמש מחובר, ושדות ה-`details` מסוננים ב-`_shared/events.js`
   - `get-dashboard-data.js` — קריאה מוגנת ב-`ADMIN_SECRET`, מרכזת נתונים לדשבורד (v2, Netlify Blobs)
 
 - `public/`

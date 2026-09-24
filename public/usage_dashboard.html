@@ -221,7 +221,7 @@
         <tr class="clickable" onclick="openModal(${i})">
           <td>${escapeHtml(u.userName)}</td>
           <td><div class="grid30">${days.map(d => `<div class="cell${u.activeDates.includes(d) ? ' active' : ''}" title="${d}"></div>`).join('')}</div></td>
-          <td>${u.placementLevel || '—'} → ${u.currentLevel || '—'}</td>
+          <td>${escapeHtml(u.placementLevel || '—')} → ${escapeHtml(u.currentLevel || '—')}</td>
           <td>${u.avgHelpUsed !== null ? u.avgHelpUsed.toFixed(1) : '—'} ${trendBadge(u.helpTrend)}</td>
           <td>$${u.estimatedCostUsd.toFixed(3)}</td>
           <td>${u.daysSinceActive === 0 ? 'היום' : u.daysSinceActive === null ? '—' : `לפני ${u.daysSinceActive} ימים`}</td>
@@ -231,7 +231,7 @@
 
     const topicsList = document.getElementById('topicsList');
     topicsList.innerHTML = data.summary.popularTopics.length
-      ? data.summary.popularTopics.map(t => `<li><span>${escapeHtml(t.topic)}</span><strong>${t.count}</strong></li>`).join('')
+      ? data.summary.popularTopics.map(t => `<li><span>${escapeHtml(t.topic)}</span><strong>${Number(t.count) || 0}</strong></li>`).join('')
       : '<li class="empty" style="border:none;background:none">אין עדיין נתונים</li>';
 
     const inactiveList = document.getElementById('inactiveList');
@@ -245,10 +245,10 @@
     document.getElementById('modalName').textContent = u.userName;
     const topics = Object.entries(u.topicCounts || {}).sort((a, b) => b[1] - a[1]);
     document.getElementById('modalBody').innerHTML = `
-      <p><strong>רמה:</strong> ${u.placementLevel || '—'} ← ${u.currentLevel || '—'}</p>
+      <p><strong>רמה:</strong> ${escapeHtml(u.placementLevel || '—')} ← ${escapeHtml(u.currentLevel || '—')}</p>
       <p><strong>עלות משוערת:</strong> $${u.estimatedCostUsd.toFixed(3)}</p>
       <p><strong>נושאים שתורגלו:</strong></p>
-      <ul class="topics-list">${topics.length ? topics.map(([t, c]) => `<li><span>${escapeHtml(t)}</span><strong>${c}</strong></li>`).join('') : '<li>אין עדיין</li>'}</ul>
+      <ul class="topics-list">${topics.length ? topics.map(([t, c]) => `<li><span>${escapeHtml(t)}</span><strong>${Number(c) || 0}</strong></li>`).join('') : '<li>אין עדיין</li>'}</ul>
     `;
     document.getElementById('userModalBackdrop').hidden = false;
   }
