@@ -54,6 +54,16 @@ Required environment variables (Site settings → Environment variables on Netli
 committed to the repo): `GROQ_API_KEY`, `ADMIN_SECRET`. Optional: `AI_DAILY_LIMIT_PER_USER`
 (AI calls per account per day, default 600).
 
+**Crash reporting (optional)**: render crashes are caught by error boundaries
+(`src/components/ErrorBoundary.jsx`) and go through `src/services/errorReporting.js`, which
+only logs to the console unless the build has `VITE_SENTRY_DSN`. To turn on Sentry:
+1. Set `VITE_SENTRY_DSN` in Netlify's environment variables. It's read at build time, so
+   redeploy after setting it.
+2. Add the project's ingest host (e.g. `https://o123456.ingest.us.sentry.io`) to
+   `connect-src` in the CSP in `netlify.toml`. Otherwise the browser blocks the reports.
+
+Without a DSN the Sentry SDK is compiled out and isn't downloaded at all.
+
 **Firestore security rules** live in `firestore.rules` and are *not* deployed by Netlify. They
 are the only thing keeping one account from reading another's synced history (the Firebase
 web config is public by design). After changing them, deploy with

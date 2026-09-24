@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@netlify/blobs": "^11.0.3",
+    "@sentry/react": "^11.0.0",
     "firebase": "^12.19.0",
     "jose": "^6.2.12",
     "react": "^19.2.7",
@@ -20,9 +21,11 @@
     "react-router-dom": "^7.18.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
     "netlify-cli": "^27.5.2",
     "oxlint": "^1.69.0",
     "sharp": "^0.34.5",
