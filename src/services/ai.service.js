@@ -320,70 +320,47 @@ function buildProfileContext(placement) {
 }
 
 export const aiService = {
+  // Throws when the reply can't be had. useRolePlay shows the failure with
+  // a retry. The canned "I see! Tell me more about that." replies it used to
+  // return made users talk to a fake partner without knowing. A failed
+  // Hebrew translation, on the other hand, doesn't fail the turn: the reply
+  // itself arrived, so it's shown without the Hebrew line.
   async sendMessage({ systemPrompt, messages, chatDifficulty = "easy", placement = null, signal }) {
+    const difficultyExtra = DIFFICULTY_INSTRUCTIONS[chatDifficulty] || "";
+    const profileContext = buildProfileContext(placement);
+    const groqMessages = [
+      { role: "system", content: systemPrompt + "\n" + systemInstruction + difficultyExtra + profileContext },
+      ...messages,
+    ];
+
+    const parsed = await groqChat({
+      model: CHAT_MODEL,
+      messages: groqMessages,
+      temperature: 0.85,
+      schema: chatTurnSchema,
+      signal,
+    });
+
+    const suggestions = chatDifficulty === "hard" ? [] : parsed.suggested_user_responses;
+
+    const toTranslate = [parsed.ai_reply, ...suggestions.map((s) => s.en)];
+    let hebrew = [];
     try {
-      const difficultyExtra = DIFFICULTY_INSTRUCTIONS[chatDifficulty] || "";
-      const profileContext = buildProfileContext(placement);
-      const groqMessages = [
-        { role: "system", content: systemPrompt + "\n" + systemInstruction + difficultyExtra + profileContext },
-        ...messages,
-      ];
-
-      const parsed = await groqChat({
-        model: CHAT_MODEL,
-        messages: groqMessages,
-        temperature: 0.85,
-        schema: chatTurnSchema,
-        signal,
-      });
-
-      const suggestions = chatDifficulty === "hard" ? [] : parsed.suggested_user_responses;
-
-      const toTranslate = [parsed.ai_reply, ...suggestions.map((s) => s.en)].filter(Boolean);
-      const hebrew = toTranslate.length ? await translateToHebrew(toTranslate, { signal }) : [];
-
-      return {
-        ai_reply: parsed.ai_reply,
-        ai_reply_he: hebrew[0] || "",
-        suggested_user_responses: suggestions.map((s, i) => ({
-          en: s.en,
-          he: hebrew[i + 1] || "",
-          hint: s.hint || "",
-        })),
-      };
+      hebrew = await translateToHebrew(toTranslate, { signal });
     } catch (error) {
-      // A cancelled request's caller has moved on; don't answer it at all.
       if (isAbortError(error)) throw error;
-      console.warn("Groq proxy unavailable, using fallback mock response:", error);
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const turnCount = messages.filter((m) => m.role === "user").length;
-
-      let ai_reply = "Hi there! Welcome. How can I help you today?";
-      if (turnCount > 0) {
-        ai_reply = "I see! Tell me more about that.";
-        if (turnCount > 2) {
-          ai_reply = "Interesting! What else would you like to know?";
-        }
-      }
-
-      const mockTranslations = {
-        "Hi there! Welcome. How can I help you today?": "היי! ברוכים הבאים. איך אוכל לעזור?",
-        "I see! Tell me more about that.": "הבנתי! ספרו לי עוד על זה.",
-        "Interesting! What else would you like to know?": "מעניין! מה עוד תרצו לדעת?",
-      };
-
-      return {
-        ai_reply,
-        ai_reply_he: mockTranslations[ai_reply] || "",
-        suggested_user_responses: chatDifficulty === "hard" ? [] : [
-          { en: "I would like to order a coffee, please.", he: "הייתי רוצה להזמין קפה, בבקשה." },
-          { en: "Could you tell me more about the options?", he: "אפשר לשמוע עוד על האפשרויות?" },
-          { en: "Thank you, that is all I need for now.", he: "תודה, זה הכל לעכשיו." },
-        ],
-      };
+      console.warn("Translation failed; showing the reply without Hebrew:", error);
     }
+
+    return {
+      ai_reply: parsed.ai_reply,
+      ai_reply_he: hebrew[0] || "",
+      suggested_user_responses: suggestions.map((s, i) => ({
+        en: s.en,
+        he: hebrew[i + 1] || "",
+        hint: s.hint || "",
+      })),
+    };
   },
 
   async transcribeAudio(blob, mimeType = "audio/webm", { signal } = {}) {

@@ -104,4 +104,38 @@ describe("useRolePlay", () => {
     await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
     expect(aiService.sendMessage).not.toHaveBeenCalled();
   });
+
+  it("shows a failed reply as REPLY_FAILED without inventing a message, and retry fetches it", async () => {
+    aiService.sendMessage.mockResolvedValueOnce(reply("What can I get you?"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    aiService.sendMessage.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await act(async () => { await result.current.handleUserMessage("A coffee please"); });
+
+    expect(result.current.phase).toBe("REPLY_FAILED");
+    expect(result.current.messages.map((m) => m.content)).toEqual(["What can I get you?", "A coffee please"]);
+
+    aiService.sendMessage.mockResolvedValueOnce(reply("Coming right up."));
+    await act(async () => { result.current.retryReply(); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    expect(result.current.messages.at(-1).content).toBe("Coming right up.");
+    expect(aiService.sendMessage.mock.calls.at(-1)[0].messages.at(-1)).toEqual({ role: "user", content: "A coffee please" });
+    error.mockRestore();
+  });
+
+  it("retries a failed opening line", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    aiService.sendMessage.mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null });
+    await waitFor(() => expect(result.current.phase).toBe("REPLY_FAILED"));
+    expect(result.current.messages).toEqual([]);
+
+    aiService.sendMessage.mockResolvedValueOnce(reply("Welcome in!"));
+    await act(async () => { result.current.retryReply(); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    expect(result.current.messages.map((m) => m.content)).toEqual(["Welcome in!"]);
+    error.mockRestore();
+  });
 });

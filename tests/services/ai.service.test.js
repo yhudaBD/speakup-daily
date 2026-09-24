@@ -162,3 +162,36 @@ describe("request timeouts and cancellation", () => {
     }
   });
 });
+
+describe("sendMessage", () => {
+  const args = { systemPrompt: "You are a barista.", messages: [{ role: "user", content: "Hi" }] };
+
+  it("rejects instead of returning a canned reply when the chat call fails", async () => {
+    fetchMock.mockResolvedValue(new Response("upstream down", { status: 502 }));
+    await expect(aiService.sendMessage(args)).rejects.toThrow();
+  });
+
+  it("still returns the reply when only the Hebrew translation fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock
+      .mockResolvedValueOnce(groqReply({ ai_reply: "Hello!", suggested_user_responses: ["Hi there"] }))
+      .mockResolvedValueOnce(new Response("upstream down", { status: 502 }));
+    const out = await aiService.sendMessage(args);
+    expect(out).toEqual({
+      ai_reply: "Hello!",
+      ai_reply_he: "",
+      suggested_user_responses: [{ en: "Hi there", he: "", hint: "" }],
+    });
+    warn.mockRestore();
+  });
+
+  it("lines up translations with the reply and each suggestion", async () => {
+    fetchMock
+      .mockResolvedValueOnce(groqReply({ ai_reply: "Hello!", suggested_user_responses: ["Hi", "Hey"] }))
+      .mockResolvedValueOnce(groqReply({ translations: ["שלום!", "היי", "הי"] }));
+    const out = await aiService.sendMessage(args);
+    expect(out.ai_reply_he).toBe("שלום!");
+    expect(out.suggested_user_responses.map((s) => s.he)).toEqual(["היי", "הי"]);
+  });
+});
+

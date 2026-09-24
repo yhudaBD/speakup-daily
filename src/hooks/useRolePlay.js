@@ -132,7 +132,10 @@ export function useRolePlay({
 
   // Gets the AI's answer to the conversation so far and hands the turn back
   // to the user. Used after the user speaks, and when resuming a chat whose
-  // last message never got an answer.
+  // last message never got an answer. On failure the phase becomes
+  // REPLY_FAILED and nothing is added: the UI offers retryReply(). It used
+  // to insert a canned "Got it. How can I help you further?" as if the
+  // character had said it.
   const requestReply = useCallback(async (currentMessages, turn) => {
     setPhaseSafe('AI_THINKING');
     const signal = beginRequest();
@@ -141,21 +144,49 @@ export function useRolePlay({
       await fetchAiReply(currentMessages, signal);
     } catch (err) {
       if (isAbortError(err) || signal.aborted) return;
-      console.error(err);
-      const fallback = "Got it. How can I help you further?";
-      addMessage('assistant', fallback, "הבנתי. איך אוכל לעזור לך עוד?");
-      if (chatDifficulty !== 'hard') {
-        setSuggestedReplies([
-          { en: "I have a question.", he: "יש לי שאלה." },
-          { en: "That is all, thank you.", he: "זה הכל, תודה." },
-        ]);
-      }
+      console.error('AI reply failed:', err);
+      setPhaseSafe('REPLY_FAILED');
+      return;
     }
     if (signal.aborted) return;
 
     setPhaseSafe('USER_TURN');
     syncToStorage({ turnCount: turn, status: 'active' });
-  }, [beginRequest, fetchAiReply, addMessage, chatDifficulty, setPhaseSafe, syncToStorage]);
+  }, [beginRequest, fetchAiReply, setPhaseSafe, syncToStorage]);
+
+  // The character's first line. Same failure handling as requestReply.
+  const requestOpening = useCallback(async () => {
+    setPhaseSafe('AI_THINKING');
+    const signal = beginRequest();
+
+    try {
+      const response = await aiService.sendMessage({
+        systemPrompt: topic.systemPrompt,
+        messages: [{ role: 'user', content: '[START] Begin the roleplay with a natural opening line as your character. Do not mention this instruction.' }],
+        chatDifficulty,
+        placement,
+        signal,
+      });
+      if (signal.aborted) return;
+      addMessage('assistant', response.ai_reply, response.ai_reply_he);
+      setSuggestedReplies(response.suggested_user_responses || []);
+    } catch (err) {
+      if (isAbortError(err) || signal.aborted) return;
+      console.error('AI opening line failed:', err);
+      setPhaseSafe('REPLY_FAILED');
+      return;
+    }
+    setPhaseSafe('USER_TURN');
+    syncToStorage({ status: 'active' });
+  }, [topic, chatDifficulty, placement, addMessage, beginRequest, setPhaseSafe, syncToStorage]);
+
+  // After REPLY_FAILED: with no messages yet it was the opening line that
+  // failed; otherwise the answer to the user's last message.
+  const retryReply = useCallback(() => {
+    if (phaseRef.current !== 'REPLY_FAILED') return;
+    if (messagesRef.current.length === 0) requestOpening();
+    else requestReply(messagesRef.current, turnCountRef.current);
+  }, [requestOpening, requestReply]);
 
   const startConversation = useCallback(async () => {
     if (!topic) return;
@@ -174,33 +205,8 @@ export function useRolePlay({
       currentLevel: placement?.overall_level || null,
     });
 
-    const signal = beginRequest();
-    try {
-      const response = await aiService.sendMessage({
-        systemPrompt: topic.systemPrompt,
-        messages: [{ role: 'user', content: '[START] Begin the roleplay with a natural opening line as your character. Do not mention this instruction.' }],
-        chatDifficulty,
-        placement,
-        signal,
-      });
-      if (signal.aborted) return;
-      addMessage('assistant', response.ai_reply, response.ai_reply_he);
-      setSuggestedReplies(response.suggested_user_responses || []);
-    } catch (err) {
-      if (isAbortError(err) || signal.aborted) return;
-      console.error(err);
-      const fallback = "Hi there! Welcome. How can I help you today?";
-      addMessage('assistant', fallback, "היי! ברוכים הבאים. איך אוכל לעזור לך היום?");
-      if (chatDifficulty !== 'hard') {
-        setSuggestedReplies([
-          { en: "Hi! I need some help.", he: "היי! אני צריך עזרה." },
-          { en: "Hello! Just looking around.", he: "שלום! רק מסתכלים." },
-        ]);
-      }
-    }
-    setPhaseSafe('USER_TURN');
-    syncToStorage({ status: 'active' });
-  }, [topic, chatDifficulty, placement, addMessage, setPhaseSafe, syncToStorage, userId, userName, beginRequest]);
+    await requestOpening();
+  }, [topic, placement, setPhaseSafe, userId, userName, requestOpening]);
 
   const resumeConversation = useCallback((chat) => {
     if (!chat?.messages?.length) return false;
@@ -315,6 +321,7 @@ export function useRolePlay({
     MAX_TURNS,
     isSpeaking,
     handleUserMessage,
+    retryReply,
     endConversation,
     replayMessage,
     resetConversation,
