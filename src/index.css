@@ -813,6 +813,22 @@ h3 { font-size: clamp(1rem, 3vw, 1.25rem); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== TOP BANNERS (update / offline) ===== */
+/* One fixed stack so the update and offline pills never overlap each other.
+   The stack itself ignores taps; each banner opts back in. */
+.top-banners {
+  position: fixed;
+  top: calc(var(--safe-top) + 8px);
+  left: 0;
+  right: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
 /* ===== TOAST / NOTIFICATION ===== */
 .toast {
   position: fixed;

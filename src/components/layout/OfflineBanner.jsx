@@ -22,11 +22,6 @@ export default function OfflineBanner() {
     <div
       role="status"
       style={{
-        position: "fixed",
-        top: "calc(var(--safe-top) + 8px)",
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 300,
         background: "var(--color-warning)",
         color: "#1E1B4B",
         fontSize: 13,
