@@ -43,9 +43,19 @@ describe("analyzeConversation", () => {
     });
   });
 
-  it("rejects an analysis without a usable score", async () => {
-    fetchMock.mockResolvedValue(groqReply({ summary: "x" }));
-    await expect(aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" })).rejects.toThrow(/incomplete/);
+  it("retries a reply that doesn't fit the schema, then gives up", async () => {
+    fetchMock.mockImplementation(async () => groqReply({ summary: "x" }));
+    await expect(aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" })).rejects.toThrow(/schema_invalid/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("succeeds when a retry returns a valid reply", async () => {
+    fetchMock
+      .mockResolvedValueOnce(groqReply({ summary: "x" }))
+      .mockResolvedValueOnce(groqReply({ overall_score: 70, summary: "טוב" }));
+    const result = await aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" });
+    expect(result.overall_score).toBe(70);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -72,9 +82,9 @@ describe("generatePracticeSentences", () => {
     await expect(aiService.generatePracticeSentences({ topic: "בשדה התעופה" })).rejects.toThrow();
   });
 
-  it("rejects a response with no usable sentences", async () => {
-    fetchMock.mockResolvedValue(groqReply({ topic_en: "Airport", sentences: [{ translation: "x" }] }));
-    await expect(aiService.generatePracticeSentences({ topic: "בשדה התעופה" })).rejects.toThrow(/no practice sentences/);
+  it("rejects a response with no usable sentences after retrying", async () => {
+    fetchMock.mockImplementation(async () => groqReply({ topic_en: "Airport", sentences: [{ translation: "x" }] }));
+    await expect(aiService.generatePracticeSentences({ topic: "בשדה התעופה" })).rejects.toThrow(/no usable sentences/);
   });
 
   it("returns cleaned sentences", async () => {
@@ -84,5 +94,17 @@ describe("generatePracticeSentences", () => {
     expect(sentences).toEqual([{
       id: "ai_001", text: "Where is gate 5?", translation: "איפה שער 5?", category: "ai", difficulty: "easy", phonetic_tips: "",
     }]);
+  });
+});
+
+describe("runPlacementTurn", () => {
+  it("returns a normalized final result", async () => {
+    fetchMock.mockResolvedValue(groqReply({
+      phase: "complete", ai_reply: "Great chat!", ai_reply_he: "",
+      result: { overall_level: "B1 (usually the lower)", learning_plan: [{ title_he: "א", focus_en: "b" }] },
+    }));
+    const turn = await aiService.runPlacementTurn({ messages: [{ role: "user", content: "hi" }] });
+    expect(turn.phase).toBe("complete");
+    expect(turn.result.overall_level).toBe("B1");
   });
 });
