@@ -22,11 +22,14 @@ export default function App() {
 
   return (
     <AppProvider>
+      {/* Outside AuthGate so a stale sign-in screen can be updated too. */}
+      <div className="top-banners">
+        <UpdateBanner />
+        <OfflineBanner />
+      </div>
       <BrowserRouter>
         <AuthGate>
           <div className="app-shell">
-            <OfflineBanner />
-            <UpdateBanner />
             <BottomNav />
             <main className="page-content" role="main">
               <Routes>
