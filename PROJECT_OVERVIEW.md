@@ -67,6 +67,9 @@
 
 בהתנתקות (`signOutAndClear`) הנתונים נשמרים לענן פעם אחרונה, ואז נמחקים מה-`localStorage`. אם השמירה לענן לא אושרה, הם נשארים במכשיר.
 
+**מחיקת חשבון** (`deleteAccountData`, מ-Settings): מוחקת את `users/{uid}` ב-Firestore, את ה-`localStorage` ואת רשומת ה-Auth, ואז טוענת מחדש את האפליקציה.
+אירועי האנליטיקה ב-Netlify Blobs **לא** נמחקים.
+
 ```
 {
   isLoaded,       // true רק אחרי שהטעינה מ-localStorage הסתיימה (מונע "פרופיל טרי" מדומה)
