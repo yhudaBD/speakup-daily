@@ -55,13 +55,22 @@
 
 ---
 
-### 3. State מרכזי — `AppContext.jsx`
+### 3. State מרכזי — `AppContext.jsx` + `appState.js`
 
-נשמר תחת מפתח `speakup_data` ב-`localStorage`, עם `schemaVersion` לצורך מיגרציות עתידיות.
+ה-reducer, צורת ה-state והפונקציות הטהורות נמצאים ב-`src/context/appState.js` (ויש להם טסטים ב-`tests/state/`).
+`AppContext.jsx` מטפל רק ב-side effects: localStorage, סנכרון Firestore והזדהות.
+ה-state נשמר תחת מפתח `speakup_data` ב-`localStorage`, עם `schemaVersion` לצורך מיגרציות עתידיות.
+
+**בידוד בין חשבונות:** `ownerUid` מסמן לאיזה חשבון Firebase שייכים הנתונים שבמכשיר. בהתחברות:
+- אם הנתונים שייכים לחשבון אחר, הם מוחלפים בפרופיל חדש (`RESET_FOR_ACCOUNT`) ולא ממוזגים לענן.
+- אם לנתונים אין בעלים (נשמרו לפני שהשדה נוסף), הם משויכים לחשבון הראשון שמתחבר (`CLAIM_LOCAL_DATA`).
+
+בהתנתקות (`signOutAndClear`) הנתונים נשמרים לענן פעם אחרונה, ואז נמחקים מה-`localStorage`. אם השמירה לענן לא אושרה, הם נשארים במכשיר.
 
 ```
 {
   isLoaded,       // true רק אחרי שהטעינה מ-localStorage הסתיימה (מונע "פרופיל טרי" מדומה)
+  ownerUid,       // uid של חשבון Firebase שהנתונים שייכים לו (null = עוד לא שויכו)
   user: { id, name },
   settings: { dailyGoal, difficulty, ttsSpeed, showTranslation, chatDifficulty, showChatTranslation },
   streak: { current, longest, lastPracticeDate },
@@ -85,7 +94,8 @@
 `SAVE_ROLEPLAY_SESSION`, `UPDATE_ROLEPLAY_FEEDBACK`, `LOAD_DATA`, `UPSERT_ROLEPLAY_CHAT`,
 `DELETE_ROLEPLAY_CHAT`, `ADD_CUSTOM_TOPIC`/`DELETE_CUSTOM_TOPIC`,
 `ADD_PRACTICE_WORDS`/`REMOVE_WORD_FROM_BANK`, `ADD_CUSTOM_PRACTICE_TOPIC`/`DELETE_CUSTOM_PRACTICE_TOPIC`,
-`SET_PLACEMENT_RESULT`, `UPDATE_PLAN_PROGRESS`, `MERGE_PLACEMENT_GAPS`, `ADJUST_LEVEL`.
+`SET_PLACEMENT_RESULT`, `UPDATE_PLAN_PROGRESS`, `MERGE_PLACEMENT_GAPS`, `ADJUST_LEVEL`,
+`MERGE_CLOUD_DATA`, `CLAIM_LOCAL_DATA`, `RESET_FOR_ACCOUNT`.
 
 ---
 

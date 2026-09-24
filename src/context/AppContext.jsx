@@ -1,8 +1,11 @@
-import { createContext, useContext, useReducer, useEffect, useState, useRef } from "react";
+import { createContext, useCallback, useContext, useReducer, useEffect, useState, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { STORAGE_KEY, SCHEMA_VERSION, ensureUser, pruneOldSessions, computeLifetimeStats, defaultLifetimeStats, initialState, reducer, snapshotForSync } from "./appState";
+import {
+  STORAGE_KEY, SCHEMA_VERSION, ensureUser, pruneOldSessions, computeLifetimeStats, defaultLifetimeStats,
+  initialState, reducer, snapshotForSync, localDataOwnership, freshStateFor,
+} from "./appState";
 import { getTodayString } from "../utils/dateHelpers";
-import { auth, loadCloudProfile, saveCloudProfile } from "../services/firebase";
+import { auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle } from "../services/firebase";
 
 const AppContext = createContext(null);
 
@@ -18,6 +21,9 @@ export function AppProvider({ children }) {
   // state over the account's cloud copy before it had even been read.
   const mergedForUidRef = useRef(null);
   const cloudReadyUidRef = useRef(null);
+  // Set while signing out, so the persist effect can't write this account's
+  // state back into localStorage after it has been cleared.
+  const persistBlockedRef = useRef(false);
 
   // Track the signed-in Firebase account, if any. AuthGate reads authReady
   // (below) from context instead of subscribing to this itself, so there is
@@ -87,18 +93,39 @@ export function AppProvider({ children }) {
   // Home's "first-ever launch" check never runs against pre-merge, still-empty
   // local state and wrongly sends a returning user (on a new device) to the
   // placement flow as if they were brand new.
+  //
+  // Before any of that, check whose data this device is holding. If it
+  // belongs to a different account (a shared browser), it's replaced with a
+  // fresh profile instead of being merged into, or seeded as, this account's
+  // history. Data nobody has claimed yet (saved before ownerUid existed)
+  // goes to the first account that signs in, as it always has.
   useEffect(() => {
     const uid = firebaseUser?.uid;
     if (!uid || !state.isLoaded || mergedForUidRef.current === uid) return;
     mergedForUidRef.current = uid;
     setSynced(false);
+
+    let local = state;
+    const ownership = localDataOwnership(state.ownerUid, uid);
+    if (ownership === "foreign") {
+      local = freshStateFor(uid, {
+        name: firebaseUser.displayName,
+        email: firebaseUser.email,
+        photoURL: firebaseUser.photoURL,
+      });
+      dispatch({ type: "RESET_FOR_ACCOUNT", payload: local });
+    } else if (ownership === "unclaimed") {
+      local = { ...state, ownerUid: uid };
+      dispatch({ type: "CLAIM_LOCAL_DATA", payload: { uid } });
+    }
+
     (async () => {
       try {
         const cloud = await loadCloudProfile(uid);
         if (cloud) {
           dispatch({ type: "MERGE_CLOUD_DATA", payload: cloud });
         } else {
-          await saveCloudProfile(uid, snapshotForSync(state));
+          await saveCloudProfile(uid, snapshotForSync(local));
         }
         // Set before the MERGE_CLOUD_DATA re-render commits, so that render's
         // persist effect writes the merged result back to the cloud.
@@ -119,7 +146,7 @@ export function AppProvider({ children }) {
   useEffect(() => {
     // Before LOAD_DATA this is initialState — saving it would blank out the
     // stored history if the page died before the load re-render.
-    if (!state.isLoaded) return;
+    if (!state.isLoaded || persistBlockedRef.current) return;
     const toSave = snapshotForSync(state);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -130,14 +157,48 @@ export function AppProvider({ children }) {
     if (uid && cloudReadyUidRef.current === uid) {
       saveCloudProfile(uid, toSave).catch((e) => console.error("Cloud save failed", e));
     }
-  }, [firebaseUser, state.isLoaded, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
+  }, [firebaseUser, state.isLoaded, state.ownerUid, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
+
+  // Signing out also removes this account's data from the device, so the
+  // next person to use this browser can't see it. That's only safe once
+  // it's confirmed in the cloud: if this session never finished syncing,
+  // or the final save fails, the local copy is kept. ownerUid still keeps
+  // it out of any other account.
+  const signOutAndClear = useCallback(async () => {
+    const uid = firebaseUser?.uid;
+    let savedToCloud = false;
+    if (uid && cloudReadyUidRef.current === uid) {
+      try {
+        await saveCloudProfile(uid, snapshotForSync(state));
+        savedToCloud = true;
+      } catch (e) {
+        console.error("Final cloud save before sign-out failed; keeping local data", e);
+      }
+    }
+    persistBlockedRef.current = true;
+    try {
+      await signOutOfGoogle();
+    } catch (e) {
+      persistBlockedRef.current = false;
+      throw e;
+    }
+    if (savedToCloud) {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Storage blocked: nothing we can clear anyway.
+      }
+    }
+    // A full reload drops every trace of this account from memory too.
+    window.location.replace("/");
+  }, [firebaseUser, state]);
 
   const authReady = firebaseUser === undefined ? "checking"
     : firebaseUser === null ? "signed-out"
     : synced ? "ready" : "syncing";
 
   return (
-    <AppContext.Provider value={{ state, dispatch, firebaseUser, authReady }}>
+    <AppContext.Provider value={{ state, dispatch, firebaseUser, authReady, signOutAndClear }}>
       {children}
     </AppContext.Provider>
   );

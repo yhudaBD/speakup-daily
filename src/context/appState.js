@@ -121,6 +121,9 @@ export const initialState = {
   },
   lifetimeStats: { ...defaultLifetimeStats },
   placement: null,
+  // Firebase uid of the account this device's saved data belongs to. See
+  // localDataOwnership() below.
+  ownerUid: null,
   isLoaded: false,
 };
 
@@ -136,6 +139,15 @@ export function reducer(state, action) {
     // any other fields survive.
     case "SET_GOOGLE_PROFILE":
       return { ...state, user: ensureUser({ ...state.user, ...action.payload }) };
+    // Signing in with saved data that no account has claimed yet (saved
+    // before ownerUid existed, or on a device where nobody has signed in).
+    case "CLAIM_LOCAL_DATA":
+      return { ...state, ownerUid: action.payload.uid };
+    // Signing in on a device whose saved data belongs to a different
+    // account. The payload is a whole fresh state from freshStateFor(),
+    // built outside the reducer so its new user id is generated once.
+    case "RESET_FOR_ACCOUNT":
+      return action.payload;
     case "UPDATE_SETTINGS":
       return { ...state, settings: { ...state.settings, ...action.payload } };
     case "SAVE_SESSION_RESULT": {
@@ -386,6 +398,7 @@ export function reducer(state, action) {
 export function snapshotForSync(state) {
   return {
     schemaVersion: SCHEMA_VERSION,
+    ownerUid: state.ownerUid ?? null,
     user: state.user,
     settings: state.settings,
     streak: state.streak,
@@ -394,5 +407,30 @@ export function snapshotForSync(state) {
     practice: state.practice,
     lifetimeStats: state.lifetimeStats,
     placement: state.placement,
+  };
+}
+
+// Whose data is sitting in this browser, relative to the account that just
+// signed in. "foreign" data must never be merged into, or seeded as, this
+// account's history: on a shared browser that is exactly how one person's
+// practice ended up in another's cloud copy.
+export function localDataOwnership(localOwnerUid, uid) {
+  if (!localOwnerUid) return "unclaimed";
+  return localOwnerUid === uid ? "own" : "foreign";
+}
+
+// A brand-new profile for `uid`, carrying over only the Google profile
+// fields. Used when the data on this device belongs to someone else.
+export function freshStateFor(uid, profile = {}) {
+  return {
+    ...initialState,
+    settings: { ...initialState.settings },
+    streak: { ...initialState.streak },
+    rolePlay: { chats: [], customTopics: [] },
+    practice: { wordBank: [], customTopics: [] },
+    lifetimeStats: { ...defaultLifetimeStats },
+    user: ensureUser({ name: profile.name || "", email: profile.email, photoURL: profile.photoURL }),
+    ownerUid: uid,
+    isLoaded: true,
   };
 }

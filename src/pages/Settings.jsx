@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
-import { signOutOfGoogle } from "../services/firebase";
 
 function Toggle({ checked, onChange, id }) {
   return (
@@ -33,7 +32,7 @@ function RadioGroup({ options, value, onChange }) {
 }
 
 export default function Settings() {
-  const { state, dispatch, firebaseUser } = useApp();
+  const { state, dispatch, firebaseUser, signOutAndClear } = useApp();
   const navigate = useNavigate();
   const { settings, user, placement } = state;
   const [name, setName] = useState(user?.name || "");
@@ -49,8 +48,16 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const [signingOut, setSigningOut] = useState(false);
+
   const handleGoogleSignOut = async () => {
-    await signOutOfGoogle();
+    setSigningOut(true);
+    try {
+      await signOutAndClear();
+    } catch (err) {
+      console.error("Sign-out failed", err);
+      setSigningOut(false);
+    }
   };
 
   return (
@@ -101,8 +108,8 @@ export default function Settings() {
                   <p className="text-muted" dir="ltr" style={{ fontSize: 12, textAlign: "right" }}>{firebaseUser.email}</p>
                 </div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={handleGoogleSignOut}>
-                התנתק
+              <button className="btn btn-ghost btn-sm" onClick={handleGoogleSignOut} disabled={signingOut}>
+                {signingOut ? "מתנתק..." : "התנתק"}
               </button>
             </div>
           )}
