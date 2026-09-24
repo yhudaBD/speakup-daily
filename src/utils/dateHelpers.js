@@ -1,9 +1,36 @@
 /**
  * dateHelpers.js — utility functions for dates and streaks
+ *
+ * Day keys ("YYYY-MM-DD", the keys of state.sessions and
+ * streak.lastPracticeDate) are the user's *local* calendar date. They used
+ * to come from toISOString(), which is the UTC date. In Israel (UTC+2/+3)
+ * that rolls over at 02:00/03:00, so practice after midnight was filed
+ * under the previous day and could break a streak. Build and parse day keys
+ * only through the helpers here.
  */
 
+export function toDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// new Date("YYYY-MM-DD") means UTC midnight, which is still the previous
+// day anywhere west of UTC. This returns local midnight of that date.
+export function parseDateKey(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 export function getTodayString() {
-  return new Date().toISOString().split("T")[0];
+  return toDateKey();
 }
 
 export function getGreeting(name = "") {
@@ -15,25 +42,23 @@ export function getGreeting(name = "") {
   return `${greeting}${displayName}! 👋`;
 }
 
-export function formatDate(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+export function formatDate(dateKey) {
+  return parseDateKey(dateKey).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-export function getLastNDays(n) {
+// Oldest first, ending with today.
+export function getLastNDays(n, now = new Date()) {
   const days = [];
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().split("T")[0]);
+    days.push(toDateKey(addDays(now, -i)));
   }
   return days;
 }
 
-export function daysSince(dateString) {
-  if (!dateString) return Infinity;
-  const then = new Date(dateString);
-  const now = new Date();
-  const diff = now - then;
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+// Whole calendar days from a day key to today. Rounded because a day
+// that crosses a DST change is 23 or 25 hours long.
+export function daysSince(dateKey, now = new Date()) {
+  if (!dateKey) return Infinity;
+  const today = parseDateKey(toDateKey(now));
+  return Math.round((today - parseDateKey(dateKey)) / (1000 * 60 * 60 * 24));
 }

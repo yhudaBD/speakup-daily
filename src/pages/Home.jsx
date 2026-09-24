@@ -1,7 +1,7 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
-import { getGreeting, getTodayString, getLastNDays } from "../utils/dateHelpers";
+import { getGreeting, getTodayString, getLastNDays, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
 
 function WeeklyChart({ sessions }) {
@@ -16,7 +16,7 @@ function WeeklyChart({ sessions }) {
           const session = sessions[day];
           const score = session?.averageScore || 0;
           const isToday = day === getTodayString();
-          const date = new Date(day);
+          const date = parseDateKey(day);
           const label = dayLabels[date.getDay()];
           const heightPct = score > 0 ? `${score}%` : "14px";
           return (
