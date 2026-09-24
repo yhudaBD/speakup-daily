@@ -54,6 +54,12 @@ Required environment variables (Site settings → Environment variables on Netli
 committed to the repo): `GROQ_API_KEY`, `ADMIN_SECRET`. Optional: `AI_DAILY_LIMIT_PER_USER`
 (AI calls per account per day, default 600).
 
+**Firestore security rules** live in `firestore.rules` and are *not* deployed by Netlify. They
+are the only thing keeping one account from reading another's synced history (the Firebase
+web config is public by design). After changing them, deploy with
+`npx firebase-tools deploy --only firestore:rules` (project set in `.firebaserc`), or paste the
+file into Firebase Console → Firestore → Rules.
+
 **Netlify Free build-minute cap**: the account is on Netlify's free tier, capped at 300 build
 minutes/month account-wide (not per site) on a fixed monthly anchor date — not the calendar
 month. Every push to `main` **and every open PR's deploy preview** consumes this same pool.
