@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { aiService } from '../services/ai.service';
 import { ConversationBubble } from '../components/roleplay/ConversationBubble';
 import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
+import { ReplyFailedBubble } from '../components/roleplay/ReplyFailedBubble';
 import { SuggestedReplies } from '../components/roleplay/SuggestedReplies';
 import { MicButton } from '../components/roleplay/MicButton';
 
@@ -620,7 +621,7 @@ export default function RolePlay() {
 
   const {
     messages, suggestedReplies, phase, turnCount, MAX_TURNS,
-    isSpeaking, handleUserMessage, endConversation, replayMessage, logHelpUsed,
+    isSpeaking, handleUserMessage, retryReply, endConversation, replayMessage, logHelpUsed,
   } = useRolePlay({
     topic: activeSession?.topic,
     sessionId: activeSession?.id,
@@ -793,6 +794,7 @@ export default function RolePlay() {
           />
         ))}
         {phase === 'AI_THINKING' && <ThinkingBubble topicEmoji={topic.emoji} />}
+        {phase === 'REPLY_FAILED' && <ReplyFailedBubble topicEmoji={topic.emoji} onRetry={retryReply} />}
         <div ref={chatBottomRef} />
       </div>
 
