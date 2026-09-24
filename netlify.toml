@@ -1,6 +1,14 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Skip the build when a push changes nothing that ships (docs, tests, CI
+  # config, Firestore rules), so it doesn't spend build minutes. See the
+  # free-tier cap in README. Exit 0 = skip. It always builds when there's no
+  # previous build to compare against, or it's the same commit (e.g. "Clear
+  # cache and deploy"). A bare `git diff` would compare against the clean
+  # checkout there and wrongly skip. Any new file or folder that affects the
+  # build must be added to the path list.
+  ignore = '[ -n "$CACHED_COMMIT_REF" ] && [ "$CACHED_COMMIT_REF" != "$COMMIT_REF" ] && git diff --quiet "$CACHED_COMMIT_REF" "$COMMIT_REF" -- src public netlify index.html package.json package-lock.json netlify.toml vite.config.js scripts .env.production'
 
 [functions]
   directory = "netlify/functions"

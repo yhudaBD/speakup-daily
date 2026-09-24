@@ -74,5 +74,8 @@ PROJECT_OVERVIEW.md §9 for the full incident writeup from September 2026.
 
 One feature branch per task, tests (`npm test -- --run`), build (`npm run build`) and lint
 (`npm run lint`) clean, then
-merge `--no-ff` into `main` and push. `git log --oneline` on `main` is the authoritative
+merge `--no-ff` into `main` and push. GitHub Actions (`.github/workflows/ci.yml`) runs the same
+checks, plus `npm audit` on production dependencies, on every push, so a red check on `main`
+means the deploy Netlify just made should not have happened. Netlify skips the build entirely
+when a push touches only docs/tests/CI/Firestore rules (`ignore` in `netlify.toml`). `git log --oneline` on `main` is the authoritative
 history of what's been built and why — commit messages here are written to stand alone.
