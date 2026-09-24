@@ -2,7 +2,7 @@
 // AppContext.jsx so they can be unit-tested without React or Firebase.
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
-import { getTodayString, daysSince } from "../utils/dateHelpers";
+import { getTodayString, daysSince, toDateKey, parseDateKey, addDays } from "../utils/dateHelpers";
 
 export const STORAGE_KEY = "speakup_data";
 export const SCHEMA_VERSION = 1;
@@ -59,16 +59,16 @@ const defaultSettings = {
   showChatTranslation: true,
 };
 
-function computeStreak(streak, today) {
+// `today` is a local day key (see dateHelpers.js). "Yesterday" is derived
+// from it, not from the clock, so the rule is pure and testable.
+export function computeStreak(streak, today) {
   const lastDate = streak.lastPracticeDate;
   let current = streak.current;
   if (lastDate === today) {
     // same day, no change
   } else {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-    current = lastDate === yesterdayStr ? current + 1 : 1;
+    const yesterday = toDateKey(addDays(parseDateKey(today), -1));
+    current = lastDate === yesterday ? current + 1 : 1;
   }
   const longest = Math.max(streak.longest, current);
   return { current, longest, lastPracticeDate: today };
