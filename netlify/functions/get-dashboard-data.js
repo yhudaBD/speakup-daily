@@ -7,21 +7,25 @@
 // v2 function (export default (req) =>), not the classic handler(event)
 // style — see log-event.js for why: Netlify's automatic Blobs credential
 // injection needed the v2 signature to work in production during testing.
+//
+// The secret is only accepted from the X-Admin-Secret header, not the body,
+// and compared in constant time. Event details are sanitized again here, not
+// just on write, so events stored before that check existed can't carry
+// markup into the dashboard.
+import { createHash, timingSafeEqual } from "node:crypto";
 import { getStore } from "@netlify/blobs";
-
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
+import { HttpError, errorResponse, json, requirePost } from "./_shared/http.js";
+import { sanitizeDetails } from "./_shared/events.js";
 // Rough cost estimate per RolePlay turn, derived from real Groq pricing
 // measured earlier in this project (~$0.11/user/month at typical usage) —
 // good enough for the $10/month alert threshold; not meant to be exact.
 const EST_COST_PER_TURN_USD = 0.0004;
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Admin-Secret",
-    "Content-Type": "application/json",
-  };
+// Hashing first gives both sides the same length, which timingSafeEqual
+// requires, without leaking the real secret's length.
+function secretMatches(provided, expected) {
+  const digest = (v) => createHash("sha256").update(String(v)).digest();
+  return timingSafeEqual(digest(provided), digest(expected));
 }
 
 function dateOf(ts) {
@@ -29,34 +33,24 @@ function dateOf(ts) {
 }
 
 export default async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("", { status: 204, headers: corsHeaders() });
-  }
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders() });
-  }
-
-  if (!ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: "Server misconfigured: ADMIN_SECRET is not set" }), { status: 500, headers: corsHeaders() });
-  }
-
-  let payload;
   try {
-    payload = await req.json();
-  } catch {
-    payload = {};
-  }
-  const providedSecret = req.headers.get("x-admin-secret") || payload.secret;
-  if (providedSecret !== ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders() });
-  }
+    requirePost(req);
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      throw new HttpError(500, "server_misconfigured", "Server misconfigured: ADMIN_SECRET is not set");
+    }
+    const provided = req.headers.get("x-admin-secret");
+    if (!provided || !secretMatches(provided, adminSecret)) {
+      throw new HttpError(401, "unauthorized", "Unauthorized");
+    }
 
-  try {
     const store = getStore("events");
     const { blobs } = await store.list();
     const events = (
       await Promise.all(blobs.map((b) => store.get(b.key, { type: "json" }).catch(() => null)))
-    ).filter(Boolean);
+    )
+      .filter((ev) => ev && typeof ev.userId === "string")
+      .map((ev) => ({ ...ev, details: sanitizeDetails(ev.details) }));
 
     const now = Date.now();
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -135,12 +129,12 @@ export default async (req) => {
       .sort((a, b) => b.count - a.count);
     const totalCostUsd = Math.round(users.reduce((s, u) => s + u.estimatedCostUsd, 0) * 10000) / 10000;
 
-    return new Response(JSON.stringify({
+    return json(200, {
       users: users.sort((a, b) => (b.lastActiveTs || "").localeCompare(a.lastActiveTs || "")),
       summary: { totalUsers: users.length, weeklyActiveUsers, popularTopics, totalCostUsd },
       generatedAt: new Date().toISOString(),
-    }), { status: 200, headers: corsHeaders() });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message || "Aggregation error" }), { status: 502, headers: corsHeaders() });
+    });
+  } catch (err) {
+    return errorResponse(err);
   }
 };
