@@ -5,7 +5,9 @@ import {
   initialState, reducer, snapshotForSync, localDataOwnership, freshStateFor,
 } from "./appState";
 import { getTodayString } from "../utils/dateHelpers";
-import { auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle } from "../services/firebase";
+import {
+  auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle, deleteCloudProfile, deleteAuthAccountOrSignOut,
+} from "../services/firebase";
 
 const AppContext = createContext(null);
 
@@ -193,12 +195,40 @@ export function AppProvider({ children }) {
     window.location.replace("/");
   }, [firebaseUser, state]);
 
+  // Settings' "delete account": erases this account's cloud copy, this
+  // device's copy, and the Firebase Auth record, then reloads to a signed-out
+  // app. Persistence is blocked first so no pending state change can write
+  // the document back. Firestore applies one client's writes in order, so
+  // an earlier save still in flight lands before the delete, not after it.
+  // If the cloud delete fails, nothing local is touched and the error goes
+  // back to the caller.
+  const deleteAccountData = useCallback(async () => {
+    const uid = firebaseUser?.uid;
+    if (!uid) throw new Error("Not signed in");
+    persistBlockedRef.current = true;
+    cloudReadyUidRef.current = null;
+    try {
+      await deleteCloudProfile(uid);
+    } catch (e) {
+      persistBlockedRef.current = false;
+      cloudReadyUidRef.current = uid;
+      throw e;
+    }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage blocked: nothing we can clear anyway.
+    }
+    await deleteAuthAccountOrSignOut();
+    window.location.replace("/");
+  }, [firebaseUser]);
+
   const authReady = firebaseUser === undefined ? "checking"
     : firebaseUser === null ? "signed-out"
     : synced ? "ready" : "syncing";
 
   return (
-    <AppContext.Provider value={{ state, dispatch, firebaseUser, authReady, signOutAndClear }}>
+    <AppContext.Provider value={{ state, dispatch, firebaseUser, authReady, signOutAndClear, deleteAccountData }}>
       {children}
     </AppContext.Provider>
   );

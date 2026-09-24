@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, deleteUser } from "firebase/auth";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 
 // Firebase's web config identifies which project to talk to — it is not a
 // secret (unlike GROQ_API_KEY, see PROJECT_OVERVIEW.md §2) and is safe to
@@ -95,4 +95,23 @@ export async function loadCloudProfile(uid) {
 export function saveCloudProfile(uid, data) {
   if (!db) return Promise.resolve();
   return setDoc(doc(db, "users", uid), data, { merge: true });
+}
+
+export function deleteCloudProfile(uid) {
+  if (!db) return Promise.resolve();
+  return deleteDoc(doc(db, "users", uid));
+}
+
+// Removes the Firebase Auth record too, which also signs the user out.
+// Firebase refuses that when the sign-in is old (auth/requires-recent-login),
+// and re-authenticating would mean another Google redirect. The data itself
+// is already gone by the time this runs, so a plain sign-out is enough then.
+export async function deleteAuthAccountOrSignOut() {
+  if (!auth?.currentUser) return;
+  try {
+    await deleteUser(auth.currentUser);
+  } catch (err) {
+    if (err?.code !== "auth/requires-recent-login") console.error("Deleting the auth account failed", err);
+    await signOut(auth);
+  }
 }

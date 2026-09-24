@@ -31,8 +31,92 @@ function RadioGroup({ options, value, onChange }) {
   );
 }
 
+const DELETE_CONFIRM_WORD = "מחק";
+
+// Replaces the old "Reset All Data", which only cleared localStorage. The
+// account's cloud copy then restored everything on the next load. This
+// deletes both, plus the sign-in record, and asks the user to type a word
+// rather than tap through a native confirm().
+function DeleteAccountCard({ onDelete }) {
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  const cancel = () => {
+    setConfirming(false);
+    setTyped("");
+    setError("");
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError("");
+    try {
+      await onDelete();
+    } catch (err) {
+      console.error("Account deletion failed", err);
+      setError("המחיקה נכשלה. בדוק חיבור לאינטרנט ונסה שוב. שום דבר לא נמחק.");
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="card mb-4" style={{ borderColor: "var(--color-error)", borderWidth: 1.5 }}>
+      <h3 style={{ marginBottom: 8, color: "var(--color-error)" }}>⚠️ מחיקת החשבון והנתונים</h3>
+      <p className="text-muted mb-3" style={{ fontSize: 14 }}>
+        מוחק לצמיתות את כל ההתקדמות, הרצף, השיחות והמילים השמורות, גם מהענן וגם מהמכשיר הזה, ומנתק אותך. אי אפשר לשחזר.
+      </p>
+      {!confirming ? (
+        <button className="btn btn-danger" onClick={() => setConfirming(true)}>
+          מחק את החשבון והנתונים 🗑️
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <label htmlFor="delete-confirm" style={{ fontSize: 14, fontWeight: 600 }}>
+            כדי לאשר, הקלד <strong>{DELETE_CONFIRM_WORD}</strong>:
+          </label>
+          <input
+            id="delete-confirm"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            disabled={deleting}
+            style={{
+              padding: "10px 14px",
+              border: "1.5px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              fontSize: 15,
+              background: "var(--color-surface)",
+              color: "var(--color-text)",
+              fontFamily: "var(--font-body)",
+            }}
+          />
+          <div className="flex gap-2">
+            <button
+              className="btn btn-danger"
+              onClick={handleDelete}
+              disabled={typed.trim() !== DELETE_CONFIRM_WORD || deleting}
+            >
+              {deleting ? "מוחק..." : "מחק לצמיתות"}
+            </button>
+            <button className="btn btn-ghost" onClick={cancel} disabled={deleting}>
+              ביטול
+            </button>
+          </div>
+          {error && (
+            <p role="alert" style={{ color: "var(--color-error)", fontSize: 13, fontWeight: 600 }}>
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
-  const { state, dispatch, firebaseUser, signOutAndClear } = useApp();
+  const { state, dispatch, firebaseUser, signOutAndClear, deleteAccountData } = useApp();
   const navigate = useNavigate();
   const { settings, user, placement } = state;
   const [name, setName] = useState(user?.name || "");
@@ -249,24 +333,7 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Reset */}
-        <div className="card mb-4" style={{ borderColor: "var(--color-error)", borderWidth: 1.5 }}>
-          <h3 style={{ marginBottom: 8, color: "var(--color-error)" }}>⚠️ Danger Zone</h3>
-          <p className="text-muted mb-3" style={{ fontSize: 14 }}>
-            This will erase all your progress, streak, and session history.
-          </p>
-          <button
-            className="btn btn-danger"
-            onClick={() => {
-              if (window.confirm("Are you sure? All progress will be lost.")) {
-                localStorage.clear();
-                window.location.reload();
-              }
-            }}
-          >
-            Reset All Data 🗑️
-          </button>
-        </div>
+        <DeleteAccountCard onDelete={deleteAccountData} />
 
         {/* Info */}
         <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
