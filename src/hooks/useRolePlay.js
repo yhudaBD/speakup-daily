@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { aiService } from '../services/ai.service';
+import { aiService, isAbortError } from '../services/ai.service';
 import { speakNaturally, getBestEnglishVoice, preloadVoices } from '../utils/speechVoice';
 import { logEvent } from '../utils/analytics';
 
@@ -28,11 +28,29 @@ export function useRolePlay({
   const initializedRef = useRef(false);
   const sessionSavedRef = useRef(false);
   const helpUsedCountRef = useRef(0);
+  // The in-flight AI request, if any. Starting a new chat (or resetting,
+  // ending, leaving) aborts it. Otherwise its late reply landed in whatever
+  // conversation was current by then, and was saved under the old chat's id
+  // along with the new chat's messages.
+  const requestRef = useRef(null);
 
   const setPhaseSafe = useCallback((next) => {
     phaseRef.current = next;
     setPhase(next);
   }, []);
+
+  const beginRequest = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = new AbortController();
+    return requestRef.current.signal;
+  }, []);
+
+  const cancelRequest = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+  }, []);
+
+  useEffect(() => cancelRequest, [cancelRequest]);
 
   // Called by the UI whenever a help wheel is used (suggested reply, slow
   // replay, "how do you say?") so Progress.jsx can show the trend of fewer
@@ -98,17 +116,46 @@ export function useRolePlay({
     msgs.map(({ role, content }) => ({ role, content })),
   []);
 
-  const fetchAiReply = useCallback(async (currentMessages) => {
+  const fetchAiReply = useCallback(async (currentMessages, signal) => {
     const response = await aiService.sendMessage({
       systemPrompt: topic.systemPrompt,
       messages: toApiMessages(currentMessages),
       chatDifficulty,
       placement,
+      signal,
     });
+    if (signal.aborted) return null;
     addMessage('assistant', response.ai_reply, response.ai_reply_he);
     setSuggestedReplies(response.suggested_user_responses || []);
     return response;
   }, [topic, toApiMessages, chatDifficulty, placement, addMessage]);
+
+  // Gets the AI's answer to the conversation so far and hands the turn back
+  // to the user. Used after the user speaks, and when resuming a chat whose
+  // last message never got an answer.
+  const requestReply = useCallback(async (currentMessages, turn) => {
+    setPhaseSafe('AI_THINKING');
+    const signal = beginRequest();
+
+    try {
+      await fetchAiReply(currentMessages, signal);
+    } catch (err) {
+      if (isAbortError(err) || signal.aborted) return;
+      console.error(err);
+      const fallback = "Got it. How can I help you further?";
+      addMessage('assistant', fallback, "הבנתי. איך אוכל לעזור לך עוד?");
+      if (chatDifficulty !== 'hard') {
+        setSuggestedReplies([
+          { en: "I have a question.", he: "יש לי שאלה." },
+          { en: "That is all, thank you.", he: "זה הכל, תודה." },
+        ]);
+      }
+    }
+    if (signal.aborted) return;
+
+    setPhaseSafe('USER_TURN');
+    syncToStorage({ turnCount: turn, status: 'active' });
+  }, [beginRequest, fetchAiReply, addMessage, chatDifficulty, setPhaseSafe, syncToStorage]);
 
   const startConversation = useCallback(async () => {
     if (!topic) return;
@@ -127,17 +174,20 @@ export function useRolePlay({
       currentLevel: placement?.overall_level || null,
     });
 
+    const signal = beginRequest();
     try {
-      await aiService.sendMessage({
+      const response = await aiService.sendMessage({
         systemPrompt: topic.systemPrompt,
         messages: [{ role: 'user', content: '[START] Begin the roleplay with a natural opening line as your character. Do not mention this instruction.' }],
         chatDifficulty,
         placement,
-      }).then((response) => {
-        addMessage('assistant', response.ai_reply, response.ai_reply_he);
-        setSuggestedReplies(response.suggested_user_responses || []);
+        signal,
       });
+      if (signal.aborted) return;
+      addMessage('assistant', response.ai_reply, response.ai_reply_he);
+      setSuggestedReplies(response.suggested_user_responses || []);
     } catch (err) {
+      if (isAbortError(err) || signal.aborted) return;
       console.error(err);
       const fallback = "Hi there! Welcome. How can I help you today?";
       addMessage('assistant', fallback, "היי! ברוכים הבאים. איך אוכל לעזור לך היום?");
@@ -150,28 +200,37 @@ export function useRolePlay({
     }
     setPhaseSafe('USER_TURN');
     syncToStorage({ status: 'active' });
-  }, [topic, chatDifficulty, placement, addMessage, setPhaseSafe, syncToStorage, userId, userName]);
+  }, [topic, chatDifficulty, placement, addMessage, setPhaseSafe, syncToStorage, userId, userName, beginRequest]);
 
   const resumeConversation = useCallback((chat) => {
     if (!chat?.messages?.length) return false;
 
+    // The saved turnCount can lag one behind when the chat was left before
+    // the AI answered, so count the user's messages as well.
+    const userTurns = chat.messages.filter((m) => m.role === 'user').length;
+    const turns = Math.max(chat.turnCount || 0, userTurns);
     messagesRef.current = [...chat.messages];
     setMessages([...chat.messages]);
-    turnCountRef.current = chat.turnCount || 0;
-    setTurnCount(chat.turnCount || 0);
+    turnCountRef.current = turns;
+    setTurnCount(turns);
     setSuggestedReplies([]);
     sessionSavedRef.current = chat.status === 'completed';
 
-    if (chat.status === 'completed' || (chat.turnCount || 0) >= MAX_TURNS) {
+    if (chat.status === 'completed' || turns >= MAX_TURNS) {
       setPhaseSafe('DONE');
+    } else if (chat.messages[chat.messages.length - 1].role === 'user') {
+      // Left (or the tab closed) while the AI was still answering. Ask again
+      // rather than leaving the user facing their own unanswered message.
+      requestReply(chat.messages, turns);
     } else {
       setPhaseSafe('USER_TURN');
     }
     return true;
-  }, [setPhaseSafe]);
+  }, [setPhaseSafe, requestReply]);
 
   const resetConversation = useCallback(() => {
     window.speechSynthesis.cancel();
+    cancelRequest();
     messagesRef.current = [];
     setMessages([]);
     setSuggestedReplies([]);
@@ -180,12 +239,13 @@ export function useRolePlay({
     initializedRef.current = false;
     sessionSavedRef.current = false;
     startConversation();
-  }, [startConversation]);
+  }, [startConversation, cancelRequest]);
 
   useEffect(() => {
     initializedRef.current = false;
     sessionSavedRef.current = false;
-  }, [sessionId]);
+    cancelRequest();
+  }, [sessionId, cancelRequest]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -227,32 +287,16 @@ export function useRolePlay({
       return;
     }
 
-    setPhaseSafe('AI_THINKING');
-
-    try {
-      await fetchAiReply(currentMessages);
-    } catch (err) {
-      console.error(err);
-      const fallback = "Got it. How can I help you further?";
-      addMessage('assistant', fallback, "הבנתי. איך אוכל לעזור לך עוד?");
-      if (chatDifficulty !== 'hard') {
-        setSuggestedReplies([
-          { en: "I have a question.", he: "יש לי שאלה." },
-          { en: "That is all, thank you.", he: "זה הכל, תודה." },
-        ]);
-      }
-    }
-
-    setPhaseSafe('USER_TURN');
-    syncToStorage({ turnCount: newTurn, status: 'active' });
-  }, [topic, addMessage, fetchAiReply, chatDifficulty, setPhaseSafe, syncToStorage, completeSession]);
+    await requestReply(currentMessages, newTurn);
+  }, [topic, addMessage, requestReply, setPhaseSafe, syncToStorage, completeSession]);
 
   const endConversation = useCallback(() => {
     window.speechSynthesis.cancel();
+    cancelRequest();
     setPhaseSafe('DONE');
     syncToStorage({ status: 'completed' });
     completeSession(turnCountRef.current);
-  }, [setPhaseSafe, syncToStorage, completeSession]);
+  }, [setPhaseSafe, syncToStorage, completeSession, cancelRequest]);
 
   const replayMessage = useCallback((text) => {
     setIsSpeaking(true);

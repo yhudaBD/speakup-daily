@@ -169,12 +169,53 @@ async function proxyHeaders() {
   };
 }
 
-async function groqChatOnce({ model, messages, temperature, json }) {
-  const response = await fetch(PROXY_URL, {
-    method: "POST",
-    headers: await proxyHeaders(),
-    body: JSON.stringify({ type: "chat", model, messages, temperature, json }),
-  });
+// A stalled request used to leave the UI in "thinking…" (or "transcribing…")
+// indefinitely. Every proxy call now gives up after REQUEST_TIMEOUT_MS,
+// a bit past the proxy's own 25s upstream timeout, so a slow-but-alive
+// Groq response is still let through. Callers can also pass a `signal` to
+// cancel a request whose result no longer matters (the user left the
+// conversation). Both reject with a DOMException: "TimeoutError" or
+// "AbortError". Built by hand, not with AbortSignal.any/timeout, which
+// older iOS Safari versions this app supports don't have.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+export function isAbortError(err) {
+  return err?.name === "AbortError";
+}
+
+async function proxyFetch(body, { signal } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("The AI request timed out", "TimeoutError")),
+    REQUEST_TIMEOUT_MS,
+  );
+  const forwardAbort = () => controller.abort(signal.reason ?? new DOMException("Aborted", "AbortError"));
+  if (signal?.aborted) forwardAbort();
+  else signal?.addEventListener("abort", forwardAbort, { once: true });
+
+  try {
+    return await fetch(PROXY_URL, {
+      method: "POST",
+      headers: await proxyHeaders(),
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    // fetch rejects with the abort reason. Make sure it's always a
+    // recognizable Timeout/AbortError, whatever the browser passes through.
+    if (controller.signal.aborted) {
+      const reason = controller.signal.reason;
+      throw reason instanceof DOMException ? reason : new DOMException("Aborted", "AbortError");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", forwardAbort);
+  }
+}
+
+async function groqChatOnce({ model, messages, temperature, json, signal }) {
+  const response = await proxyFetch({ type: "chat", model, messages, temperature, json }, { signal });
 
   if (!response.ok) {
     const errText = await response.text();
@@ -222,10 +263,10 @@ function validateReply(content, schema) {
 // With a `schema`, returns the parsed, validated value. A reply that doesn't
 // fit uses up an attempt like any other recoverable failure. Without one
 // (plain-text mode), returns the raw content.
-async function groqChat({ model, messages, temperature = 0.7, json = true, schema }) {
+async function groqChat({ model, messages, temperature = 0.7, json = true, schema, signal }) {
   let result;
   for (let attempt = 1; attempt <= MAX_GROQ_ATTEMPTS; attempt++) {
-    result = await groqChatOnce({ model, messages, temperature, json });
+    result = await groqChatOnce({ model, messages, temperature, json, signal });
     if (result.ok && schema) result = validateReply(result.content, schema);
     if (result.ok || !isRecoverableGroqError(result.errText)) break;
   }
@@ -246,7 +287,7 @@ async function blobToBase64(blob) {
   return btoa(binary);
 }
 
-async function translateToHebrew(texts) {
+async function translateToHebrew(texts, { signal } = {}) {
   if (!texts.length) return [];
 
   const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join("\n");
@@ -258,6 +299,7 @@ async function translateToHebrew(texts) {
     ],
     temperature: 0.1,
     schema: translationSchema,
+    signal,
   });
 
   if (translations.length !== texts.length) {
@@ -278,7 +320,7 @@ function buildProfileContext(placement) {
 }
 
 export const aiService = {
-  async sendMessage({ systemPrompt, messages, chatDifficulty = "easy", placement = null }) {
+  async sendMessage({ systemPrompt, messages, chatDifficulty = "easy", placement = null, signal }) {
     try {
       const difficultyExtra = DIFFICULTY_INSTRUCTIONS[chatDifficulty] || "";
       const profileContext = buildProfileContext(placement);
@@ -292,12 +334,13 @@ export const aiService = {
         messages: groqMessages,
         temperature: 0.85,
         schema: chatTurnSchema,
+        signal,
       });
 
       const suggestions = chatDifficulty === "hard" ? [] : parsed.suggested_user_responses;
 
       const toTranslate = [parsed.ai_reply, ...suggestions.map((s) => s.en)].filter(Boolean);
-      const hebrew = toTranslate.length ? await translateToHebrew(toTranslate) : [];
+      const hebrew = toTranslate.length ? await translateToHebrew(toTranslate, { signal }) : [];
 
       return {
         ai_reply: parsed.ai_reply,
@@ -309,6 +352,8 @@ export const aiService = {
         })),
       };
     } catch (error) {
+      // A cancelled request's caller has moved on; don't answer it at all.
+      if (isAbortError(error)) throw error;
       console.warn("Groq proxy unavailable, using fallback mock response:", error);
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -341,14 +386,10 @@ export const aiService = {
     }
   },
 
-  async transcribeAudio(blob, mimeType = "audio/webm") {
+  async transcribeAudio(blob, mimeType = "audio/webm", { signal } = {}) {
     const audioBase64 = await blobToBase64(blob);
 
-    const response = await fetch(PROXY_URL, {
-      method: "POST",
-      headers: await proxyHeaders(),
-      body: JSON.stringify({ type: "transcribe", audioBase64, mimeType }),
-    });
+    const response = await proxyFetch({ type: "transcribe", audioBase64, mimeType }, { signal });
 
     if (!response.ok) {
       const errText = await response.text();
@@ -362,7 +403,7 @@ export const aiService = {
   // No fallback: a made-up score here used to be saved as the real result
   // and fed ADJUST_LEVEL / MERGE_PLACEMENT_GAPS. On failure this throws, and
   // RolePlay's DoneScreen shows an error with a retry.
-  async analyzeConversation({ messages, topicTitle }) {
+  async analyzeConversation({ messages, topicTitle, signal }) {
     if (!messages.some((m) => m.role === "user")) {
       throw new Error("Nothing to analyze: the conversation has no user messages");
     }
@@ -382,13 +423,14 @@ export const aiService = {
       ],
       temperature: 0.3,
       schema: conversationAnalysisSchema,
+      signal,
     });
   },
 
   // No fallback, for the same reason as analyzeConversation: the old one
   // put invented "words" (the first long word of each sentence) into the
   // word bank. Practice.jsx shows an error with a retry instead.
-  async analyzePracticeSession({ sentences, categoryLabel, difficulty, averageScore }) {
+  async analyzePracticeSession({ sentences, categoryLabel, difficulty, averageScore, signal }) {
     const sentenceList = sentences.map((s) => `- ${s.text}`).join("\n");
 
     return groqChat({
@@ -402,13 +444,14 @@ export const aiService = {
       ],
       temperature: 0.4,
       schema: practiceAnalysisSchema,
+      signal,
     });
   },
 
   // No fallback: generic canned sentences presented as the user's own topic
   // (and savable as one) were worse than an honest error, which
   // AITopicPanel in Practice.jsx already shows with a retry.
-  async generatePracticeSentences({ topic, difficulty = "easy", count = 5, placement = null }) {
+  async generatePracticeSentences({ topic, difficulty = "easy", count = 5, placement = null, signal }) {
     const profileContext = buildProfileContext(placement);
     const parsed = await groqChat({
       model: TRANSLATION_MODEL,
@@ -421,6 +464,7 @@ export const aiService = {
       ],
       temperature: 0.7,
       schema: practiceSentencesSchema,
+      signal,
     });
 
     const sentences = parsed.sentences.map((s, i) => ({
@@ -438,7 +482,7 @@ export const aiService = {
   // No mock fallback here either: a fabricated level result
   // would be actively misleading since it drives personalization everywhere else.
   // Let callers catch the error and offer the user a manual skip instead.
-  async runPlacementTurn({ messages }) {
+  async runPlacementTurn({ messages, signal }) {
     const groqMessages = [
       { role: "system", content: placementSystemPrompt },
       ...messages,
@@ -451,6 +495,7 @@ export const aiService = {
       messages: groqMessages,
       temperature: 0.5, // lower than roleplay's 0.85 — steadier JSON-mode compliance for this model
       schema: placementTurnSchema,
+      signal,
     });
   },
 
@@ -458,7 +503,7 @@ export const aiService = {
   // English without it counting as the user's conversation turn. Plain-text
   // mode (json: false) — no schema to satisfy, so it's naturally more
   // reliable than the JSON-mode calls above.
-  async translateToEnglish(hebrewText) {
+  async translateToEnglish(hebrewText, { signal } = {}) {
     try {
       const raw = await groqChat({
         model: CHAT_MODEL,
@@ -471,6 +516,7 @@ export const aiService = {
         ],
         temperature: 0.3,
         json: false,
+        signal,
       });
       return raw.trim();
     } catch (error) {

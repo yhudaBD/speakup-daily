@@ -108,3 +108,57 @@ describe("runPlacementTurn", () => {
     expect(turn.result.overall_level).toBe("B1");
   });
 });
+
+describe("request timeouts and cancellation", () => {
+  // Never answers; rejects with the abort reason, like a real fetch
+  // (immediately, if the signal is already aborted when it's called).
+  const hangingFetch = (_url, { signal }) =>
+    new Promise((_, reject) => {
+      if (signal.aborted) return reject(signal.reason);
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+
+  it("rejects with AbortError when the caller cancels, without retrying", async () => {
+    fetchMock.mockImplementation(hangingFetch);
+    const controller = new AbortController();
+    const pending = aiService.analyzeConversation({ messages: conversation, topicTitle: "Café", signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives up on a stalled request after 30 seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(hangingFetch);
+      const pending = aiService.runPlacementTurn({ messages: [{ role: "user", content: "hi" }] });
+      const assertion = expect(pending).rejects.toMatchObject({ name: "TimeoutError" });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not answer a cancelled chat turn with the canned fallback", async () => {
+    fetchMock.mockImplementation(hangingFetch);
+    const controller = new AbortController();
+    const pending = aiService.sendMessage({ systemPrompt: "x", messages: [], signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("times out a stalled transcription too", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(hangingFetch);
+      const pending = aiService.transcribeAudio(new Blob(["abc"], { type: "audio/webm" }));
+      const assertion = expect(pending).rejects.toMatchObject({ name: "TimeoutError" });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
