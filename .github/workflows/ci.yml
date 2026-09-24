@@ -23,7 +23,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 24 ships npm 11, which wrote package-lock.json. Node 22's
+          # npm 10 resolves the optional/overridden peers differently and
+          # rejects the same lockfile in `npm ci` ("Missing: … from lock
+          # file"). Keep this in step with the npm used locally.
+          node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
