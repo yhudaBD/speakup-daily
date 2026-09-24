@@ -33,9 +33,16 @@
 `process.env.GROQ_API_KEY` (ללא קידומת `VITE_` — קידומת כזו הייתה גורמת ל-Vite "לאפות" את
 המפתח לתוך קובץ ה-JS שנשלח לדפדפן, בדיוק הבאג שתוקן בתחילת הפרויקט הזה).
 
-`groq-proxy.js` הוא פונקציה "קלאסית" (`export const handler = async (event) => {...}`).
-לעומת זאת `log-event.js` ו-`get-dashboard-data.js` (שמשתמשות ב-Netlify Blobs) כתובות
-בפורמט **v2** (`export default async (req) => {...}`, מחזירות `Response`) — בבדיקה מול
+**ה-proxy לא פתוח לציבור.** כל קריאה חייבת לשאת Firebase ID token של משתמש מחובר
+(`Authorization: Bearer ...`, ש-`ai.service.js` מצרף אוטומטית). השרת מאמת אותו ב-`netlify/functions/_shared/auth.js`
+מול המפתחות הציבוריים של Google (ספריית `jose`, בלי service account). בנוסף:
+- רק שני המודלים שהאפליקציה משתמשת בהם מותרים.
+- `max_completion_tokens` נקבע בשרת.
+- יש תקרות על מספר ההודעות, על אורכן ועל גודל האודיו.
+- יש מכסה יומית לכל חשבון (`_shared/quota.js`, Netlify Blobs). ברירת המחדל היא 600 קריאות ביום, וניתן לשנות אותה דרך `AI_DAILY_LIMIT_PER_USER`.
+- אין כותרות CORS: האפליקציה וה-API באותו origin.
+
+כל הפונקציות כתובות בפורמט **v2** (`export default async (req) => {...}`, מחזירות `Response`). בבדיקה מול
 סביבת production התברר שהזרקת האישורים האוטומטית של Blobs לא עבדה בפורמט הקלאסי, רק ב-v2.
 אל תחזיר פונקציה שמשתמשת ב-Blobs לפורמט הישן.
 
@@ -85,7 +92,8 @@
 ### 4. מבנה הפרויקט – תיקיות עיקריות
 
 - `netlify/functions/`
-  - `groq-proxy.js` — כל קריאות ה-AI (chat/translation/analysis/placement/transcription), מפתח מוסתר בצד שרת, ניסיון חוזר על כשלי JSON-mode
+  - `groq-proxy.js` — כל קריאות ה-AI (chat/translation/analysis/placement/transcription), מפתח מוסתר בצד שרת, דורש משתמש מחובר ומוגבל במכסה יומית
+  - `_shared/` — קוד משותף לפונקציות (אימות token, עזרי HTTP, מכסה). זו לא פונקציה בעצמה
   - `log-event.js` — כתיבת אירועי שימוש אנונימיים (v2, Netlify Blobs)
   - `get-dashboard-data.js` — קריאה מוגנת ב-`ADMIN_SECRET`, מרכזת נתונים לדשבורד (v2, Netlify Blobs)
 
@@ -179,7 +187,7 @@ Blobs — קשורים למזהה מכשיר אנונימי (`user.id`), **לא*
 - ניקוד הגייה פונטי אמיתי (נשאר Levenshtein) — הוחלט פעמיים לא לתעדף
 - תשלומים/Stripe — לא הותחל
 - פיצ'רים חברתיים בין חברים — לא בעדיפות
-- הגבלת שימוש בצד שרת (rate limiting/quota per user) על `groq-proxy.js` — עדיין אין; ה-CORS פתוח (`Access-Control-Allow-Origin: "*"`), כך שזו נקודה לטפל בה לפני שיש משתמשים משלמים
+- מכסות לפי מסלול תשלום: היום יש רק תקרה יומית אחידה לכל חשבון (ראה סעיף 2)
 
 (חשבונות משתמש/סנכרון בין מכשירים **כן** נבנו — ראה סעיף 1; זה היה כאן ברשימה בגרסה קודמת של המסמך)
 

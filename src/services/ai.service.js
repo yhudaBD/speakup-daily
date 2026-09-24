@@ -1,5 +1,6 @@
 import { systemInstruction } from "../data/rolePlayTopics";
 import { placementSystemPrompt } from "../data/placementPrompt";
+import { auth } from "./firebase";
 
 const PROXY_URL = "/api/groq-proxy";
 const CHAT_MODEL = "openai/gpt-oss-20b";
@@ -148,10 +149,21 @@ function isRecoverableGroqError(errText) {
   }
 }
 
+// The proxy only serves signed-in users (netlify/functions/_shared/auth.js).
+// getIdToken() returns the cached token, refreshing it first if it's about
+// to expire, so this adds no round trip on most calls.
+async function proxyHeaders() {
+  const token = await auth?.currentUser?.getIdToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 async function groqChatOnce({ model, messages, temperature, json }) {
   const response = await fetch(PROXY_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await proxyHeaders(),
     body: JSON.stringify({ type: "chat", model, messages, temperature, json }),
   });
 
@@ -316,7 +328,7 @@ export const aiService = {
 
     const response = await fetch(PROXY_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await proxyHeaders(),
       body: JSON.stringify({ type: "transcribe", audioBase64, mimeType }),
     });
 

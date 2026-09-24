@@ -51,7 +51,8 @@ project is linked to a real Netlify site (`netlify link`, requires login) — ex
 
 The Netlify site is connected to this repo's `main` branch — every push deploys automatically.
 Required environment variables (Site settings → Environment variables on Netlify, never
-committed to the repo): `GROQ_API_KEY`, `ADMIN_SECRET`.
+committed to the repo): `GROQ_API_KEY`, `ADMIN_SECRET`. Optional: `AI_DAILY_LIMIT_PER_USER`
+(AI calls per account per day, default 600).
 
 **Netlify Free build-minute cap**: the account is on Netlify's free tier, capped at 300 build
 minutes/month account-wide (not per site) on a fixed monthly anchor date — not the calendar
@@ -65,6 +66,7 @@ PROJECT_OVERVIEW.md §9 for the full incident writeup from September 2026.
 
 ## Workflow
 
-One feature branch per task, build (`npm run build`) and lint (`npm run lint`) clean, then
+One feature branch per task, tests (`npm test -- --run`), build (`npm run build`) and lint
+(`npm run lint`) clean, then
 merge `--no-ff` into `main` and push. `git log --oneline` on `main` is the authoritative
 history of what's been built and why — commit messages here are written to stand alone.
