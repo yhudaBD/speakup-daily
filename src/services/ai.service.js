@@ -1,6 +1,10 @@
 import { systemInstruction } from "../data/rolePlayTopics";
 import { placementSystemPrompt } from "../data/placementPrompt";
 import { auth } from "./firebase";
+import {
+  chatTurnSchema, translationSchema, placementTurnSchema,
+  conversationAnalysisSchema, practiceAnalysisSchema, practiceSentencesSchema,
+} from "./aiSchemas";
 
 const PROXY_URL = "/api/groq-proxy";
 const CHAT_MODEL = "openai/gpt-oss-20b";
@@ -127,7 +131,12 @@ Be encouraging but specific. Reference actual things the user said.`;
 // retry the exact same request (see MAX_GROQ_ATTEMPTS below) before giving up.
 // tool_use_failed can also be recovered directly from failed_generation
 // without even retrying.
-const RECOVERABLE_ERROR_CODES = new Set(["tool_use_failed", "json_validate_failed", "output_parse_failed", "empty_completion"]);
+// invalid_json / schema_invalid are ours: a reply that parsed badly or
+// didn't fit its schema (see groqChat).
+const RECOVERABLE_ERROR_CODES = new Set([
+  "tool_use_failed", "json_validate_failed", "output_parse_failed", "empty_completion",
+  "invalid_json", "schema_invalid",
+]);
 
 function recoverFromToolUseFailure(errBody) {
   try {
@@ -192,16 +201,38 @@ async function groqChatOnce({ model, messages, temperature, json }) {
 // compounding failure chance low without noticeably slowing down a turn.
 const MAX_GROQ_ATTEMPTS = 3;
 
-async function groqChat({ model, messages, temperature = 0.7, json = true }) {
+function invalidReply(code, detail) {
+  return { ok: false, status: 200, errText: JSON.stringify({ error: { code, message: detail } }) };
+}
+
+// Parses a JSON-mode reply and checks it against its schema (aiSchemas.js).
+function validateReply(content, schema) {
+  let data;
+  try {
+    data = JSON.parse(content);
+  } catch {
+    return invalidReply("invalid_json", "Reply was not valid JSON");
+  }
+  const parsed = schema.safeParse(data);
+  if (parsed.success) return { ok: true, value: parsed.data };
+  console.warn("AI reply did not match its schema:", parsed.error.issues);
+  return invalidReply("schema_invalid", parsed.error.issues.map((i) => i.message).join("; "));
+}
+
+// With a `schema`, returns the parsed, validated value. A reply that doesn't
+// fit uses up an attempt like any other recoverable failure. Without one
+// (plain-text mode), returns the raw content.
+async function groqChat({ model, messages, temperature = 0.7, json = true, schema }) {
   let result;
   for (let attempt = 1; attempt <= MAX_GROQ_ATTEMPTS; attempt++) {
     result = await groqChatOnce({ model, messages, temperature, json });
+    if (result.ok && schema) result = validateReply(result.content, schema);
     if (result.ok || !isRecoverableGroqError(result.errText)) break;
   }
   if (!result.ok) {
     throw new Error(`Groq API error: ${result.status} ${result.errText}`);
   }
-  return result.content;
+  return schema ? result.value : result.content;
 }
 
 async function blobToBase64(blob) {
@@ -219,17 +250,15 @@ async function translateToHebrew(texts) {
   if (!texts.length) return [];
 
   const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join("\n");
-  const raw = await groqChat({
+  const { translations } = await groqChat({
     model: TRANSLATION_MODEL,
     messages: [
       { role: "system", content: TRANSLATION_SYSTEM },
       { role: "user", content: `Translate these English sentences to Hebrew:\n\n${numbered}` },
     ],
     temperature: 0.1,
+    schema: translationSchema,
   });
-
-  const parsed = JSON.parse(raw);
-  const translations = parsed.translations || [];
 
   if (translations.length !== texts.length) {
     console.warn("Translation count mismatch, padding with empty strings");
@@ -248,45 +277,6 @@ function buildProfileContext(placement) {
   return parts.length > 1 ? parts.join("\n") + "\n" : "";
 }
 
-// The analysis/generation calls below feed state that sticks: the level
-// auto-adjust, the placement gaps used in every later prompt, the word bank.
-// So their JSON is checked here, and a malformed result is an error the UI
-// can offer to retry, never something half-filled that gets saved.
-const stringList = (v, max = 8) =>
-  (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).slice(0, max) : []);
-const optionalString = (v) => (typeof v === "string" ? v : "");
-
-function normalizeConversationAnalysis(parsed) {
-  const score = Number(parsed?.overall_score);
-  if (!Number.isFinite(score) || typeof parsed?.summary !== "string") {
-    throw new Error("AI returned an incomplete conversation analysis");
-  }
-  return {
-    overall_score: Math.round(Math.min(100, Math.max(0, score))),
-    summary: parsed.summary,
-    strengths: stringList(parsed.strengths),
-    improvements: stringList(parsed.improvements),
-    grammar_notes: stringList(parsed.grammar_notes),
-    vocabulary_suggestions: stringList(parsed.vocabulary_suggestions),
-  };
-}
-
-function normalizePracticeAnalysis(parsed) {
-  if (typeof parsed?.summary_he !== "string") {
-    throw new Error("AI returned an incomplete practice summary");
-  }
-  const vocabulary = (Array.isArray(parsed.vocabulary) ? parsed.vocabulary : [])
-    .filter((v) => v && typeof v.word === "string" && v.word.trim())
-    .slice(0, 8)
-    .map((v) => ({
-      word: v.word.trim(),
-      meaning_he: optionalString(v.meaning_he),
-      usage_tip_he: optionalString(v.usage_tip_he),
-      example: optionalString(v.example),
-    }));
-  return { summary_he: parsed.summary_he, speaking_tips: stringList(parsed.speaking_tips), vocabulary };
-}
-
 export const aiService = {
   async sendMessage({ systemPrompt, messages, chatDifficulty = "easy", placement = null }) {
     try {
@@ -297,25 +287,14 @@ export const aiService = {
         ...messages,
       ];
 
-      const responseText = await groqChat({
+      const parsed = await groqChat({
         model: CHAT_MODEL,
         messages: groqMessages,
         temperature: 0.85,
+        schema: chatTurnSchema,
       });
 
-      let parsed;
-      try {
-        parsed = JSON.parse(responseText);
-      } catch {
-        console.error("Failed to parse JSON from Groq:", responseText);
-        throw new Error("Invalid response format from AI");
-      }
-
-      const suggestions = chatDifficulty === "hard"
-        ? []
-        : (parsed.suggested_user_responses || []).map((s) =>
-            typeof s === "string" ? { en: s } : { en: s.en || "", hint: s.hint || "" }
-          );
+      const suggestions = chatDifficulty === "hard" ? [] : parsed.suggested_user_responses;
 
       const toTranslate = [parsed.ai_reply, ...suggestions.map((s) => s.en)].filter(Boolean);
       const hebrew = toTranslate.length ? await translateToHebrew(toTranslate) : [];
@@ -392,7 +371,7 @@ export const aiService = {
       .map((m) => `${m.role === "user" ? "Student" : "AI"}: ${m.content}`)
       .join("\n");
 
-    const raw = await groqChat({
+    return groqChat({
       model: TRANSLATION_MODEL,
       messages: [
         { role: "system", content: ANALYSIS_SYSTEM },
@@ -402,9 +381,8 @@ export const aiService = {
         },
       ],
       temperature: 0.3,
+      schema: conversationAnalysisSchema,
     });
-
-    return normalizeConversationAnalysis(JSON.parse(raw));
   },
 
   // No fallback, for the same reason as analyzeConversation: the old one
@@ -413,7 +391,7 @@ export const aiService = {
   async analyzePracticeSession({ sentences, categoryLabel, difficulty, averageScore }) {
     const sentenceList = sentences.map((s) => `- ${s.text}`).join("\n");
 
-    const raw = await groqChat({
+    return groqChat({
       model: TRANSLATION_MODEL,
       messages: [
         { role: "system", content: PRACTICE_ANALYSIS_SYSTEM },
@@ -423,9 +401,8 @@ export const aiService = {
         },
       ],
       temperature: 0.4,
+      schema: practiceAnalysisSchema,
     });
-
-    return normalizePracticeAnalysis(JSON.parse(raw));
   },
 
   // No fallback: generic canned sentences presented as the user's own topic
@@ -433,7 +410,7 @@ export const aiService = {
   // AITopicPanel in Practice.jsx already shows with a retry.
   async generatePracticeSentences({ topic, difficulty = "easy", count = 5, placement = null }) {
     const profileContext = buildProfileContext(placement);
-    const raw = await groqChat({
+    const parsed = await groqChat({
       model: TRANSLATION_MODEL,
       messages: [
         { role: "system", content: GENERATE_SENTENCES_SYSTEM + profileContext },
@@ -443,23 +420,19 @@ export const aiService = {
         },
       ],
       temperature: 0.7,
+      schema: practiceSentencesSchema,
     });
 
-    const parsed = JSON.parse(raw);
-    const topicEn = typeof parsed.topic_en === "string" && parsed.topic_en.trim() ? parsed.topic_en : topic;
-    const sentences = (Array.isArray(parsed.sentences) ? parsed.sentences : [])
-      .filter((s) => s && typeof s.text === "string" && s.text.trim())
-      .map((s, i) => ({
-        id: typeof s.id === "string" && s.id ? s.id : `ai_${String(i + 1).padStart(3, "0")}`,
-        text: s.text.trim(),
-        translation: optionalString(s.translation),
-        category: "ai",
-        difficulty,
-        phonetic_tips: optionalString(s.phonetic_tips),
-      }));
-    if (!sentences.length) throw new Error("AI returned no practice sentences");
+    const sentences = parsed.sentences.map((s, i) => ({
+      id: s.id || `ai_${String(i + 1).padStart(3, "0")}`,
+      text: s.text,
+      translation: s.translation,
+      category: "ai",
+      difficulty,
+      phonetic_tips: s.phonetic_tips,
+    }));
 
-    return { sentences, topicEn };
+    return { sentences, topicEn: parsed.topic_en || topic };
   },
 
   // No mock fallback here either: a fabricated level result
@@ -471,20 +444,14 @@ export const aiService = {
       ...messages,
     ];
 
-    const responseText = await groqChat({
+    // placementTurnSchema requires a usable result (a CEFR overall_level) on
+    // the final turn, since that result drives personalization everywhere.
+    return groqChat({
       model: CHAT_MODEL,
       messages: groqMessages,
       temperature: 0.5, // lower than roleplay's 0.85 — steadier JSON-mode compliance for this model
+      schema: placementTurnSchema,
     });
-
-    const parsed = JSON.parse(responseText);
-    const complete = parsed.phase === "complete";
-    return {
-      phase: complete ? "complete" : "in_progress",
-      ai_reply: parsed.ai_reply || "",
-      ai_reply_he: parsed.ai_reply_he || "",
-      result: complete ? parsed.result || null : null,
-    };
   },
 
   // "How do you say...?" helper: translate a Hebrew phrase to natural spoken
