@@ -403,7 +403,13 @@ export function AppProvider({ children }) {
   // undefined = still checking Firebase; null = confirmed signed out.
   const [firebaseUser, setFirebaseUser] = useState(undefined);
   const [synced, setSynced] = useState(false);
+  // mergedForUidRef: the merge below has *started* for this uid (guards
+  // re-firing). cloudReadyUidRef: it has *finished*, so writing local state
+  // to Firestore is now safe. Kept separate because marking "ready" at the
+  // start let the persist effect push the device's pre-merge (possibly empty)
+  // state over the account's cloud copy before it had even been read.
   const mergedForUidRef = useRef(null);
+  const cloudReadyUidRef = useRef(null);
 
   // Track the signed-in Firebase account, if any. AuthGate reads authReady
   // (below) from context instead of subscribing to this itself, so there is
@@ -486,7 +492,12 @@ export function AppProvider({ children }) {
         } else {
           await saveCloudProfile(uid, snapshotForSync(state));
         }
+        // Set before the MERGE_CLOUD_DATA re-render commits, so that render's
+        // persist effect writes the merged result back to the cloud.
+        cloudReadyUidRef.current = uid;
       } catch (e) {
+        // Leave cloud writes off: we never saw the cloud copy, so pushing
+        // this device's state could overwrite history we don't have.
         console.error("Cloud sync failed", e);
       } finally {
         setSynced(true);
@@ -498,6 +509,9 @@ export function AppProvider({ children }) {
   // one-time merge/seed above has run for this account — mirror the same
   // snapshot to Firestore so it follows the account across devices.
   useEffect(() => {
+    // Before LOAD_DATA this is initialState — saving it would blank out the
+    // stored history if the page died before the load re-render.
+    if (!state.isLoaded) return;
     const toSave = snapshotForSync(state);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -505,10 +519,10 @@ export function AppProvider({ children }) {
       console.error("Failed to save data", e);
     }
     const uid = firebaseUser?.uid;
-    if (uid && mergedForUidRef.current === uid) {
+    if (uid && cloudReadyUidRef.current === uid) {
       saveCloudProfile(uid, toSave).catch((e) => console.error("Cloud save failed", e));
     }
-  }, [firebaseUser, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
+  }, [firebaseUser, state.isLoaded, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
 
   const authReady = firebaseUser === undefined ? "checking"
     : firebaseUser === null ? "signed-out"
