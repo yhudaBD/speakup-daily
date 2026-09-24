@@ -248,6 +248,45 @@ function buildProfileContext(placement) {
   return parts.length > 1 ? parts.join("\n") + "\n" : "";
 }
 
+// The analysis/generation calls below feed state that sticks: the level
+// auto-adjust, the placement gaps used in every later prompt, the word bank.
+// So their JSON is checked here, and a malformed result is an error the UI
+// can offer to retry, never something half-filled that gets saved.
+const stringList = (v, max = 8) =>
+  (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).slice(0, max) : []);
+const optionalString = (v) => (typeof v === "string" ? v : "");
+
+function normalizeConversationAnalysis(parsed) {
+  const score = Number(parsed?.overall_score);
+  if (!Number.isFinite(score) || typeof parsed?.summary !== "string") {
+    throw new Error("AI returned an incomplete conversation analysis");
+  }
+  return {
+    overall_score: Math.round(Math.min(100, Math.max(0, score))),
+    summary: parsed.summary,
+    strengths: stringList(parsed.strengths),
+    improvements: stringList(parsed.improvements),
+    grammar_notes: stringList(parsed.grammar_notes),
+    vocabulary_suggestions: stringList(parsed.vocabulary_suggestions),
+  };
+}
+
+function normalizePracticeAnalysis(parsed) {
+  if (typeof parsed?.summary_he !== "string") {
+    throw new Error("AI returned an incomplete practice summary");
+  }
+  const vocabulary = (Array.isArray(parsed.vocabulary) ? parsed.vocabulary : [])
+    .filter((v) => v && typeof v.word === "string" && v.word.trim())
+    .slice(0, 8)
+    .map((v) => ({
+      word: v.word.trim(),
+      meaning_he: optionalString(v.meaning_he),
+      usage_tip_he: optionalString(v.usage_tip_he),
+      example: optionalString(v.example),
+    }));
+  return { summary_he: parsed.summary_he, speaking_tips: stringList(parsed.speaking_tips), vocabulary };
+}
+
 export const aiService = {
   async sendMessage({ systemPrompt, messages, chatDifficulty = "easy", placement = null }) {
     try {
@@ -341,134 +380,89 @@ export const aiService = {
     return (data.text || "").trim();
   },
 
+  // No fallback: a made-up score here used to be saved as the real result
+  // and fed ADJUST_LEVEL / MERGE_PLACEMENT_GAPS. On failure this throws, and
+  // RolePlay's DoneScreen shows an error with a retry.
   async analyzeConversation({ messages, topicTitle }) {
-    const userMessages = messages.filter((m) => m.role === "user");
-    if (!userMessages.length) {
-      return {
-        overall_score: 0,
-        summary: "לא היו הודעות מהמשתמש לניתוח.",
-        strengths: [],
-        improvements: ["נסה לשלוח לפחות הודעה אחת בשיחה"],
-        grammar_notes: [],
-        vocabulary_suggestions: [],
-      };
+    if (!messages.some((m) => m.role === "user")) {
+      throw new Error("Nothing to analyze: the conversation has no user messages");
     }
 
-    try {
-      const transcript = messages
-        .map((m) => `${m.role === "user" ? "Student" : "AI"}: ${m.content}`)
-        .join("\n");
+    const transcript = messages
+      .map((m) => `${m.role === "user" ? "Student" : "AI"}: ${m.content}`)
+      .join("\n");
 
-      const raw = await groqChat({
-        model: TRANSLATION_MODEL,
-        messages: [
-          { role: "system", content: ANALYSIS_SYSTEM },
-          {
-            role: "user",
-            content: `Topic: ${topicTitle}\n\nConversation:\n${transcript}`,
-          },
-        ],
-        temperature: 0.3,
-      });
+    const raw = await groqChat({
+      model: TRANSLATION_MODEL,
+      messages: [
+        { role: "system", content: ANALYSIS_SYSTEM },
+        {
+          role: "user",
+          content: `Topic: ${topicTitle}\n\nConversation:\n${transcript}`,
+        },
+      ],
+      temperature: 0.3,
+    });
 
-      return JSON.parse(raw);
-    } catch (error) {
-      console.warn("Groq proxy unavailable, using fallback mock analysis:", error);
-      await new Promise((r) => setTimeout(r, 1200));
-      return {
-        overall_score: 78,
-        summary: "שיחה טובה! דיברת באנגלית בצורה טבעית והגבת לשאלות.",
-        strengths: ["המשכת את השיחה בצורה טבעית", "השתמשת במילים מתאימות לתרחיש"],
-        improvements: ["נסה משפטים ארוכים יותר", "שים לב לזמנים (past/present)"],
-        grammar_notes: ["שים לב לשימוש ב-articles (a/the)"],
-        vocabulary_suggestions: ["I would appreciate...", "Could you please..."],
-      };
-    }
+    return normalizeConversationAnalysis(JSON.parse(raw));
   },
 
+  // No fallback, for the same reason as analyzeConversation: the old one
+  // put invented "words" (the first long word of each sentence) into the
+  // word bank. Practice.jsx shows an error with a retry instead.
   async analyzePracticeSession({ sentences, categoryLabel, difficulty, averageScore }) {
     const sentenceList = sentences.map((s) => `- ${s.text}`).join("\n");
 
-    try {
-      const raw = await groqChat({
-        model: TRANSLATION_MODEL,
-        messages: [
-          { role: "system", content: PRACTICE_ANALYSIS_SYSTEM },
-          {
-            role: "user",
-            content: `Topic: ${categoryLabel || "Mixed"}\nDifficulty: ${difficulty}\nAverage pronunciation score: ${averageScore}%\n\nSentences practiced:\n${sentenceList}`,
-          },
-        ],
-        temperature: 0.4,
-      });
+    const raw = await groqChat({
+      model: TRANSLATION_MODEL,
+      messages: [
+        { role: "system", content: PRACTICE_ANALYSIS_SYSTEM },
+        {
+          role: "user",
+          content: `Topic: ${categoryLabel || "Mixed"}\nDifficulty: ${difficulty}\nAverage pronunciation score: ${averageScore}%\n\nSentences practiced:\n${sentenceList}`,
+        },
+      ],
+      temperature: 0.4,
+    });
 
-      return JSON.parse(raw);
-    } catch (error) {
-      console.warn("Groq proxy unavailable, using fallback mock analysis:", error);
-      await new Promise((r) => setTimeout(r, 1000));
-      return {
-        summary_he: `תרגול מצוין בנושא ${categoryLabel || "כללי"}! המשכת להתאמן והגעת לממוצע של ${averageScore}%.`,
-        speaking_tips: [
-          "בדיבור טבעי, מקשרים מילים — 'want to' נשמע כמו 'wanna' בדיבור לא רשמי.",
-          "השתמש במילות מילוי כמו 'well', 'you know' כדי לקנות זמן לחשיבה.",
-          "הדגש את המילה החשובה במשפט — זה עוזר למאזין להבין אותך.",
-        ],
-        vocabulary: sentences.slice(0, 3).map((s) => {
-          const words = s.text.split(/\s+/).filter((w) => w.length > 5);
-          const word = words[0]?.replace(/[^a-zA-Z'-]/g, "") || "practice";
-          return {
-            word,
-            meaning_he: s.translation || "מילה מהתרגול",
-            usage_tip_he: "השתמש במילה הזו במשפטים יומיומיים כשאתה מדבר על אותו נושא.",
-            example: s.text,
-          };
-        }),
-      };
-    }
+    return normalizePracticeAnalysis(JSON.parse(raw));
   },
 
+  // No fallback: generic canned sentences presented as the user's own topic
+  // (and savable as one) were worse than an honest error, which
+  // AITopicPanel in Practice.jsx already shows with a retry.
   async generatePracticeSentences({ topic, difficulty = "easy", count = 5, placement = null }) {
-    try {
-      const profileContext = buildProfileContext(placement);
-      const raw = await groqChat({
-        model: TRANSLATION_MODEL,
-        messages: [
-          { role: "system", content: GENERATE_SENTENCES_SYSTEM + profileContext },
-          {
-            role: "user",
-            content: `Topic (in Hebrew or English): "${topic}"\nDifficulty: ${difficulty}\nNumber of sentences: ${count}\n\nGenerate ${count} natural English pronunciation practice sentences about this topic.`,
-          },
-        ],
-        temperature: 0.7,
-      });
+    const profileContext = buildProfileContext(placement);
+    const raw = await groqChat({
+      model: TRANSLATION_MODEL,
+      messages: [
+        { role: "system", content: GENERATE_SENTENCES_SYSTEM + profileContext },
+        {
+          role: "user",
+          content: `Topic (in Hebrew or English): "${topic}"\nDifficulty: ${difficulty}\nNumber of sentences: ${count}\n\nGenerate ${count} natural English pronunciation practice sentences about this topic.`,
+        },
+      ],
+      temperature: 0.7,
+    });
 
-      const parsed = JSON.parse(raw);
-      const topicEn = parsed.topic_en || topic;
-      const sentences = (parsed.sentences || []).map((s, i) => ({
-        id: s.id || `ai_${String(i + 1).padStart(3, "0")}`,
-        text: s.text,
-        translation: s.translation || "",
+    const parsed = JSON.parse(raw);
+    const topicEn = typeof parsed.topic_en === "string" && parsed.topic_en.trim() ? parsed.topic_en : topic;
+    const sentences = (Array.isArray(parsed.sentences) ? parsed.sentences : [])
+      .filter((s) => s && typeof s.text === "string" && s.text.trim())
+      .map((s, i) => ({
+        id: typeof s.id === "string" && s.id ? s.id : `ai_${String(i + 1).padStart(3, "0")}`,
+        text: s.text.trim(),
+        translation: optionalString(s.translation),
         category: "ai",
         difficulty,
-        phonetic_tips: s.phonetic_tips || "",
+        phonetic_tips: optionalString(s.phonetic_tips),
       }));
+    if (!sentences.length) throw new Error("AI returned no practice sentences");
 
-      return { sentences, topicEn };
-    } catch (error) {
-      console.warn("Groq proxy unavailable, using fallback mock sentences:", error);
-      await new Promise((r) => setTimeout(r, 1200));
-      const fallbackSentences = [
-        { id: "ai_001", text: "Let me tell you about that.", translation: "תן לי לספר לך על זה.", category: "ai", difficulty, phonetic_tips: "'tell you' — blend naturally" },
-        { id: "ai_002", text: "That is a really good point.", translation: "זו נקודה ממש טובה.", category: "ai", difficulty, phonetic_tips: "'really' — stress on first syllable" },
-        { id: "ai_003", text: "I think we should try that.", translation: "אני חושב שכדאי לנסות את זה.", category: "ai", difficulty, phonetic_tips: "'should' — the 'l' is silent" },
-        { id: "ai_004", text: "Can you help me with this?", translation: "אתה יכול לעזור לי עם זה?", category: "ai", difficulty, phonetic_tips: "'help me' — link the two words" },
-        { id: "ai_005", text: "I would love to learn more about it.", translation: "הייתי שמח ללמוד עוד על זה.", category: "ai", difficulty, phonetic_tips: "'would' — the 'l' is silent" },
-      ].slice(0, count);
-      return { sentences: fallbackSentences, topicEn: topic };
-    }
+    return { sentences, topicEn };
   },
 
-  // No mock fallback here (unlike the other methods): a fabricated level result
+  // No mock fallback here either: a fabricated level result
   // would be actively misleading since it drives personalization everywhere else.
   // Let callers catch the error and offer the user a manual skip instead.
   async runPlacementTurn({ messages }) {

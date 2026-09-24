@@ -426,6 +426,9 @@ function DoneScreen({ turnCount, topic, messages, chatId, savedFeedback, onNewCh
   const [analyzing, setAnalyzing] = useState(false);
   const [feedback, setFeedback] = useState(savedFeedback || null);
   const [error, setError] = useState(null);
+  // Ending a chat before saying anything used to "analyze" it into a 0%
+  // score, which ADJUST_LEVEL then counted as a weak result.
+  const hasUserMessages = messages.some((m) => m.role === 'user');
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -467,18 +470,24 @@ function DoneScreen({ turnCount, topic, messages, chatId, savedFeedback, onNewCh
         {topic.emoji} {topic.title}
       </p>
 
-      <button
-        onClick={handleAnalyze}
-        disabled={analyzing}
-        style={{
-          backgroundColor: '#1E1B4B', color: '#fff', border: 'none', borderRadius: 12,
-          padding: '14px 32px', fontSize: 15, fontWeight: 600, cursor: analyzing ? 'wait' : 'pointer',
-          width: '100%', marginBottom: 12, opacity: analyzing ? 0.7 : 1
-        }}
-      >
-        {analyzing ? '⏳ מנתח את השיחה...' : '🤖 ניתוח השיחה ב-AI'}
-      </button>
-      {error && <p style={{ color: '#EF4444', fontSize: 13, marginBottom: 12 }}>{error}</p>}
+      {hasUserMessages ? (
+        <button
+          onClick={handleAnalyze}
+          disabled={analyzing}
+          style={{
+            backgroundColor: '#1E1B4B', color: '#fff', border: 'none', borderRadius: 12,
+            padding: '14px 32px', fontSize: 15, fontWeight: 600, cursor: analyzing ? 'wait' : 'pointer',
+            width: '100%', marginBottom: 12, opacity: analyzing ? 0.7 : 1
+          }}
+        >
+          {analyzing ? '⏳ מנתח את השיחה...' : '🤖 ניתוח השיחה ב-AI'}
+        </button>
+      ) : (
+        <p style={{ color: '#6B7280', fontSize: 13, marginBottom: 12 }}>
+          לא נשלחו הודעות בשיחה הזו, אז אין מה לנתח.
+        </p>
+      )}
+      {error && <p role="alert" style={{ color: '#EF4444', fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       <button onClick={onNewChat} style={{
         backgroundColor: '#6C63FF', color: '#fff', border: 'none', borderRadius: 12,

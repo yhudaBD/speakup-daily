@@ -88,6 +88,7 @@ function AITopicPanel({ difficulty, dailyGoal, onStart, onBack }) {
     try {
       await onStart(topic.trim());
     } catch (err) {
+      console.error("Sentence generation failed:", err);
       setError("אירעה שגיאה ביצירת המשפטים. נסה שוב.");
       setIsGenerating(false);
     }
@@ -373,7 +374,7 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, 
   );
 }
 
-function SessionSummary({ avg, sessionResults, summary, categoryLabel, canSaveTopic, topicSaved, onSaveTopic, onHome, onPracticeWords, onPracticeAgain }) {
+function SessionSummary({ avg, sessionResults, summary, summaryError, onRetrySummary, categoryLabel, canSaveTopic, topicSaved, onSaveTopic, onHome, onPracticeWords, onPracticeAgain }) {
   return (
     <div className="page-enter" style={{ padding: "24px 0" }}>
       <div className="container desktop-center">
@@ -390,6 +391,17 @@ function SessionSummary({ avg, sessionResults, summary, categoryLabel, canSaveTo
           }}>{avg}%</div>
           <p className="text-muted">ממוצע הגייה</p>
         </div>
+
+        {summaryError && (
+          <div className="card mb-3" role="alert" style={{ textAlign: "center" }}>
+            <p style={{ fontSize: 14, marginBottom: 10 }}>
+              ⚠️ לא הצלחנו להכין סיכום ומילים חדשות לסשן הזה. הציונים שלך נשמרו.
+            </p>
+            <button className="btn btn-ghost btn-sm" onClick={onRetrySummary}>
+              🔄 נסה שוב
+            </button>
+          </div>
+        )}
 
         {summary && (
           <>
@@ -489,6 +501,7 @@ export default function Practice() {
   const [showTranslation, setShowTranslation] = useState(settings.showTranslation);
   const [sessionSummary, setSessionSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(false);
   const [topicSaved, setTopicSaved] = useState(false);
 
   const { transcript, liveTranscript, isListening, isTranscribing, error, isSupported, start, stop } = useSpeechRecognition();
@@ -541,6 +554,7 @@ export default function Practice() {
     setResult(null);
     setSessionResults([]);
     setSessionSummary(null);
+    setSummaryError(false);
     setTopicSaved(false);
     setPracticeState(loaded.length > 0 ? "IDLE" : "SETUP");
   }, [settings.difficulty, settings.dailyGoal, todayProgress, practice?.wordBank, practice?.customTopics, sessions]);
@@ -567,6 +581,7 @@ export default function Practice() {
     setResult(null);
     setSessionResults([]);
     setSessionSummary(null);
+    setSummaryError(false);
     const { sentences: aiSentences, topicEn } = await aiService.generatePracticeSentences({
       topic,
       difficulty: settings.difficulty,
@@ -618,6 +633,7 @@ export default function Practice() {
 
   const fetchSummary = useCallback(async (results, category, catLabel) => {
     setSummaryLoading(true);
+    setSummaryError(false);
     try {
       const avg = results.length
         ? Math.round(results.reduce((s, x) => s + x.score, 0) / results.length)
@@ -641,6 +657,7 @@ export default function Practice() {
       }
     } catch (err) {
       console.error("Practice summary failed:", err);
+      setSummaryError(true);
     } finally {
       setSummaryLoading(false);
     }
@@ -730,6 +747,8 @@ export default function Practice() {
         avg={avg}
         sessionResults={sessionResults}
         summary={sessionSummary}
+        summaryError={summaryError}
+        onRetrySummary={() => fetchSummary(sessionResults, selectedCategory, categoryLabel)}
         categoryLabel={categoryLabel}
         canSaveTopic={selectedCategory === "ai"}
         topicSaved={topicSaved}
