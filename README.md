@@ -13,6 +13,11 @@ See **[PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md)** for the full architecture, 
 and data model. See **[placement_prompt.md](./placement_prompt.md)** for the AI placement
 conversation's system prompt and the Groq reliability quirks it works around.
 
+Known issues, ranked by severity with file/line references and the order to fix them, are in
+**[CRITICAL_REVIEW.md](./CRITICAL_REVIEW.md)**. The product roadmap (audiences, features,
+milestones) is in **[IMPROVEMENT_IDEAS.md](./IMPROVEMENT_IDEAS.md)**, and the working rules for
+AI-assisted sessions are in **[CLAUDE.md](./CLAUDE.md)**.
+
 ## Stack
 
 React 19 + Vite 8, no backend framework — Netlify Functions for anything that needs a secret
