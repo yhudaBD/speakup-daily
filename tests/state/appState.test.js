@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   freshStateFor,
   initialState,
@@ -73,5 +73,46 @@ describe("freshStateFor", () => {
     a.settings.dailyGoal = 10;
     expect(b.rolePlay.chats).toEqual([]);
     expect(b.settings.dailyGoal).toBe(initialState.settings.dailyGoal);
+  });
+});
+
+// Verified bugs from CRITICAL_REVIEW.md. Each `it.fails` states the correct
+// behavior and fails today; the fix turns it into a plain `it`. The plain
+// test beside it keeps `it.fails` honest: a crash would also "fail".
+describe("verified bugs (CRITICAL_REVIEW.md)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 28, 12, 0));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const today = "2026-09-28";
+  const chat = { chatId: "c1", topicId: "t1", turnCount: 4, helpUsedCount: 0, completedAt: "2026-09-28T09:00:00.000Z" };
+  const sentence = { sentenceId: "s1", text: "I need water", score: 80 };
+
+  it("§3 setup: a chat is saved under today's session", () => {
+    const next = reducer(loaded(), { type: "SAVE_ROLEPLAY_SESSION", payload: chat });
+    expect(next.sessions[today].chats).toHaveLength(1);
+  });
+
+  it.fails("§3: practicing a sentence after a chat keeps the day's chats", () => {
+    const afterChat = reducer(loaded(), { type: "SAVE_ROLEPLAY_SESSION", payload: chat });
+    const next = reducer(afterChat, { type: "SAVE_SESSION_RESULT", payload: sentence });
+    expect(next.sessions[today].chats).toHaveLength(1);
+  });
+
+  const bankOf = (n) =>
+    Array.from({ length: n }, (_, i) => ({ id: `w${i}`, word: `word${i}`, learnedAt: "2026-09-01T00:00:00.000Z" }));
+
+  it("§11 setup: a new word is saved while the bank has room", () => {
+    const state = loaded({ practice: { wordBank: bankOf(10) } });
+    const next = reducer(state, { type: "ADD_PRACTICE_WORDS", payload: [{ word: "schedule" }] });
+    expect(next.practice.wordBank.map((w) => w.word)).toContain("schedule");
+  });
+
+  it.fails("§11: a new word is saved when the bank already holds 100 words", () => {
+    const state = loaded({ practice: { wordBank: bankOf(100) } });
+    const next = reducer(state, { type: "ADD_PRACTICE_WORDS", payload: [{ word: "schedule" }] });
+    expect(next.practice.wordBank.map((w) => w.word)).toContain("schedule");
   });
 });
