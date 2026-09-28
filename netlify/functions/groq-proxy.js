@@ -5,15 +5,17 @@
 //
 // Hiding the key only helps if the proxy isn't a free Groq endpoint for
 // anyone who finds its URL. So every call must carry a signed-in user's
-// Firebase ID token (requireUser), is capped per account per day
-// (consumeDailyQuota), and may only use an allowlisted model with a bounded
-// request size and output budget.
+// Firebase ID token (verifyUser), must come from an account on the beta
+// list when ALLOWED_EMAILS is set (requireBetaAccess), is capped per account
+// per day (consumeDailyQuota), and may only use an allowlisted model with a
+// bounded request size and output budget.
 //
 // v2 function (export default (req) =>), like log-event.js and
 // get-dashboard-data.js. Reached via the /api/* → /.netlify/functions/*
 // rewrite in netlify.toml.
 import { HttpError, errorResponse, readJson, requirePost } from "./_shared/http.js";
-import { requireUser } from "./_shared/auth.js";
+import { verifyUser } from "./_shared/auth.js";
+import { requireBetaAccess } from "./_shared/betaAccess.js";
 import { consumeDailyQuota } from "./_shared/quota.js";
 
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
@@ -144,7 +146,9 @@ export default async (req) => {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new HttpError(500, "server_misconfigured", "Server misconfigured: GROQ_API_KEY is not set");
 
-    const uid = await requireUser(req);
+    const user = await verifyUser(req);
+    requireBetaAccess(user);
+    const { uid } = user;
     const payload = await readJson(req, MAX_BODY_BYTES);
 
     let run;

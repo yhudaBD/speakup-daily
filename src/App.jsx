@@ -6,6 +6,7 @@ import AuthGate from "./components/AuthGate";
 import { ErrorBoundary, AppCrashScreen, RouteErrorBoundary } from "./components/ErrorBoundary";
 import BottomNav from "./components/layout/BottomNav";
 import OfflineBanner from "./components/layout/OfflineBanner";
+import BetaAccessBanner from "./components/layout/BetaAccessBanner";
 import UpdateBanner from "./components/layout/UpdateBanner";
 import Home from "./pages/Home";
 import Practice from "./pages/Practice";
@@ -44,11 +45,12 @@ export default function App() {
     <>
       {/* Outside AuthGate so a stale sign-in screen can be updated too, and
           outside the app-wide boundary so a crash can still be fixed by
-          taking the update. Neither banner reads app state. */}
+          taking the update. None of the banners reads app state. */}
       <div className="top-banners">
         <ErrorBoundary name="banners" fallback={() => null}>
           <UpdateBanner />
           <OfflineBanner />
+          <BetaAccessBanner />
         </ErrorBoundary>
       </div>
       <ErrorBoundary name="app" fallback={() => <AppCrashScreen />}>

@@ -20,7 +20,13 @@ const GOOGLE_JWKS = createRemoteJWKSet(
 
 // Returns the caller's Firebase uid, or throws HttpError 401/503.
 // `keys` and `projectId` are only overridden by tests.
-export async function requireUser(req, { keys = GOOGLE_JWKS, projectId = PROJECT_ID } = {}) {
+export async function requireUser(req, options) {
+  return (await verifyUser(req, options)).uid;
+}
+
+// Like requireUser, with the token's email and whether Google verified it,
+// for checks that go by email (betaAccess.js).
+export async function verifyUser(req, { keys = GOOGLE_JWKS, projectId = PROJECT_ID } = {}) {
   const match = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") || "");
   if (!match) throw new HttpError(401, "missing_token", "Sign-in required");
 
@@ -31,7 +37,11 @@ export async function requireUser(req, { keys = GOOGLE_JWKS, projectId = PROJECT
       algorithms: ["RS256"],
     });
     if (!payload.sub) throw new HttpError(401, "invalid_token", "Invalid sign-in token");
-    return payload.sub;
+    return {
+      uid: payload.sub,
+      email: typeof payload.email === "string" ? payload.email : undefined,
+      emailVerified: payload.email_verified === true,
+    };
   } catch (err) {
     if (err instanceof HttpError) throw err;
     // Couldn't fetch Google's keys: that's our outage, not a bad token.

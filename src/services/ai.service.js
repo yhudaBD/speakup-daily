@@ -1,6 +1,7 @@
 import { systemInstruction } from "../data/rolePlayTopics";
 import { placementSystemPrompt } from "../data/placementPrompt";
 import { auth } from "./firebase";
+import { markNotInBeta } from "./betaAccess";
 import {
   chatTurnSchema, translationSchema, placementTurnSchema,
   conversationAnalysisSchema, practiceAnalysisSchema, practiceSentencesSchema,
@@ -183,6 +184,18 @@ export function isAbortError(err) {
   return err?.name === "AbortError";
 }
 
+// The proxy refuses accounts outside the beta list with 403 not_in_beta.
+// Reported to betaAccess.js, so the app shows why instead of a generic
+// failure. Reads a clone, so the caller still gets the body.
+async function noticeBetaRefusal(response) {
+  try {
+    const body = await response.clone().json();
+    if (body?.error?.code === "not_in_beta") markNotInBeta();
+  } catch {
+    // Not JSON: some other 403.
+  }
+}
+
 async function proxyFetch(body, { signal } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(
@@ -194,12 +207,14 @@ async function proxyFetch(body, { signal } = {}) {
   else signal?.addEventListener("abort", forwardAbort, { once: true });
 
   try {
-    return await fetch(PROXY_URL, {
+    const response = await fetch(PROXY_URL, {
       method: "POST",
       headers: await proxyHeaders(),
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    if (response.status === 403) await noticeBetaRefusal(response);
+    return response;
   } catch (err) {
     // fetch rejects with the abort reason. Make sure it's always a
     // recognizable Timeout/AbortError, whatever the browser passes through.

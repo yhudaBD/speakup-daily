@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "../../netlify/functions/_shared/http.js";
 
 vi.mock("../../netlify/functions/_shared/auth.js", () => ({
-  requireUser: vi.fn(async (req) => {
+  verifyUser: vi.fn(async (req) => {
     if (!req.headers.get("authorization")) throw new HttpError(401, "missing_token", "Sign-in required");
-    return "uid-1";
+    return { uid: "uid-1", email: "dana@example.com", emailVerified: true };
   }),
 }));
 vi.mock("../../netlify/functions/_shared/quota.js", () => ({
@@ -22,7 +22,10 @@ beforeEach(() => {
   fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [] }), { status: 200 }));
   vi.stubGlobal("fetch", fetchMock);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  delete process.env.ALLOWED_EMAILS;
+});
 
 function call(body, { token = "t", method = "POST" } = {}) {
   return handler(new Request("http://localhost/api/groq-proxy", {
@@ -112,6 +115,21 @@ describe("groq-proxy", () => {
 
     finishWrite();
     expect((await pending).status).toBe(200);
+  });
+
+  it("refuses an account outside ALLOWED_EMAILS before the quota or Groq (CRITICAL_REVIEW §26א)", async () => {
+    process.env.ALLOWED_EMAILS = "someone-else@example.com";
+    consumeDailyQuota.mockClear();
+    const res = await call(validChat);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.code).toBe("not_in_beta");
+    expect(consumeDailyQuota).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("lets an account on ALLOWED_EMAILS through", async () => {
+    process.env.ALLOWED_EMAILS = "dana@example.com";
+    expect((await call(validChat)).status).toBe(200);
   });
 
   it("passes Groq's own error status and body through for the client's retry logic", async () => {
