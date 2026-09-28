@@ -74,7 +74,7 @@ function CategoryPicker({ onPick, onBack }) {
   return (
     <div className="page-enter" style={{ padding: "20px 0" }}>
       <div className="container desktop-center">
-        <button className="btn btn-ghost btn-sm mb-3" onClick={onBack}>← חזרה</button>
+        <button className="btn btn-ghost btn-sm mb-3" onClick={onBack}>→ חזרה</button>
         <h2 style={{ marginBottom: 4 }}>✍️ השלמת משפטים</h2>
         <p className="text-muted mb-4" style={{ fontSize: 14 }}>
           בחר קטגוריה — נחסר מילה ממשפט ואתה בוחר מה חסר
