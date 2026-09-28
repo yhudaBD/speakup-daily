@@ -12,7 +12,10 @@ const script = readFileSync(resolve("public/usage_dashboard.js"), "utf8");
 
 const data = {
   generatedAt: "2026-09-28T10:00:00.000Z",
-  summary: { totalUsers: 2, weeklyActiveUsers: 1, popularTopics: [], totalCostUsd: 0.5 },
+  summary: {
+    totalUsers: 2, weeklyActiveUsers: 1, popularTopics: [], totalCostUsd: 0.5,
+    largeCloudDocs: { "700-800KB": 0, "800-900KB": 1, "900KB+": 0 },
+  },
   users: [
     { userLabel: "…abc123", activeDates: [], placementLevel: "A2", currentLevel: "B1", daysSinceActive: 0,
       avgHelpUsed: null, helpTrend: null, topicCounts: { Cafe: 2 }, estimatedCostUsd: 0.2 },
@@ -41,6 +44,9 @@ describe("usage dashboard", () => {
       headers: expect.objectContaining({ "X-Admin-Secret": "s3cret" }),
     }));
     expect($("usersBody").querySelectorAll("tr[data-index]")).toHaveLength(2);
+    expect($("largeDocs").hidden).toBe(false);
+    expect($("largeDocs").textContent).toContain("800-900KB: 1");
+    expect($("largeDocs").textContent).not.toContain("700-800KB");
   });
 
   it("opens a user's details from any cell in the row, and closes them", async () => {

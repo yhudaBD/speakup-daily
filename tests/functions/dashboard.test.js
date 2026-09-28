@@ -59,6 +59,14 @@ describe("log-event", () => {
     expect(JSON.stringify(stored)).not.toMatch(/Dana|dana@/);
   });
 
+  it("accepts a cloud document size report (CRITICAL_REVIEW §1א)", async () => {
+    const res = await logEvent(post("/api/log-event", {
+      userId: "user_1", type: "cloud_doc_large", details: { sizeRange: "700-800KB" },
+    }, { Authorization: "Bearer t" }));
+    expect(res.status).toBe(200);
+    expect([...blobs.values()][0]).toMatchObject({ type: "cloud_doc_large", details: { sizeRange: "700-800KB" } });
+  });
+
   it("rejects unknown event types", async () => {
     const res = await logEvent(post("/api/log-event", { userId: "u", type: "drop_table" }, { Authorization: "Bearer t" }));
     expect(res.status).toBe(400);
@@ -91,6 +99,16 @@ describe("get-dashboard-data", () => {
     const data = await res.json();
     expect(data.users[0]).toMatchObject({ placementLevel: null, currentLevel: "B1" });
     expect(JSON.stringify(data)).not.toContain("onerror");
+  });
+
+  it("counts users by the largest cloud document size they reported (CRITICAL_REVIEW §1א)", async () => {
+    const ev = (userId, sizeRange, ts) => ({ userId, type: "cloud_doc_large", details: { sizeRange }, ts });
+    blobs.set("1", ev("user_1", "700-800KB", "2026-09-20T10:00:00.000Z"));
+    blobs.set("2", ev("user_1", "800-900KB", "2026-09-21T10:00:00.000Z"));
+    blobs.set("3", ev("user_2", "700-800KB", "2026-09-21T10:00:00.000Z"));
+    const res = await getDashboardData(post("/api/get-dashboard-data", {}, { "X-Admin-Secret": "correct-horse" }));
+    const { summary } = await res.json();
+    expect(summary.largeCloudDocs).toEqual({ "700-800KB": 1, "800-900KB": 1, "900KB+": 0 });
   });
 
   it("labels users by the end of their uid, and never shows a stored name (CRITICAL_REVIEW §41א)", async () => {

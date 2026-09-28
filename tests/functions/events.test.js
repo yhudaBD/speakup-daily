@@ -29,4 +29,9 @@ describe("sanitizeDetails", () => {
     expect(sanitizeDetails(undefined)).toEqual({});
     expect(sanitizeDetails("x")).toEqual({});
   });
+
+  it("keeps a cloud document size only as one of the known ranges (CRITICAL_REVIEW §1א)", () => {
+    expect(sanitizeDetails({ sizeRange: "800-900KB" })).toEqual({ sizeRange: "800-900KB" });
+    expect(sanitizeDetails({ sizeRange: "812345" })).toEqual({});
+  });
 });
