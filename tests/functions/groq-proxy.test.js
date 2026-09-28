@@ -8,7 +8,7 @@ vi.mock("../../netlify/functions/_shared/auth.js", () => ({
   }),
 }));
 vi.mock("../../netlify/functions/_shared/quota.js", () => ({
-  consumeDailyQuota: vi.fn(async () => undefined),
+  consumeDailyQuota: vi.fn(async () => ({ write: Promise.resolve() })),
 }));
 
 const { default: handler } = await import("../../netlify/functions/groq-proxy.js");
@@ -97,6 +97,21 @@ describe("groq-proxy", () => {
       response_format: { type: "json_object" },
     });
     expect(sent.messages).toEqual([{ role: "user", content: "Hi" }]);
+  });
+
+  it("starts the Groq call during the quota write, and answers only after it (CRITICAL_REVIEW §34)", async () => {
+    let finishWrite;
+    const write = new Promise((resolve) => { finishWrite = resolve; });
+    consumeDailyQuota.mockResolvedValueOnce({ write });
+
+    let answered = false;
+    const pending = call(validChat).then((res) => { answered = true; return res; });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(answered).toBe(false);
+
+    finishWrite();
+    expect((await pending).status).toBe(200);
   });
 
   it("passes Groq's own error status and body through for the client's retry logic", async () => {
