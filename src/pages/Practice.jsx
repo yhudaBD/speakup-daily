@@ -111,10 +111,10 @@ function AITopicPanel({ difficulty, dailyGoal, onStart, onBack }) {
   return (
     <div className="page-enter" style={{ padding: "20px 0" }}>
       <div className="container desktop-center">
-        <button className="btn btn-ghost btn-sm mb-3" onClick={onBack}>← חזרה</button>
+        <button className="btn btn-ghost btn-sm mb-3" onClick={onBack}>→ חזרה</button>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>🤖</div>
-          <h2 style={{ marginBottom: 4 }}>טרוף AI אישי</h2>
+          <h2 style={{ marginBottom: 4 }}>תרגול AI אישי</h2>
           <p className="text-muted" style={{ fontSize: 14 }}>
             כתוב נושא וה-AI ייצור משפטים ברמת {difficulty === "easy" ? "קל" : difficulty === "medium" ? "בינוני" : "מתקדם"}
           </p>
@@ -246,7 +246,7 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, 
   return (
     <div className="page-enter" style={{ padding: "20px 0" }}>
       <div className="container desktop-center">
-        <button className="btn btn-ghost btn-sm mb-3" onClick={onBack}>← חזרה</button>
+        <button className="btn btn-ghost btn-sm mb-3" onClick={onBack}>→ חזרה</button>
         <h2 style={{ marginBottom: 4 }}>בחר נושא לתרגול</h2>
         <p className="text-muted mb-4" style={{ fontSize: 14 }}>
           {dailyGoal} משפטים · רמת {difficulty === "easy" ? "קל" : difficulty === "medium" ? "בינוני" : "מתקדם"}
@@ -273,7 +273,7 @@ function TopicSetup({ difficulty, dailyGoal, wordBank, weakCount, customTopics, 
           <span style={{ fontSize: 28 }}>🤖</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-primary)" }}>נושא חופשי עם AI ✨</div>
-            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>כתוב כל נושא וה-AI יייצר משפטים בהתאם</div>
+            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>כתוב כל נושא וה-AI ייצר משפטים בהתאם</div>
           </div>
           <span style={{ color: "var(--color-primary)", fontSize: 18 }}>➨</span>
         </button>
@@ -845,7 +845,7 @@ export default function Practice() {
           {practiceState === "IDLE" && (
             <>
               <div style={{ fontSize: 48 }}>🎧</div>
-              <p style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>הקשיב קודם, ואז דבר</p>
+              <p style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>הקשב קודם, ואז דבר</p>
               <button className="btn btn-primary btn-lg" onClick={handleListen} id="listen-btn">
                 🔊 האזן
               </button>

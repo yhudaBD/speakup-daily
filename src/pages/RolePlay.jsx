@@ -530,7 +530,7 @@ function SavedChatReview({ messages, topic, savedChat, showTranslation, onReplay
   return (
     <div className="chat-shell">
       <div className="chat-shell-header">
-        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>→</button>
         <span style={{ fontWeight: 600, fontSize: 14, color: '#6B7280' }}>שיחה שמורה</span>
         <span style={{ width: 40 }} />
       </div>
@@ -724,7 +724,7 @@ export default function RolePlay() {
     <div className="chat-shell">
       <div className="chat-shell-header">
         <button onClick={handleBack} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          ←
+          →
         </button>
         <span style={{ fontWeight: 600, color: '#1E1B4B', fontSize: 15, textAlign: 'center', flex: 1, padding: '0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {topic.emoji} {topic.title}
