@@ -32,6 +32,14 @@ function dateOf(ts) {
   return (ts || "").slice(0, 10);
 }
 
+// Users are shown by the end of their Firebase uid, never by name (§41א);
+// the admin keeps any uid-to-name mapping locally. Events from before the
+// uid was stored fall back to the device id. A name stored by older app
+// versions is never read.
+function labelFor(uid, userId) {
+  return `…${String(uid || userId).slice(-6)}`;
+}
+
 export default async (req) => {
   try {
     requirePost(req);
@@ -60,7 +68,7 @@ export default async (req) => {
       if (!byUser.has(ev.userId)) {
         byUser.set(ev.userId, {
           userId: ev.userId,
-          userName: "",
+          uid: null,
           activeDates: new Set(),
           placementLevel: null,
           currentLevel: null,
@@ -71,7 +79,7 @@ export default async (req) => {
         });
       }
       const u = byUser.get(ev.userId);
-      if (ev.userName) u.userName = ev.userName;
+      if (typeof ev.uid === "string" && ev.uid) u.uid = ev.uid;
       u.activeDates.add(dateOf(ev.ts));
       if (!u.lastActiveTs || ev.ts > u.lastActiveTs) u.lastActiveTs = ev.ts;
       if (ev.details?.currentLevel) u.currentLevel = ev.details.currentLevel;
@@ -108,7 +116,7 @@ export default async (req) => {
 
       return {
         userId: u.userId,
-        userName: u.userName || "(unnamed)",
+        userLabel: labelFor(u.uid, u.userId),
         activeDates: [...u.activeDates].sort(),
         placementLevel: u.placementLevel,
         currentLevel: u.currentLevel || u.placementLevel,

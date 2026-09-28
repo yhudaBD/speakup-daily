@@ -630,7 +630,6 @@ export default function RolePlay() {
     ttsSpeed,
     placement: state.placement,
     userId: state.user?.id,
-    userName: state.user?.name,
     onPersist: handlePersist,
     onSessionComplete: handleSessionComplete,
   });

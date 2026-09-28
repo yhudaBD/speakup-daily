@@ -72,7 +72,7 @@ function render(data) {
   } else {
     usersBody.innerHTML = data.users.map((u, i) => `
       <tr class="clickable" data-index="${i}">
-        <td>${escapeHtml(u.userName)}</td>
+        <td>${escapeHtml(u.userLabel)}</td>
         <td><div class="grid30">${days.map(d => `<div class="cell${u.activeDates.includes(d) ? ' active' : ''}" title="${d}"></div>`).join('')}</div></td>
         <td>${escapeHtml(u.placementLevel || '—')} → ${escapeHtml(u.currentLevel || '—')}</td>
         <td>${u.avgHelpUsed !== null ? u.avgHelpUsed.toFixed(1) : '—'} ${trendBadge(u.helpTrend)}</td>
@@ -89,13 +89,13 @@ function render(data) {
 
   const inactiveList = document.getElementById('inactiveList');
   inactiveList.innerHTML = inactive.length
-    ? inactive.map(u => `<li><span>${escapeHtml(u.userName)}</span><span>לפני ${u.daysSinceActive} ימים</span></li>`).join('')
+    ? inactive.map(u => `<li><span>${escapeHtml(u.userLabel)}</span><span>לפני ${u.daysSinceActive} ימים</span></li>`).join('')
     : '<li class="empty" style="border:none;background:none">כולם פעילים 🎉</li>';
 }
 
 function openModal(index) {
   const u = currentData.users[index];
-  document.getElementById('modalName').textContent = u.userName;
+  document.getElementById('modalName').textContent = u.userLabel;
   const topics = Object.entries(u.topicCounts || {}).sort((a, b) => b[1] - a[1]);
   document.getElementById('modalBody').innerHTML = `
     <p><strong>רמה:</strong> ${escapeHtml(u.placementLevel || '—')} ← ${escapeHtml(u.currentLevel || '—')}</p>

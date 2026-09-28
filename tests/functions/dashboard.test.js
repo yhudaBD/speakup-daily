@@ -45,7 +45,18 @@ describe("log-event", () => {
     }, { Authorization: "Bearer t" }));
     expect(res.status).toBe(200);
     const [stored] = blobs.values();
-    expect(stored).toMatchObject({ userId: "user_1", uid: "uid-1", userName: "Dana", details: {} });
+    expect(stored).toMatchObject({ userId: "user_1", uid: "uid-1", details: {} });
+  });
+
+  it("doesn't store a name or email, even from an older app version that still sends one (CRITICAL_REVIEW §41א)", async () => {
+    const res = await logEvent(post("/api/log-event", {
+      userId: "user_1", userName: "Dana Levi", email: "dana@example.com", type: "session_started", details: {},
+    }, { Authorization: "Bearer t" }));
+    expect(res.status).toBe(200);
+    const [stored] = blobs.values();
+    expect(stored).not.toHaveProperty("userName");
+    expect(stored).not.toHaveProperty("email");
+    expect(JSON.stringify(stored)).not.toMatch(/Dana|dana@/);
   });
 
   it("rejects unknown event types", async () => {
@@ -78,7 +89,19 @@ describe("get-dashboard-data", () => {
     const res = await getDashboardData(post("/api/get-dashboard-data", {}, { "X-Admin-Secret": "correct-horse" }));
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.users[0]).toMatchObject({ userName: "Dana", placementLevel: null, currentLevel: "B1" });
+    expect(data.users[0]).toMatchObject({ placementLevel: null, currentLevel: "B1" });
     expect(JSON.stringify(data)).not.toContain("onerror");
+  });
+
+  it("labels users by the end of their uid, and never shows a stored name (CRITICAL_REVIEW §41א)", async () => {
+    blobs.set("a", {
+      userId: "user_1", uid: "firebase-uid-abc123", userName: "Dana Levi", type: "session_started",
+      details: {}, ts: "2026-09-21T10:00:00.000Z",
+    });
+    blobs.set("b", { userId: "user_legacy_xyz789", type: "session_started", details: {}, ts: "2026-09-20T10:00:00.000Z" });
+    const res = await getDashboardData(post("/api/get-dashboard-data", {}, { "X-Admin-Secret": "correct-horse" }));
+    const data = await res.json();
+    expect(data.users.map((u) => u.userLabel).sort()).toEqual(["…abc123", "…xyz789"]);
+    expect(JSON.stringify(data)).not.toMatch(/Dana|userName/);
   });
 });

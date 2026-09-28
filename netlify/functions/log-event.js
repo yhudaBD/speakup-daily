@@ -25,7 +25,9 @@ export default async (req) => {
   try {
     requirePost(req);
     const uid = await requireUser(req);
-    const { userId, userName, type, details } = await readJson(req, MAX_BODY_BYTES);
+    // Only these fields are kept. Older app versions also send userName; it's
+    // dropped here, since events must not identify the user (§41א).
+    const { userId, type, details } = await readJson(req, MAX_BODY_BYTES);
     if (typeof userId !== "string" || !userId || !ALLOWED_TYPES.has(type)) {
       throw new HttpError(400, "invalid_request", "Missing userId or unknown type");
     }
@@ -35,7 +37,6 @@ export default async (req) => {
     await store.setJSON(key, {
       userId: userId.slice(0, 100),
       uid,
-      userName: typeof userName === "string" ? userName.slice(0, 100) : "",
       type,
       details: sanitizeDetails(details),
       ts: new Date().toISOString(),
