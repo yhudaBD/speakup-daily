@@ -8,9 +8,12 @@ import { useVoiceInput } from "./useVoiceInput";
  */
 export function useSpeechRecognition() {
   const [transcript, setTranscript] = useState("");
+  // How long the recording behind this transcript ran (T4: speaking time).
+  const [durationMs, setDurationMs] = useState(null);
 
-  const handleResult = useCallback((text) => {
+  const handleResult = useCallback((text, { durationMs: ms } = {}) => {
     setTranscript(text);
+    setDurationMs(ms ?? null);
   }, []);
 
   const {
@@ -31,6 +34,7 @@ export function useSpeechRecognition() {
 
   const start = useCallback(() => {
     setTranscript("");
+    setDurationMs(null);
     startRecording();
   }, [startRecording]);
 
@@ -40,6 +44,7 @@ export function useSpeechRecognition() {
 
   return {
     transcript,
+    durationMs,
     liveTranscript,
     isListening,
     isRecording,

@@ -101,6 +101,25 @@ describe("get-dashboard-data", () => {
     expect(JSON.stringify(data)).not.toContain("onerror");
   });
 
+  it("sums each user's independent and repeat speaking over the last 7 days (T4)", async () => {
+    const day = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
+    const ev = (details, ts) => ({ userId: "user_1", type: "speaking_time", details, ts });
+    blobs.set("1", ev({ kind: "roleplay", independent_sec: 40, repeat_sec: 0 }, day(1)));
+    blobs.set("2", ev({ kind: "practice", independent_sec: 0, repeat_sec: 25 }, day(2)));
+    blobs.set("3", ev({ kind: "roleplay", independent_sec: 30, repeat_sec: 0 }, day(3)));
+    blobs.set("4", ev({ kind: "roleplay", independent_sec: 500, repeat_sec: 0 }, day(10)));
+    const res = await getDashboardData(post("/api/get-dashboard-data", {}, { "X-Admin-Secret": "correct-horse" }));
+    const { users } = await res.json();
+    expect(users[0]).toMatchObject({ independentSec7d: 70, repeatSec7d: 25 });
+  });
+
+  it("accepts a speaking time report (T4)", async () => {
+    const res = await logEvent(post("/api/log-event", {
+      userId: "user_1", type: "speaking_time", details: { kind: "roleplay", independent_sec: 12, repeat_sec: 0 },
+    }, { Authorization: "Bearer t" }));
+    expect(res.status).toBe(200);
+  });
+
   it("counts users by the largest cloud document size they reported (CRITICAL_REVIEW §1א)", async () => {
     const ev = (userId, sizeRange, ts) => ({ userId, type: "cloud_doc_large", details: { sizeRange }, ts });
     blobs.set("1", ev("user_1", "700-800KB", "2026-09-20T10:00:00.000Z"));

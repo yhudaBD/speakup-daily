@@ -54,6 +54,12 @@ export function useVoiceInput({
   const silenceTimerRef = useRef(null);
   const mimeTypeRef = useRef("");
   const stopRecordingRef = useRef(() => {});
+  // How long the recording ran, passed to onResult as { durationMs } (T4 in
+  // ACTION_PLAN.md: speaking time). When silence ended it, the silence wait
+  // is taken off, since the user wasn't speaking then.
+  const recordStartRef = useRef(0);
+  const recordedMsRef = useRef(null);
+  const stoppedBySilenceRef = useRef(false);
 
   const clearMaxDurationTimer = useCallback(() => {
     if (maxDurationTimerRef.current) {
@@ -79,6 +85,7 @@ export function useVoiceInput({
     silenceTimerRef.current = setTimeout(() => {
       const hasText = finalTranscriptRef.current.trim() || previewTranscriptRef.current.trim();
       if (isRecordingRef.current && hasText) {
+        stoppedBySilenceRef.current = true;
         stopRecordingRef.current();
       }
     }, silenceMs);
@@ -116,7 +123,7 @@ export function useVoiceInput({
     finalTranscriptRef.current = "";
     previewTranscriptRef.current = "";
     setLiveTranscript("");
-    if (text?.trim()) onResult?.(text.trim());
+    if (text?.trim()) onResult?.(text.trim(), { durationMs: recordedMsRef.current ?? undefined });
   }, [onResult]);
 
   const applyRecognitionResult = useCallback((e, { previewOnly = false } = {}) => {
@@ -195,6 +202,11 @@ export function useVoiceInput({
     if (!isRecordingRef.current) return;
     clearMaxDurationTimer();
     clearSilenceTimer();
+    const silenceTail = stoppedBySilenceRef.current ? silenceMs : 0;
+    stoppedBySilenceRef.current = false;
+    recordedMsRef.current = recordStartRef.current
+      ? Math.max(0, Date.now() - recordStartRef.current - silenceTail)
+      : null;
 
     if (useRecorder && recorderRef.current?.state === "recording") {
       isRecordingRef.current = false;
@@ -214,7 +226,7 @@ export function useVoiceInput({
     finishWithText(text);
     abortRecognition(recognitionRef);
     stopStream(streamRef);
-  }, [useRecorder, clearMaxDurationTimer, clearSilenceTimer, finishWithText, abortRecognition]);
+  }, [useRecorder, clearMaxDurationTimer, clearSilenceTimer, finishWithText, abortRecognition, silenceMs]);
 
   stopRecordingRef.current = stopRecording;
 
@@ -284,6 +296,7 @@ export function useVoiceInput({
 
     recorderRef.current = recorder;
     recorder.start(250);
+    recordStartRef.current = Date.now();
     isRecordingRef.current = true;
     setIsRecording(true);
     setLiveTranscript("");
@@ -320,6 +333,7 @@ export function useVoiceInput({
     recognitionRef.current = recognition;
     try {
       recognition.start();
+      recordStartRef.current = Date.now();
       setIsRecording(true);
       setError(null);
       maxDurationTimerRef.current = setTimeout(() => stopRecording(), MAX_RECORDING_MS);

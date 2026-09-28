@@ -30,6 +30,13 @@ describe("sanitizeDetails", () => {
     expect(sanitizeDetails("x")).toEqual({});
   });
 
+  it("keeps speaking time as whole seconds within a sane range (T4)", () => {
+    expect(sanitizeDetails({ kind: "practice", independent_sec: 0, repeat_sec: 42.7 })).toEqual({
+      kind: "practice", independent_sec: 0, repeat_sec: 42,
+    });
+    expect(sanitizeDetails({ independent_sec: -1, repeat_sec: 999999, kind: "other" })).toEqual({});
+  });
+
   it("keeps a cloud document size only as one of the known ranges (CRITICAL_REVIEW §1א)", () => {
     expect(sanitizeDetails({ sizeRange: "800-900KB" })).toEqual({ sizeRange: "800-900KB" });
     expect(sanitizeDetails({ sizeRange: "812345" })).toEqual({});

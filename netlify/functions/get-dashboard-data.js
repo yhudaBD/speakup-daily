@@ -77,6 +77,8 @@ export default async (req) => {
           topicCounts: {},
           totalTurns: 0,
           largestDocRange: -1,
+          independentSec7d: 0,
+          repeatSec7d: 0,
         });
       }
       const u = byUser.get(ev.userId);
@@ -91,6 +93,11 @@ export default async (req) => {
       if (!u.lastActiveTs || ev.ts > u.lastActiveTs) u.lastActiveTs = ev.ts;
       if (ev.details?.currentLevel) u.currentLevel = ev.details.currentLevel;
 
+      // The North Star baseline (T4): seconds spoken in the last 7 days.
+      if (ev.type === "speaking_time" && new Date(ev.ts).getTime() >= sevenDaysAgo) {
+        u.independentSec7d += ev.details.independent_sec || 0;
+        u.repeatSec7d += ev.details.repeat_sec || 0;
+      }
       if (ev.type === "placement_completed" && !u.placementLevel) {
         u.placementLevel = ev.details?.level || null;
       }
@@ -133,6 +140,8 @@ export default async (req) => {
         helpTrend: trend,
         topicCounts: u.topicCounts,
         estimatedCostUsd: Math.round(u.totalTurns * EST_COST_PER_TURN_USD * 10000) / 10000,
+        independentSec7d: u.independentSec7d,
+        repeatSec7d: u.repeatSec7d,
       };
     });
 

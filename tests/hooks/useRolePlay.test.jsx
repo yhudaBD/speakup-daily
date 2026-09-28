@@ -15,6 +15,7 @@ vi.mock("../../src/utils/analytics", () => ({ logEvent: vi.fn() }));
 
 const { aiService } = await import("../../src/services/ai.service");
 const { useRolePlay } = await import("../../src/hooks/useRolePlay");
+const { logEvent } = await import("../../src/utils/analytics");
 
 const topic = { id: "cafe", emoji: "☕", title: "Café", description: "", difficulty: "easy", systemPrompt: "You are a barista." };
 const reply = (text) => ({ ai_reply: text, ai_reply_he: "", suggested_user_responses: [] });
@@ -137,5 +138,66 @@ describe("useRolePlay", () => {
     await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
     expect(result.current.messages.map((m) => m.content)).toEqual(["Welcome in!"]);
     error.mockRestore();
+  });
+});
+
+// T4 in ACTION_PLAN.md: each user turn records how it was made, and the
+// session reports its independent speaking time (never the content).
+describe("speaking source and time (T4)", () => {
+
+  it("stores the turn's source and duration, and sends the AI only role and content", async () => {
+    aiService.sendMessage.mockResolvedValueOnce(reply("What can I get you?"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    aiService.sendMessage.mockResolvedValueOnce(reply("Sure."));
+    await act(async () => { await result.current.handleUserMessage("A coffee please", { source: "spoken", durationMs: 2300 }); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    expect(persisted.at(-1).messages[1]).toMatchObject({ role: "user", content: "A coffee please", source: "spoken", durationMs: 2300 });
+    expect(aiService.sendMessage.mock.calls.at(-1)[0].messages.at(-1)).toEqual({ role: "user", content: "A coffee please" });
+  });
+
+  it("marks a turn typed when no source is given, and drops a duration on anything but speech", async () => {
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+    await act(async () => { await result.current.handleUserMessage("Hello"); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+    await act(async () => { await result.current.handleUserMessage("Tea", { source: "suggestion", durationMs: 999 }); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    const userTurns = persisted.at(-1).messages.filter((m) => m.role === "user");
+    expect(userTurns[0]).toEqual({ role: "user", content: "Hello", source: "typed" });
+    expect(userTurns[1]).toEqual({ role: "user", content: "Tea", source: "suggestion" });
+  });
+
+  it("reports the session's independent speaking time when it ends", async () => {
+    logEvent.mockClear();
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null, userId: "user_1", onSessionComplete: vi.fn() });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+    await act(async () => { await result.current.handleUserMessage("I want a coffee", { source: "spoken", durationMs: 2600 }); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+    await act(async () => { await result.current.handleUserMessage("Large", { source: "typed" }); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+
+    act(() => { result.current.endConversation(); });
+    expect(logEvent).toHaveBeenCalledWith("user_1", "speaking_time", { kind: "roleplay", independent_sec: 3, repeat_sec: 0 });
+  });
+
+  it("sends no speaking time when nothing was said out loud", async () => {
+    logEvent.mockClear();
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null, userId: "user_1", onSessionComplete: vi.fn() });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    act(() => { result.current.endConversation(); });
+    expect(logEvent).not.toHaveBeenCalledWith("user_1", "speaking_time", expect.anything());
   });
 });

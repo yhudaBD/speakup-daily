@@ -17,7 +17,7 @@ const data = {
     largeCloudDocs: { "700-800KB": 0, "800-900KB": 1, "900KB+": 0 },
   },
   users: [
-    { userLabel: "…abc123", activeDates: [], placementLevel: "A2", currentLevel: "B1", daysSinceActive: 0,
+    { userLabel: "…abc123", activeDates: [], placementLevel: "A2", currentLevel: "B1", daysSinceActive: 0, independentSec7d: 125,
       avgHelpUsed: null, helpTrend: null, topicCounts: { Cafe: 2 }, estimatedCostUsd: 0.2 },
     { userLabel: "…xyz789", activeDates: [], placementLevel: null, currentLevel: null, daysSinceActive: 5,
       avgHelpUsed: 1, helpTrend: "down", topicCounts: {}, estimatedCostUsd: 0.3 },
@@ -44,6 +44,7 @@ describe("usage dashboard", () => {
       headers: expect.objectContaining({ "X-Admin-Secret": "s3cret" }),
     }));
     expect($("usersBody").querySelectorAll("tr[data-index]")).toHaveLength(2);
+    expect($("usersBody").querySelector("tr[data-index]").textContent).toContain("2:05");
     expect($("largeDocs").hidden).toBe(false);
     expect($("largeDocs").textContent).toContain("800-900KB: 1");
     expect($("largeDocs").textContent).not.toContain("700-800KB");

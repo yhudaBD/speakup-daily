@@ -1,19 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 
+const TYPED = { source: 'typed' };
+
+// onSpoke(text, turn) gets how the text was made (T4): spoken from the mic
+// (with the recording's duration), translated from "how do you say", or
+// typed. Editing keeps the origin; clearing the field starts over as typed.
 export function MicButton({ phase, onSpoke, insertText, onInsertConsumed }) {
   const [textInput, setTextInput] = useState('');
+  const [origin, setOrigin] = useState(TYPED);
   const isActive = phase === 'USER_TURN';
 
   useEffect(() => {
     if (insertText) {
       setTextInput(insertText);
+      setOrigin({ source: 'translated' });
       onInsertConsumed?.();
     }
   }, [insertText, onInsertConsumed]);
 
-  const handleVoiceResult = useCallback((text) => {
+  const handleVoiceResult = useCallback((text, { durationMs } = {}) => {
     setTextInput(text);
+    setOrigin(durationMs > 0 ? { source: 'spoken', durationMs } : { source: 'spoken' });
   }, []);
 
   const {
@@ -37,8 +45,9 @@ export function MicButton({ phase, onSpoke, insertText, onInsertConsumed }) {
 
   const handleSend = () => {
     if (!canSend) return;
-    onSpoke(displayValue.trim());
+    onSpoke(displayValue.trim(), origin);
     setTextInput('');
+    setOrigin(TYPED);
   };
 
   return (
@@ -62,7 +71,11 @@ export function MicButton({ phase, onSpoke, insertText, onInsertConsumed }) {
         <input
           dir="ltr"
           value={displayValue}
-          onChange={e => { if (!micBusy) setTextInput(e.target.value); }}
+          onChange={e => {
+            if (micBusy) return;
+            setTextInput(e.target.value);
+            if (!e.target.value) setOrigin(TYPED);
+          }}
           onKeyDown={e => {
             if (e.key === 'Enter' && canSend) {
               handleSend();
