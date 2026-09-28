@@ -62,6 +62,13 @@ function render(data) {
   costEl.textContent = '$' + data.summary.totalCostUsd.toFixed(2);
   costEl.className = 'num' + (data.summary.totalCostUsd >= 10 ? ' bad' : '');
 
+  // Users whose cloud document is nearing Firestore's 1MB cap (§1א).
+  const large = data.summary.largeCloudDocs || {};
+  const largeDocs = document.getElementById('largeDocs');
+  const largeParts = Object.entries(large).filter(([, n]) => n > 0).map(([range, n]) => range + ': ' + n);
+  largeDocs.textContent = largeParts.length ? '⚠️ מסמכים גדולים בענן (משתמשים לפי טווח): ' + largeParts.join(' · ') : '';
+  largeDocs.hidden = !largeParts.length;
+
   const days = last30Days();
   const inactive = data.users.filter(u => u.daysSinceActive !== null && u.daysSinceActive >= 3);
   document.getElementById('inactiveCount').textContent = inactive.length;

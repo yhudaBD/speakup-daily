@@ -8,6 +8,8 @@
 // before this existed.
 
 export const CEFR_LEVELS = new Set(["Pre-A1", "A1", "A2", "B1", "B2", "C1"]);
+// A cloud document's size is reported only as one of these (src/services/cloudSync.js).
+export const SIZE_RANGES = ["700-800KB", "800-900KB", "900KB+"];
 
 const text = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
 const count = (v) => (Number.isFinite(v) && v >= 0 && v <= 1000 ? Math.floor(v) : undefined);
@@ -23,6 +25,7 @@ export function sanitizeDetails(details) {
     topicTitle: text(d.topicTitle, 120),
     turnCount: count(d.turnCount),
     helpUsedCount: count(d.helpUsedCount),
+    sizeRange: SIZE_RANGES.includes(d.sizeRange) ? d.sizeRange : undefined,
   };
   return Object.fromEntries(Object.entries(clean).filter(([, v]) => v !== undefined));
 }

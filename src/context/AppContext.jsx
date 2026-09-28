@@ -8,6 +8,8 @@ import { getTodayString } from "../utils/dateHelpers";
 import {
   auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle, deleteCloudProfile, deleteAuthAccountOrSignOut,
 } from "../services/firebase";
+import { cloudSync, docSizeBytes, sizeRange } from "../services/cloudSync";
+import { logEvent } from "../utils/analytics";
 
 const AppContext = createContext(null);
 
@@ -26,6 +28,9 @@ export function AppProvider({ children }) {
   // Set while signing out, so the persist effect can't write this account's
   // state back into localStorage after it has been cleared.
   const persistBlockedRef = useRef(false);
+  // The cloud document size range last reported this session, so a large
+  // document is reported once per range, not on every save.
+  const reportedSizeRangeRef = useRef(null);
 
   // Track the signed-in Firebase account, if any. AuthGate reads authReady
   // (below) from context instead of subscribing to this itself, so there is
@@ -150,14 +155,23 @@ export function AppProvider({ children }) {
     // stored history if the page died before the load re-render.
     if (!state.isLoaded || persistBlockedRef.current) return;
     const toSave = snapshotForSync(state);
+    const serialized = JSON.stringify(toSave);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      localStorage.setItem(STORAGE_KEY, serialized);
     } catch (e) {
       console.error("Failed to save data", e);
     }
     const uid = firebaseUser?.uid;
     if (uid && cloudReadyUidRef.current === uid) {
-      saveCloudProfile(uid, toSave).catch((e) => console.error("Cloud save failed", e));
+      // Firestore refuses documents over 1MB (CRITICAL_REVIEW.md §1).
+      // Report, as a range only, when this one is getting close.
+      const range = sizeRange(docSizeBytes(serialized));
+      if (range && range !== reportedSizeRangeRef.current) {
+        reportedSizeRangeRef.current = range;
+        logEvent(state.user?.id, "cloud_doc_large", { sizeRange: range });
+      }
+      // A failed or stuck write shows CloudSyncBanner (§1א).
+      cloudSync.track(saveCloudProfile(uid, toSave)).catch((e) => console.error("Cloud save failed", e));
     }
   }, [firebaseUser, state.isLoaded, state.ownerUid, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
 

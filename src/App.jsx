@@ -7,6 +7,7 @@ import { ErrorBoundary, AppCrashScreen, RouteErrorBoundary } from "./components/
 import BottomNav from "./components/layout/BottomNav";
 import OfflineBanner from "./components/layout/OfflineBanner";
 import BetaAccessBanner from "./components/layout/BetaAccessBanner";
+import CloudSyncBanner from "./components/layout/CloudSyncBanner";
 import UpdateBanner from "./components/layout/UpdateBanner";
 import Home from "./pages/Home";
 import Practice from "./pages/Practice";
@@ -51,6 +52,7 @@ export default function App() {
           <UpdateBanner />
           <OfflineBanner />
           <BetaAccessBanner />
+          <CloudSyncBanner />
         </ErrorBoundary>
       </div>
       <ErrorBoundary name="app" fallback={() => <AppCrashScreen />}>

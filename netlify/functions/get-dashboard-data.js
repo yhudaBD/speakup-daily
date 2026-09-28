@@ -15,7 +15,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getStore } from "@netlify/blobs";
 import { HttpError, errorResponse, json, requirePost } from "./_shared/http.js";
-import { sanitizeDetails } from "./_shared/events.js";
+import { SIZE_RANGES, sanitizeDetails } from "./_shared/events.js";
 // Rough cost estimate per RolePlay turn, derived from real Groq pricing
 // measured earlier in this project (~$0.11/user/month at typical usage) —
 // good enough for the $10/month alert threshold; not meant to be exact.
@@ -76,10 +76,17 @@ export default async (req) => {
           helpSeries: [],
           topicCounts: {},
           totalTurns: 0,
+          largestDocRange: -1,
         });
       }
       const u = byUser.get(ev.userId);
       if (typeof ev.uid === "string" && ev.uid) u.uid = ev.uid;
+      // A size report is sent when the app saves, even on just opening it,
+      // so it isn't a sign of practice.
+      if (ev.type === "cloud_doc_large") {
+        u.largestDocRange = Math.max(u.largestDocRange, SIZE_RANGES.indexOf(ev.details?.sizeRange));
+        continue;
+      }
       u.activeDates.add(dateOf(ev.ts));
       if (!u.lastActiveTs || ev.ts > u.lastActiveTs) u.lastActiveTs = ev.ts;
       if (ev.details?.currentLevel) u.currentLevel = ev.details.currentLevel;
@@ -136,10 +143,16 @@ export default async (req) => {
       .map(([topic, count]) => ({ topic, count }))
       .sort((a, b) => b.count - a.count);
     const totalCostUsd = Math.round(users.reduce((s, u) => s + u.estimatedCostUsd, 0) * 10000) / 10000;
+    // Users whose cloud document neared Firestore's 1MB cap, by the largest
+    // range each reported (§1א). A non-zero count makes the migration urgent.
+    const largeCloudDocs = Object.fromEntries(SIZE_RANGES.map((range) => [range, 0]));
+    for (const u of byUser.values()) {
+      if (u.largestDocRange >= 0) largeCloudDocs[SIZE_RANGES[u.largestDocRange]]++;
+    }
 
     return json(200, {
       users: users.sort((a, b) => (b.lastActiveTs || "").localeCompare(a.lastActiveTs || "")),
-      summary: { totalUsers: users.length, weeklyActiveUsers, popularTopics, totalCostUsd },
+      summary: { totalUsers: users.length, weeklyActiveUsers, popularTopics, totalCostUsd, largeCloudDocs },
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {

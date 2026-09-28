@@ -18,7 +18,7 @@ import { HttpError, errorResponse, json, readJson, requirePost } from "./_shared
 import { requireUser } from "./_shared/auth.js";
 import { sanitizeDetails } from "./_shared/events.js";
 
-const ALLOWED_TYPES = new Set(["placement_completed", "session_started", "session_ended"]);
+const ALLOWED_TYPES = new Set(["placement_completed", "session_started", "session_ended", "cloud_doc_large"]);
 const MAX_BODY_BYTES = 4_000;
 
 export default async (req) => {
