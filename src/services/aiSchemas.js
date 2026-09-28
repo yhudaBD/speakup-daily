@@ -17,6 +17,11 @@
 // fields, hence `loose()` below.
 import * as z from "zod/mini";
 
+// The site's CSP has no 'unsafe-eval' (netlify.toml). Zod would fall back on
+// its own, but its `new Function` probe still logs a CSP violation on every
+// load, so skip the probe.
+z.config({ jitless: true });
+
 export const CEFR_LEVELS = ["Pre-A1", "A1", "A2", "B1", "B2", "C1"];
 
 // Any value, including a missing key, mapped through fn.

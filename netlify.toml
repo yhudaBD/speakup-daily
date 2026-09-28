@@ -57,7 +57,14 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://speakup-daily-88d5a.firebaseapp.com; frame-src 'self' https://apis.google.com https://accounts.google.com https://speakup-daily-88d5a.firebaseapp.com; base-uri 'self'; frame-ancestors 'none'"
+    Permissions-Policy = "microphone=(self), camera=(), geolocation=(), payment=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # script-src has no 'unsafe-inline' or 'unsafe-eval': the dashboard's
+    # script lives in usage_dashboard.js, and neither the app bundle nor the
+    # Google sign-in scripts need eval. style-src keeps 'unsafe-inline' for
+    # React's inline styles. This header doesn't reach the proxied /__/auth/*
+    # pages, which carry Firebase's own inline scripts.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://speakup-daily-88d5a.firebaseapp.com; frame-src 'self' https://apis.google.com https://accounts.google.com https://speakup-daily-88d5a.firebaseapp.com; base-uri 'self'; frame-ancestors 'none'"
 
 # Always revalidate the service worker itself so updates are picked up promptly.
 [[headers]]
