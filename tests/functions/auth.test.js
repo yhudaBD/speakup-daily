@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from "jose";
-import { requireUser } from "../../netlify/functions/_shared/auth.js";
+import { requireUser, verifyUser } from "../../netlify/functions/_shared/auth.js";
 
 const PROJECT = "test-project";
 let privateKey;
@@ -58,6 +58,24 @@ describe("requireUser", () => {
     const token = await sign({}, { exp: Math.floor(Date.now() / 1000) - 60 });
     await expect(requireUser(withAuth(`Bearer ${token}`), { keys, projectId: PROJECT })).rejects.toMatchObject({
       status: 401,
+    });
+  });
+});
+
+describe("verifyUser", () => {
+  it("returns the uid with the email and whether Google verified it", async () => {
+    const token = await sign({ email: "dana@example.com", email_verified: true });
+    await expect(verifyUser(withAuth(`Bearer ${token}`), { keys, projectId: PROJECT })).resolves.toEqual({
+      uid: "uid-123",
+      email: "dana@example.com",
+      emailVerified: true,
+    });
+  });
+
+  it("treats a missing email_verified claim as unverified", async () => {
+    const token = await sign({ email: "dana@example.com" });
+    await expect(verifyUser(withAuth(`Bearer ${token}`), { keys, projectId: PROJECT })).resolves.toMatchObject({
+      emailVerified: false,
     });
   });
 });

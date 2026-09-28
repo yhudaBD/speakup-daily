@@ -57,7 +57,9 @@ project is linked to a real Netlify site (`netlify link`, requires login) — ex
 The Netlify site is connected to this repo's `main` branch — every push deploys automatically.
 Required environment variables (Site settings → Environment variables on Netlify, never
 committed to the repo): `GROQ_API_KEY`, `ADMIN_SECRET`. Optional: `AI_DAILY_LIMIT_PER_USER`
-(AI calls per account per day, default 600).
+(AI calls per account per day, default 600), and `ALLOWED_EMAILS` (comma-separated beta list:
+only these verified Google accounts get AI features, including transcription; unset, every
+signed-in account does).
 
 **Crash reporting (optional)**: render crashes are caught by error boundaries
 (`src/components/ErrorBoundary.jsx`) and go through `src/services/errorReporting.js`, which

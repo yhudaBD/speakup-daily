@@ -195,3 +195,32 @@ describe("sendMessage", () => {
   });
 });
 
+
+// CRITICAL_REVIEW.md §26א: the proxy refuses accounts outside the beta list
+// with 403 not_in_beta, and the app says so instead of a generic failure.
+describe("beta access", () => {
+  it("announces not_in_beta once and still rejects the call", async () => {
+    const { isNotInBeta, onNotInBeta } = await import("../../src/services/betaAccess");
+    const listener = vi.fn();
+    const unsubscribe = onNotInBeta(listener);
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: "not_in_beta", message: "beta only" } }), { status: 403 }),
+    );
+
+    await expect(aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" })).rejects.toThrow(/403/);
+    expect(isNotInBeta()).toBe(true);
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("doesn't treat other 403s as a beta refusal", async () => {
+    vi.resetModules();
+    vi.doMock("../../src/services/firebase", () => ({ auth: null }));
+    const { aiService: fresh } = await import("../../src/services/ai.service");
+    const { isNotInBeta } = await import("../../src/services/betaAccess");
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { code: "forbidden" } }), { status: 403 }));
+
+    await expect(fresh.analyzeConversation({ messages: conversation, topicTitle: "Café" })).rejects.toThrow(/403/);
+    expect(isNotInBeta()).toBe(false);
+  });
+});
