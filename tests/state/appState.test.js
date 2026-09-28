@@ -109,6 +109,32 @@ describe("speaking source and duration (T4)", () => {
   });
 });
 
+// T5 in ACTION_PLAN.md: whether the user recorded "day 1" or chose not to.
+// The recordings stay on the device; only this status is saved and synced.
+describe("day-1 recording status (T5)", () => {
+  it("starts unset, including for data saved before T5", () => {
+    expect(loaded().baseline).toBeNull();
+    expect(loaded({ sessions: {} }).baseline).toBeNull();
+  });
+
+  it("records the choice with a timestamp and saves it with the rest", () => {
+    const next = reducer(loaded(), { type: "SET_BASELINE", payload: { status: "recorded" } });
+    expect(next.baseline).toMatchObject({ status: "recorded" });
+    expect(next.baseline.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(snapshotForSync(next).baseline).toEqual(next.baseline);
+  });
+
+  it("ignores an unknown status", () => {
+    expect(reducer(loaded(), { type: "SET_BASELINE", payload: { status: "maybe" } }).baseline).toBeNull();
+  });
+
+  it("keeps the local choice when the cloud copy doesn't have one yet", () => {
+    const local = reducer(loaded(), { type: "SET_BASELINE", payload: { status: "declined" } });
+    const merged = reducer(local, { type: "MERGE_CLOUD_DATA", payload: { sessions: {} } });
+    expect(merged.baseline.status).toBe("declined");
+  });
+});
+
 // Verified bugs from CRITICAL_REVIEW.md. Each `it.fails` states the correct
 // behavior and fails today; the fix turns it into a plain `it`. The plain
 // test beside it keeps `it.fails` honest: a crash would also "fail".

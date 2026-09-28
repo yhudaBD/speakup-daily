@@ -9,6 +9,7 @@ import {
   auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle, deleteCloudProfile, deleteAuthAccountOrSignOut,
 } from "../services/firebase";
 import { cloudSync, docSizeBytes, sizeRange } from "../services/cloudSync";
+import { clearLocalAccountData } from "../services/localAccountData";
 import { logEvent } from "../utils/analytics";
 
 const AppContext = createContext(null);
@@ -173,7 +174,7 @@ export function AppProvider({ children }) {
       // A failed or stuck write shows CloudSyncBanner (§1א).
       cloudSync.track(saveCloudProfile(uid, toSave)).catch((e) => console.error("Cloud save failed", e));
     }
-  }, [firebaseUser, state.isLoaded, state.ownerUid, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement]);
+  }, [firebaseUser, state.isLoaded, state.ownerUid, state.user, state.settings, state.streak, state.sessions, state.rolePlay, state.practice, state.lifetimeStats, state.placement, state.baseline]);
 
   // Signing out also removes this account's data from the device, so the
   // next person to use this browser can't see it. That's only safe once
@@ -210,7 +211,8 @@ export function AppProvider({ children }) {
   }, [firebaseUser, state]);
 
   // Settings' "delete account": erases this account's cloud copy, this
-  // device's copy, and the Firebase Auth record, then reloads to a signed-out
+  // device's copy (with its day-1 recordings, see localAccountData.js), and
+  // the Firebase Auth record, then reloads to a signed-out
   // app. Persistence is blocked first so no pending state change can write
   // the document back. Firestore applies one client's writes in order, so
   // an earlier save still in flight lands before the delete, not after it.
@@ -228,11 +230,7 @@ export function AppProvider({ children }) {
       cloudReadyUidRef.current = uid;
       throw e;
     }
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Storage blocked: nothing we can clear anyway.
-    }
+    await clearLocalAccountData(uid);
     await deleteAuthAccountOrSignOut();
     window.location.replace("/");
   }, [firebaseUser]);

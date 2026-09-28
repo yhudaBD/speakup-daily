@@ -5,6 +5,7 @@ import { usePlacementTest } from '../hooks/usePlacementTest';
 import { ConversationBubble } from '../components/roleplay/ConversationBubble';
 import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
 import { MicButton } from '../components/roleplay/MicButton';
+import { isBaselineDismissed } from '../services/baselineRecordings';
 
 const EMOJI = '🧭';
 
@@ -85,6 +86,16 @@ export default function PlacementTest() {
   const { state, dispatch } = useApp();
   const chatBottomRef = useRef(null);
 
+  // A new user records "day 1" right after this (T5 in ACTION_PLAN.md), then
+  // goes on to `to`. Once recorded, declined or put off, straight to `to`.
+  const goAfterPlacement = (to, toState) => {
+    if (!state.baseline && !isBaselineDismissed()) {
+      navigate('/baseline', { state: { next: { to, state: toState } } });
+    } else {
+      navigate(to, toState ? { state: toState } : undefined);
+    }
+  };
+
   const skipWithDefault = () => {
     dispatch({
       type: 'SET_PLACEMENT_RESULT',
@@ -99,7 +110,7 @@ export default function PlacementTest() {
         skipped: true,
       },
     });
-    navigate('/');
+    goAfterPlacement('/');
   };
 
   const {
@@ -114,9 +125,9 @@ export default function PlacementTest() {
 
   const handleContinueAfterPlacement = () => {
     if (result?.learning_plan?.length) {
-      navigate('/progress', { state: { initialTab: 'plan' } });
+      goAfterPlacement('/progress', { initialTab: 'plan' });
     } else {
-      navigate('/');
+      goAfterPlacement('/');
     }
   };
 
