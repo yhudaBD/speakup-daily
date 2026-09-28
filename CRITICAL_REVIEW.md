@@ -2,7 +2,9 @@
 
 *ספטמבר 2026. סקירה של כל קוד הלקוח, ה-state, פונקציות Netlify, הפרומפטים ומאגר התוכן.*
 
-הבאגים המרכזיים שמסומנים **✅ אומת** הורצו בפועל מול הקוד הקיים (הרצה ישירה של ה-reducer, של `scorePronunciation`, של `getWeakSentenceStats` ושל `consumeDailyQuota`). כל השאר נבדק בקריאת קוד, עם הפניה לקובץ ולשורה.
+הבאגים המרכזיים שמסומנים **🧪 אומת** הורצו בפועל מול הקוד הקיים (הרצה ישירה של ה-reducer, של `scorePronunciation`, של `getWeakSentenceStats` ושל `consumeDailyQuota`). כל השאר נבדק בקריאת קוד, עם הפניה לקובץ ולסמל (פונקציה, `case` או קומפוננטה). מספרי שורות לא מצוינים, כי הם זזים עם כל תיקון.
+
+הקוד בסעיפים הוא שלד להמחשה, לא מפרט. ההחלטות ב-`ACTION_PLAN.md` (§2) גוברות על הצעות סותרות כאן. הסדר והסטטוס ב-`STATUS.md`.
 
 > **שילוב עם הסקירה הטכנית:** סעיפים 39–47 נוספו אחרי הכתיבה המקורית. 39–43 ו-45–47 הם מה שנשאר מסקירת הקוד הקודמת (אבטחה, ביצועים, תשתית ותצפיתיות), ששלביה הראשונים כבר בוצעו. 44 הוא באג שנמצא בבדיקת ההצלבה בין המסמכים. כל הסעיפים החדשים שובצו לפי חומרה, בסוף כל קבוצה. המספור הקיים לא שונה, כי `CLAUDE.md` ו-`IMPROVEMENT_IDEAS.md` מפנים אליו. באותה הזדמנות נוספו השלמות לסעיפים 2, 14, 31, 32, 34 ו-42.
 
@@ -11,7 +13,7 @@
 - אפשר "לנהל שיחה" בלי לדבר בכלל.
 - הרמה עולה בזכות משפטים שה-AI כתב.
 - "נקודות חלשות" לא מתנקות לעולם.
-- הסנכרון לענן יישבר שקט אצל כל משתמש פעיל תוך כמה חודשים.
+- הסנכרון לענן עלול להישבר בשקט אצל משתמשים פעילים. הקצב האמיתי ייקבע במדידה (T3).
 
 המשתמש רואה מספרים שנראים מדויקים, אבל הם לא משקפים את ההתקדמות שלו.
 
@@ -33,7 +35,9 @@
 
 ### 1. מסמך הענן גדל בלי הגבלה ויעבור את תקרת ה-1MB של Firestore
 
-**איפה:** `src/services/firebase.js:97`, `src/context/AppContext.jsx:160`, `src/context/appState.js:77`
+> **עודכן (ACTION_PLAN):** תיקון #5 הוחלף, כי כתיבה בלי `merge` לא עוזרת מול התקרה ומחמירה את סעיף 2. בתיקון #1 החלוקה היא לפי חודשים, ולא מסמך לכל יום. הסעיף מתפצל ל-1א (עכשיו) ול-1ב (עם ה-migration), לפי D6. ההערכה של כ-4 חודשים מניחה 10 משפטים ביום, וברירת המחדל היא 5. היא תוחלף בתוצאת המדידה (T3).
+
+**איפה:** `src/services/firebase.js` (`saveCloudProfile`), `src/context/AppContext.jsx` (ה-effect ששומר ל-localStorage ולענן, ב-`AppProvider`), `src/context/appState.js` (`pruneOldSessions`)
 
 **הבעיה:**
 - כל הנתונים של משתמש נשמרים במסמך Firestore אחד (`users/{uid}`), עם `setDoc(..., { merge: true })`.
@@ -44,17 +48,23 @@
 **למה זה קריטי:** כשהמסמך עובר 1MB, כל `setDoc` נכשל. הכישלון נרשם רק ב-`console.error`. המשתמש לא יודע שהסנכרון הפסיק, ובמכשיר חדש הוא יקבל היסטוריה ישנה. המשתמשים הנאמנים ביותר ייפגעו ראשונים.
 
 **תיקון מוצע:**
-1. לפצל את הנתונים לתתי-אוספים: `users/{uid}/days/{date}`, `users/{uid}/chats/{chatId}`, `users/{uid}/words/{wordId}`. המסמך הראשי יחזיק רק settings, streak, lifetimeStats ו-placement. חוקי ה-Firestore הקיימים כבר מכסים `{document=**}`.
+1. לפצל את הנתונים: מסמך פרופיל (`users/{uid}`: settings, placement, `archive` ו-`schemaVersion`), ‏`users/{uid}/months/{yyyy-mm}` לימים ולניסיונות, ו-`users/{uid}/chats/{chatId}`. חלוקה לחודשים ולא מסמך לכל יום, כי Firestore מחייב על כל מסמך שנקרא: שנה של היסטוריה היא 12 קריאות במקום כ-365. בלי מונים שמורים (D5). המבנה המלא ב-`ACTION_PLAN.md`, שלב 7. חוקי ה-Firestore הקיימים כבר מכסים `{document=**}`.
 2. לכתוב רק את מה שהשתנה (היום הנוכחי, השיחה הנוכחית), לא snapshot מלא.
 3. לא לשמור `wordResults` מלא בענן, אלא רק את המילים שנכשלו (`missedWords: ["schedule"]`).
 4. כשסנכרון נכשל, להציג באנר ("השינויים שמורים רק במכשיר הזה") במקום רק לוג.
-5. אם נשארים בינתיים עם מסמך אחד: לכתוב בלי `merge` (`setDoc(ref, data)`), כדי שמחיקות מקומיות ייכנסו לתוקף גם בענן.
+5. מחיקה מקומית (ימים ש-`pruneOldSessions` גוזם) מגיעה לענן עם `updateDoc` ו-`deleteField()` על המפתחות שנגזמו, ולא בכתיבה בלי `merge`. כתיבה בלי `merge` לא עוזרת מול תקרת ה-1MB, כי הגיזום מוחק רק ימים בני יותר משנה. היא גם מחמירה את סעיף 2: מכשיר מיושן ידרוס את כל המסמך.
+
+**פיצול (D6):**
+- **1א (עכשיו):** באנר כשהסנכרון נכשל (תיקון 4), וניטור של גודל המסמך לפני כל כתיבה.
+- **1ב (עם ה-migration):** תיקונים 1, 2, 3 ו-5.
 
 ---
 
 ### 2. מיזוג ענן/מכשיר מוחק עבודה: הענן "מנצח" בשדות שלמים
 
-**איפה:** `src/context/appState.js:377-390` (`MERGE_CLOUD_DATA`), `src/context/AppContext.jsx:128-145`
+> **עודכן (ACTION_PLAN):** במקום `Math.max` ו-`max(sessionsCompleted)` למונים: ערכים נגזרים (D5). `Math.max` מאבד תוספות משני מכשירים: 3 ו-2 נותנים 3, לא 5. הסעיף מתפצל ל-2א (עכשיו) ול-2ב (עם ה-migration).
+
+**איפה:** `src/context/appState.js` (`case "MERGE_CLOUD_DATA"` ב-`reducer`), `src/context/AppContext.jsx` (ה-effect שטוען מהענן וממזג, ב-`AppProvider`)
 
 **הבעיה:**
 - רק `sessions` ממוזג לפי תאריך. `streak`, `practice` (מאגר מילים), `rolePlay` (שיחות), `lifetimeStats` ו-`placement` **מוחלפים כולם בגרסת הענן**.
@@ -67,24 +77,29 @@
 **תיקון מוצע:** מיזוג לפי שדה ולפי פריט, במקום "ענן מנצח":
 - `wordBank`: איחוד לפי `word`, ובהתנגשות מנצח הפריט שה-`learnedAt` (או `updatedAt`) שלו מאוחר יותר.
 - `rolePlay.chats`: איחוד לפי `id` לפי `updatedAt` (השדה כבר קיים).
-- `streak`: לחשב מחדש מתוך מפתחות `sessions` הממוזגים, לא להעתיק.
-- `lifetimeStats`: `Math.max` לכל מונה, או חישוב מחדש.
-- `placement.planProgress`: `max(sessionsCompleted)` לכל מודול.
+- `streak`: לחשב מחדש מתוך `sessions` הממוזגים, ב-selector (`selectStreak`), לא להעתיק.
+- `lifetimeStats` ו-`placement.planProgress`: לא ממזגים מונים. הם הופכים לערכים נגזרים (D5), שמחושבים מתוך הנתונים הממוזגים. `Math.max` לכל מונה מאבד תוספות משני מכשירים: 3 ו-2 נותנים 3, לא 5. הוא נשאר רק כפתרון זמני ב-2א, למונים שעוד לא הפכו ל-selectors.
 
 הפיצול לתתי-אוספים מסעיף 1 פותר את רוב זה מעצמו.
 
 **שני מכשירים פתוחים באותו זמן:** מיזוג בזמן ההתחברות לא מספיק כאן, כי אף אחד מהמכשירים לא מתחבר מחדש. כל אחד ממשיך לכתוב את מה שיש לו, ולא רואה את מה שהשני כתב. צריך:
-- `onSnapshot` על מסמך הפרופיל ועל היום הנוכחי, כדי ששינוי במכשיר אחד יגיע לשני בזמן אמת.
-- מונים (`lifetimeStats`, ‏`planProgress[i].sessionsCompleted`) רק ב-`increment()` אטומי, לא בכתיבה של ערך מחושב.
-- ערך שנגזר מהערך הקודם (`streak`) ב-`runTransaction`, או חישוב מחדש מתוך הימים (כמו בתיקון שלמעלה).
+- `onSnapshot` על מסמך הפרופיל ועל החודש הנוכחי, כדי ששינוי במכשיר אחד יגיע לשני בזמן אמת, עם איחוד לפי מזהה.
+- בלי מונים שמורים (D5): רצף, ספירות והתקדמות בתוכנית מחושבים מהנתונים, ולכן אין מונה שצריך לעדכן באטומיות.
+- מחיקות עם tombstones (`deletedAt`), כדי שפריט שנמחק במכשיר אחד לא יחזור מהשני.
 
 לתכנן את זה יחד עם ה-migration של סעיף 1, לא אחריו. מבנה הנתונים החדש צריך לתמוך בזה מההתחלה.
 
+**פיצול (D6):**
+- **2א (עכשיו):** איחוד לפי מזהה ב-`MERGE_CLOUD_DATA`, ורצף שמחושב מחדש. בלי tombstones, ולכן פריט שנמחק אופליין עלול לחזור.
+- **2ב (עם ה-migration):** סנכרון בזמן אמת ו-tombstones.
+
 ---
 
-### 3. תרגול משפט מוחק את השיחות של היום ✅ אומת
+### 3. תרגול משפט מוחק את השיחות של היום 🧪 אומת
 
-**איפה:** `src/context/appState.js:161`
+> **עודכן (ACTION_PLAN):** הקוד המוצע הוחלף. היום נשמר עם כל השדות שלו (`...day`), ו-`daysActive` הוא selector לפי D1 ו-D5, במקום הדגל `dayCounted`.
+
+**איפה:** `src/context/appState.js` (`case "SAVE_SESSION_RESULT"` ב-`reducer`)
 
 **הבעיה:** ב-`SAVE_SESSION_RESULT` נבנה מחדש כל האובייקט של היום:
 ```js
@@ -105,26 +120,37 @@ chats after sentence: undefined   daysActive: 0
 
 **תיקון מוצע:**
 ```js
+// appState.js — שומרים את כל שדות היום, כולל chats
 case "SAVE_SESSION_RESULT": {
   const today = getTodayString();
-  const day = state.sessions[today] || { sentences: [], chats: [] };
-  const isNewDay = !day.dayCounted;
+  const day = state.sessions[today] || {};
   const sentences = [...(day.sentences || []), action.payload];
-  const avg = Math.round(sentences.reduce((s, x) => s + x.score, 0) / sentences.length);
   return {
     ...state,
-    sessions: { ...state.sessions, [today]: { ...day, sentences, averageScore: avg, dayCounted: true, completedAt: new Date().toISOString() } },
-    lifetimeStats: { ...state.lifetimeStats, daysActive: state.lifetimeStats.daysActive + (isNewDay ? 1 : 0), /* ... */ },
+    sessions: { ...state.sessions, [today]: { ...day, sentences, completedAt: new Date().toISOString() } },
+    // בלי daysActive ובלי averageScore: שניהם selectors
   };
 }
+
+// selectors.js — יום פעיל לפי D1
+export function isActiveDay(day) {
+  const spoke = (day.sentences || []).some(isSpoken);     // isSpoken: לא השלמת משפטים (כלל ההשלמה של סעיף 8)
+  const talked = (day.chats || []).some((c) => c.turnCount > 0); // עד T4 כל תור של המשתמש נחשב
+  return spoke || talked;
+}
+export function selectDaysActive(state) {
+  return (state.archive?.daysActive || 0) + Object.values(state.sessions || {}).filter(isActiveDay).length;
+}
 ```
-וגם ב-`SAVE_ROLEPLAY_SESSION`: לסמן `dayCounted` ולהעלות `daysActive` באותה צורה. בנוסף צריך טסט רגרסיה: שיחה, אחריה משפט, ולוודא ש-`chats.length === 1` ו-`daysActive === 1`.
+`pruneOldSessions` מקפל את הימים שהוא מוחק ל-`archive` (לפחות ימים פעילים, משפטים ושיחות), וה-selectors מחברים את הארכיון לימים שנשארו. יום עם שיחות בלבד לא מוצג בגרף השבועי כ-"No practice". טסט רגרסיה: שיחה, אחריה משפט, ולוודא ש-`chats.length === 1` ו-`selectDaysActive(state) === 1`.
+
+**למה לא `dayCounted`:** לרשומות שכבר קיימות אין את השדה, ולכן יום ה-deploy ייספר פעמיים: היום כבר נספר לפני העדכון, וה-reducer יחשוב שהוא חדש. אותו קוד גם מחשב ממוצע שכולל השלמת משפטים, בניגוד לסעיף 8. ובאופן כללי, מונה שמור מתרחק מהנתונים שמהם הוא נגזר (D5), וזה השורש של הבאג הזה ושל סעיפים 19 ו-28.
 
 ---
 
-### 4. ציון ההגייה לא מודד הגייה, ומעניק 100 לבליל מילים ✅ אומת
+### 4. ציון ההגייה לא מודד הגייה, ומעניק 100 לבליל מילים 🧪 אומת
 
-**איפה:** `src/utils/pronunciationScorer.js:48-64`
+**איפה:** `src/utils/pronunciationScorer.js` (`scorePronunciation`)
 
 **הבעיה:** כל מילה במשפט המקורי מחפשת את ההתאמה הטובה ביותר **בכל** המילים שנאמרו, בלי סדר, בלי לבדוק שכל מילה שנאמרה משמשת רק פעם אחת, ובלי עונש על מילים מיותרות.
 
@@ -166,7 +192,9 @@ function alignWords(target, spoken) {
 
 ### 5. אפשר לנהל "שיחה" בלי לומר מילה, והרמה עולה בזכות ה-AI
 
-**איפה:** `src/pages/RolePlay.jsx:804`, `src/services/ai.service.js:117-133`, `src/pages/RolePlay.jsx:617-619`
+> **עודכן (ACTION_PLAN):** תיקון #1 ממומש דרך סולם הרמזים של רעיון 3 ב-`IMPROVEMENT_IDEAS.md`: רעיון בעברית, פתיח, ומשפט מלא שנשלח רק אחרי שהמשתמש אמר אותו. תיקון #2 מבוצע ב-T4.
+
+**איפה:** `src/pages/RolePlay.jsx` (`onSelect` של `SuggestedReplies` בקומפוננטה `RolePlay`), `src/services/ai.service.js` (`ANALYSIS_SYSTEM`), `src/pages/RolePlay.jsx` (`handleFeedbackSaved`, ה-dispatch ל-`ADJUST_LEVEL`)
 
 **הבעיה:**
 - לחיצה על תשובה מוצעת שולחת אותה ישירות כהודעת המשתמש: `onSelect={(text) => { logHelpUsed(); handleUserMessage(text); }}`. במצבי easy ו-medium יש 3 הצעות בכל תור, כך שאפשר לסיים שיחה שלמה של 10 תורות בלחיצות בלבד, **בלי לדבר ובלי להקליד**.
@@ -185,13 +213,13 @@ function alignWords(target, spoken) {
 
 ### 6. ההשמעה נכשלת, והמשתמש תקוע במסך "מנגן דוגמה…" בלי מוצא
 
-**איפה:** `src/utils/speechVoice.js:175-236`, `src/pages/Practice.jsx:609-615`
+**איפה:** `src/utils/speechVoice.js` (`speakNaturally`), `src/pages/Practice.jsx` (`handleListen` בקומפוננטה `Practice`)
 
 **הבעיה:**
-- ב-`speakNaturally` יש שני מסלולים שמסתיימים ב-`resolve()` בלי לקרוא ל-`onEnd`: כש-`window.speechSynthesis` לא קיים (שורה 178), וב-`utter.onerror` (שורות 225-231).
+- ב-`speakNaturally` יש שני מסלולים שמסתיימים ב-`resolve()` בלי לקרוא ל-`onEnd`: כש-`window.speechSynthesis` לא קיים (הבדיקה בתחילת הפונקציה), וב-`utter.onerror`.
 - ב-Practice, המעבר ל-`READY_TO_RECORD` קורה **רק** ב-`onEnd`. לכן כל כישלון TTS משאיר את המסך על "מנגן דוגמה…" בלי כפתור. גם באג מוכר של Chrome ו-Android, שבו `onend` לא נורה, גורם לאותה תקיעה.
 - מסך `IDLE` מציג רק "🔊 האזן". אין דרך להגיע להקלטה בלי לעבור דרך ההשמעה.
-- אותה בעיה ב-RolePlay: `replayMessage` משאיר `isSpeaking=true` לתמיד כשיש שגיאה (`useRolePlay.js:311`).
+- אותה בעיה ב-RolePlay: `replayMessage` משאיר `isSpeaking=true` לתמיד כשיש שגיאה (`useRolePlay.js`).
 
 **תיקון מוצע:**
 ```js
@@ -207,9 +235,11 @@ const finish = () => { if (!ended) { ended = true; onEnd?.(); resolve(); } };
 
 ## 🟠 חמור
 
-### 7. "נקודות חלשות" לא מתנקות לעולם ✅ אומת
+### 7. "נקודות חלשות" לא מתנקות לעולם 🧪 אומת
 
-**איפה:** `src/utils/practiceHistory.js:13-24`
+> **עודכן (ACTION_PLAN):** בקוד המוצע היו שתי בעיות. הוא מסנן לפי `kind !== "cloze"`, אבל לרשומות קיימות אין `kind`. והוא קובע חולשה לפי `score`, בזמן שסעיף 9 קובע `firstScore`. בקוד שלמטה: חולשה לפי `firstScore`, ו-`kind` ברשומות ישנות לפי כלל ההשלמה של סעיף 8. זה תיקון מינימלי (D12): בהמשך "חלש" הוא מה ש-FSRS מחזיר (D4).
+
+**איפה:** `src/utils/practiceHistory.js` (`getWeakSentenceStats`)
 
 **הבעיה:** הפונקציה מסננת רק ניסיונות מתחת ל-70, ובוחרת את `bestScore` רק מתוכם. ניסיון מוצלח מאוחר יותר לא נלקח בחשבון.
 ```
@@ -223,12 +253,13 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
   const attempts = Object.entries(sessions || {})
     .sort(([a], [b]) => a.localeCompare(b))
     .flatMap(([, s]) => s.sentences || [])
-    .filter((x) => x.kind !== "cloze");
+    .filter(isSpoken); // kind === "speak", וברשומות ישנות לפי כלל ההשלמה של סעיף 8
   const byId = {};
   for (const x of attempts) {
+    const first = x.firstScore ?? x.score; // סעיף 9: ברשומות ישנות firstScore = score
     const w = (byId[x.sentenceId] ||= { ...x, fails: 0, passStreak: 0, bestScore: 0 });
-    w.bestScore = Math.max(w.bestScore, x.score);
-    if (x.score < threshold) { w.fails++; w.passStreak = 0; } else { w.passStreak++; }
+    w.bestScore = Math.max(w.bestScore, x.bestScore ?? x.score);
+    if (first < threshold) { w.fails++; w.passStreak = 0; } else { w.passStreak++; }
   }
   // חלש = נכשל לפחות פעם אחת ועוד לא עבר clearAfter פעמים ברצף מאז
   return Object.fromEntries(Object.entries(byId).filter(([, w]) => w.fails > 0 && w.passStreak < clearAfter));
@@ -239,7 +270,9 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 8. השלמת משפטים מזהמת את כל נתוני ההגייה
 
-**איפה:** `src/pages/ClozePractice.jsx:141-150`
+> **עודכן (ACTION_PLAN):** לרשומות שכבר נשמרו אין `kind`, ולכן נדרש כלל השלמה שמסווג אותן, למשל לפי היעדר `wordResults` או תמלול ברשומות של `ClozePractice`. הכלל נקבע בשלב 5, באישור המשתמש, ומתועד כאן. זה שינוי משמעות, ולכן migration עם מספר גרסה וטסט. `sentencesAbove90` והממוצעים הופכים ל-selectors על `speak` בלבד (D5). ה-XP להשלמת משפטים לפי D3.
+
+**איפה:** `src/pages/ClozePractice.jsx` (`handleChoose`)
 
 **הבעיה:** תשובה בבחירה מרובה נשמרת כ-`score: 100` או `score: 0` דרך אותו `SAVE_SESSION_RESULT` של ההגייה. כתוצאה:
 - טעות אחת בבחירה מכניסה את המשפט ל"נקודות חלשות **בהגייה**".
@@ -247,13 +280,15 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 - ההישגים "Sharp Tongue" (10 משפטים מעל 90) ו-"Perfect Day" נפתחים מבחירה מרובה.
 - **חוות XP:** כל לחיצה בהשלמת משפטים שווה 10 XP, בדיוק כמו משפט שנאמר בקול. 5 לחיצות בכמה שניות שוות 50 XP.
 
-**תיקון מוצע:** להוסיף `kind: "cloze" | "speak"` לכל רשומה. ממוצעים, רשימת החלשים ו-`sentencesAbove90` יחושבו רק על `speak`. להשלמת משפטים יהיו מונה וממוצע משלה, ו-XP נמוך יותר (למשל 3).
+**תיקון מוצע:** להוסיף `kind: "cloze" | "speak"` לכל רשומה חדשה, ולסווג רשומות ישנות לפי כלל ההשלמה. ממוצעים, רשימת החלשים ו-`sentencesAbove90` יהיו selectors שמחושבים רק על `speak`. להשלמת משפטים יהיו מונה וממוצע משלה, ו-XP נמוך יותר (2, לפי D3).
+
+**כלל ההשלמה לרשומות ישנות:** ייקבע בשלב 5.
 
 ---
 
 ### 9. "נסה שוב" עד 100, ורק הניסיון האחרון נשמר
 
-**איפה:** `src/pages/Practice.jsx:661-695`
+**איפה:** `src/pages/Practice.jsx` (`handleSaveAndNext` ו-`handleTryAgain`)
 
 **הבעיה:** `handleTryAgain` מוחק את התוצאה, ורק הניסיון שנשמר ב"הבא" נרשם. השדה `attempts` תמיד `1`. משתמש שניסה 6 פעמים וקיבל 30, 35, 40, 50, 60 ו-92 נרשם כמי שקיבל 92 בניסיון הראשון. הממוצעים מנופחים, ומשפט שבאמת קשה לו לא יופיע ברשימת החלשים.
 
@@ -263,7 +298,7 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 10. הסיכום אחרי תרגול עיוור לביצועים, והוא ממלא את מאגר המילים בזבל
 
-**איפה:** `src/pages/Practice.jsx:636-660`, `src/services/ai.service.js:84-105`
+**איפה:** `src/pages/Practice.jsx` (`fetchSummary`), `src/services/ai.service.js` (`PRACTICE_ANALYSIS_SYSTEM`)
 
 **הבעיה:**
 - `analyzePracticeSession` מקבל רק את טקסט המשפטים והממוצע. הוא **לא** מקבל את מה שהמשתמש אמר ולא אילו מילים נכשלו (`wordResults`). כלומר "הסיכום והטיפים" נכתבים בלי שום מידע על מה שקרה בתרגול. זה טקסט גנרי שמוצג כאילו הוא אישי.
@@ -276,9 +311,11 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ---
 
-### 11. מאגר המילים: מילים חדשות לא נשמרות, ואין בו למידה אמיתית ✅ אומת
+### 11. מאגר המילים: מילים חדשות לא נשמרות, ואין בו למידה אמיתית 🧪 אומת
 
-**איפה:** `src/context/appState.js:325-346`, `src/data/sentences.js:464-475`
+> **עודכן (ACTION_PLAN):** מצב הכרטיסיות ירד מהתיקון (D12), כי שליפת מילים מכוסה ברעיונות 1 ו-7 ב-`IMPROVEMENT_IDEAS.md`. נשאר תיקון השמירה.
+
+**איפה:** `src/context/appState.js` (`case "ADD_PRACTICE_WORDS"`), `src/data/sentences.js` (`sentencesFromWordBank`)
 
 **הבעיה:**
 - **כשיש 100 מילים, מילה חדשה לא נשמרת.** ה-Map שומר את סדר ההכנסה, מילים חדשות נכנסות לסוף, ו-`.slice(0, 100)` חותך אותן. המשתמש רואה "📚 מילים חדשות — נשמרו לחזרה", אבל שום דבר לא נשמר. (`new word kept: false`)
@@ -286,42 +323,44 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 **תיקון מוצע:**
 - לסדר מחדש כך שהחדשות נשמרות: `[...incomingNew, ...existing]`. במקרה של גלישה לזרוק את המילים ה"שולטות" (mastered) או הישנות, ולא את החדשות.
-- מצב "כרטיסיות": מוצג `meaning_he`, המשתמש אומר את המילה באנגלית, ואחר כך נחשפת התשובה. התוצאה מזינה את לוח הזמנים לחזרה (סעיף 12).
+- הלמידה עצמה (שליפה מעברית לאנגלית וחזרה מרווחת) נבנית ברעיונות 1 ו-7, ולא כמצב נפרד כאן.
 
 ---
 
 ### 12. אין חזרה מרווחת בכלל, ומאגר המשפטים דל
 
-**איפה:** `src/data/sentences.js:440-462`, `src/pages/Practice.jsx:521-546`
+> **עודכן (ACTION_PLAN):** לוח הזמנים הוא FSRS ולא Leitner (D4), והוא נבנה בחודש 1 (A1 ב-`IMPROVEMENT_IDEAS.md`), לא כטלאי כאן (D12). הרחבת מאגר ה-advanced נשארת. הנקודה על הערבוב המוטה עברה לסעיף 37.
+
+**איפה:** `src/data/sentences.js` (`getDailySentences`), `src/pages/Practice.jsx` (`loadSentences`)
 
 **הבעיה:**
 - ההערה בקוד אומרת "lightweight spaced-repetition behavior", אבל בפועל יש רק ערבוב אקראי עם משקל למשפטים חלשים. אין `dueAt`, אין מרווחים, ואין מעקב אחרי מה המשתמש כבר ראה.
 - `excludeIds` מסנן רק את המשפטים של **היום**. אתמול ושלשום יכולים לחזור מחר.
 - מאגר התוכן: 132 משפטים ב-easy, 117 ב-medium ו-**73 ב-advanced**, מחולקים ל-8 קטגוריות. זה בערך 9 משפטים מתקדמים לקטגוריה. משתמש מתקדם עם יעד של 10 ביום גומר קטגוריה ביום אחד.
-- `sort(() => Math.random() - 0.5)` הוא ערבוב מוטה (לא אחיד). כדאי להשתמש ב-Fisher-Yates.
+- הערבוב עצמו מוטה. ראו סעיף 37.
 
-**תיקון מוצע:** לוח זמנים פשוט בשיטת Leitner לכל משפט ומילה: `{ box: 1..5, dueAt }`. הצלחה מקדמת תיבה (1, 2, 4, 8 ו-16 ימים), וכישלון מחזיר לתיבה 1. המשימה היומית תהיה "N פריטים שהגיע זמנם + M חדשים". במקביל להגדיל את מאגר ה-advanced, או ליצור משפטים ב-AI לפי ה-`gaps` ולשמור אותם.
+**תיקון מוצע:** חזרה מרווחת עם FSRS (הספרייה `ts-fsrs`) לכל משפט ומילה. סולם הרמזים הופך לציון: בלי רמז = Good (או Easy כשהתשובה מהירה), רמז 1 = Hard, רמז 2 או 3 = Again. המשימה היומית תהיה "N פריטים שהגיע זמנם + M חדשים". במקביל להגדיל את מאגר ה-advanced, או ליצור משפטים ב-AI לפי ה-`gaps` ולשמור אותם.
 
 ---
 
 ### 13. מבחן הרמה לא משפיע על רמת התרגול
 
-**איפה:** `src/context/appState.js:260-268` (`SET_PLACEMENT_RESULT`), `src/context/appState.js:54-61`
+**איפה:** `src/context/appState.js` (`case "SET_PLACEMENT_RESULT"` ו-`defaultSettings`)
 
 **הבעיה:** בסוף שיחת ההיכרות נקבעת רמת CEFR, אבל `settings.difficulty` (רמת המשפטים) ו-`settings.chatDifficulty` נשארים `"easy"`, ברירת המחדל. משתמש ברמת B2 מקבל משפטים כמו "Can you pass me the water?" ו-3 הצעות תשובה מלאות בכל תור, עד שיגלה לבד שיש הגדרה לשנות. גם `ADJUST_LEVEL` לא משנה אותן. הרמה משפיעה רק על הפרומפט של השיחה.
 
-**תיקון מוצע:** ב-`SET_PLACEMENT_RESULT` וב-`ADJUST_LEVEL` לעדכן גם את ההגדרות לפי המיפוי שכבר קיים ב-`LEVEL_TO_DIFFICULTY` (`Progress.jsx:9`). זה יקרה רק אם המשתמש לא שינה אותן ידנית, כלומר צריך לשמור `settings.difficultyManual: true` כשהוא משנה.
+**תיקון מוצע:** ב-`SET_PLACEMENT_RESULT` וב-`ADJUST_LEVEL` לעדכן גם את ההגדרות לפי המיפוי שכבר קיים ב-`LEVEL_TO_DIFFICULTY` (`Progress.jsx`). זה יקרה רק אם המשתמש לא שינה אותן ידנית, כלומר צריך לשמור `settings.difficultyManual: true` כשהוא משנה.
 
 ---
 
 ### 14. התאמת הרמה האוטומטית נשענת על ציון לא יציב
 
-**איפה:** `src/context/appState.js:21-51`, `src/pages/RolePlay.jsx:434-450`, `src/pages/RolePlay.jsx:617-619`
+**איפה:** `src/context/appState.js` (`adjustLevel` ו-`CEFR_LEVELS`), `src/pages/RolePlay.jsx` (`handleAnalyze` ב-`DoneScreen`, ו-`handleFeedbackSaved`)
 
 **הבעיה:**
 - `overall_score` הוא מספר ש-LLM "מרגיש" (temperature 0.3), על תמליל ASR שכבר מכיל שגיאות תמלול, וכולל משפטים מההצעות (סעיף 5). שתי שיחות מעל 85 מספיקות כדי להזיז רמת CEFR.
 - הניתוח רץ **רק אם המשתמש לחץ "נתח"** ב-DoneScreen. כלומר עדכון הרמה תלוי בלחיצה אופציונלית. משתמש שלא לוחץ לא יעלה רמה לעולם, ומשתמש שלוחץ רק כשהלך לו טוב יעלה מהר מדי.
-- ב-`CEFR_LEVELS` אין C2. אם שיחת ההיכרות מחזירה C2, `indexOf` מחזיר ‎-1 וההתאמה כבויה לתמיד. **תוקן חלקית:** מאז הוספת `aiSchemas.js`, ‏`toCefr` (`src/services/aiSchemas.js:47`) ממיר C2 ל-C1, ומחלץ את הרמה מטקסט כמו `"A1 (usually the lower)"` שהמודל מעתיק מהדוגמה בפרומפט. זה חל רק על תוצאות חדשות. `placement` שנשמר לפני כן עדיין עלול להכיל ערך שההתאמה לא מזהה, וצריך לנרמל אותו בטעינה (`LOAD_DATA`).
+- ב-`CEFR_LEVELS` אין C2. אם שיחת ההיכרות מחזירה C2, `indexOf` מחזיר ‎-1 וההתאמה כבויה לתמיד. **תוקן חלקית:** מאז הוספת `aiSchemas.js`, ‏`toCefr` (`src/services/aiSchemas.js`) ממיר C2 ל-C1, ומחלץ את הרמה מטקסט כמו `"A1 (usually the lower)"` שהמודל מעתיק מהדוגמה בפרומפט. זה חל רק על תוצאות חדשות. `placement` שנשמר לפני כן עדיין עלול להכיל ערך שההתאמה לא מזהה, וצריך לנרמל אותו בטעינה (`LOAD_DATA`).
 
 **תיקון מוצע:** להריץ את הניתוח אוטומטית בסוף כל שיחה עם 4 תורות ומעלה. לבקש מהמודל רובריקה מובנית (fluency, grammar, vocabulary, בציון 1-5 כל אחד) ולחשב את הציון בקוד. לא לספור שיחות עם פחות מ-4 תורות עצמאיות. להוסיף C2, או לנרמל C2 ל-C1.
 
@@ -329,7 +368,9 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 15. "נקודות חולשה" הן בעצם טיפים שלמים בעברית, והן דוחקות את האבחון המקורי
 
-**איפה:** `src/pages/RolePlay.jsx:612-616`, `src/context/appState.js:293-307`, `src/services/ai.service.js:313-320`
+> **עודכן (ACTION_PLAN):** הסעיף מתפצל (D6). **15א (עכשיו):** להפסיק למזג `grammar_notes` ו-`improvements` לתוך ה-gaps, כך שה-gaps ממבחן הרמה נשמרים. **15ב:** תגיות מרשימה סגורה, עם רעיון 5 (מנוע "עברנגלית").
+
+**איפה:** `src/pages/RolePlay.jsx` (`handleFeedbackSaved`), `src/context/appState.js` (`case "MERGE_PLACEMENT_GAPS"`), `src/services/ai.service.js` (`buildProfileContext`)
 
 **הבעיה:**
 - `MERGE_PLACEMENT_GAPS` מקבל את `grammar_notes` ואת `improvements`, שהם משפטים שלמים בעברית כמו "נסה להשתמש יותר בזמן עבר כשאתה מספר על...". אלה לא תגיות חולשה.
@@ -342,7 +383,7 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 16. שלב בתוכנית מסומן "הושלם" אחרי שתי שיחות ריקות
 
-**איפה:** `src/hooks/useRolePlay.js:299-305`, `src/context/appState.js:270-290`
+**איפה:** `src/hooks/useRolePlay.js` (`endConversation`), `src/context/appState.js` (`case "UPDATE_PLAN_PROGRESS"`)
 
 **הבעיה:** `endConversation` קורא ל-`completeSession` גם כשאין אף הודעת משתמש. זה מעלה את `totalChats` (ו-25 XP), מעדכן את ה-streak, ומעדכן את `UPDATE_PLAN_PROGRESS`. שלב בתוכנית מסומן `"done"` אחרי `sessionsCompleted >= 2`, בלי קשר לביצועים.
 
@@ -354,7 +395,7 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 17. שותף השיחה אסור לו להשתמש בקיצורים, וזו אנגלית לא טבעית
 
-**איפה:** `src/data/rolePlayTopics.js:182,197`, `src/services/ai.service.js:42,48`
+**איפה:** `src/data/rolePlayTopics.js` (`systemInstruction`), `src/services/ai.service.js` (`DIFFICULTY_INSTRUCTIONS`)
 
 **הבעיה:** הפרומפט אוסר במפורש על קיצורים בכל תשובה ובכל הצעה ("NEVER use contractions anywhere"). התוצאה היא שותף שיחה שאומר "I do not think that is a good idea, it is too late". כך לא מדברים באנגלית, והמשתמש לא נחשף בשמיעה לצורות שהוא יפגוש בכל שיחה אמיתית (`gonna`, `I'd`, `won't`, `can't`, כשההבדל בין `can` ל-`can't` הוא הבעיה הקלאסית בשמיעה). זה גם סותר את מאגר המשפטים עצמו ("I'll be there", "Let's grab lunch") ואת ההנחיה "natural spoken English" בפרומפטים האחרים.
 
@@ -366,7 +407,9 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 18. אין שום תיקון במהלך השיחה
 
-**איפה:** `src/data/rolePlayTopics.js:170-199`
+> **עודכן (ACTION_PLAN): החלטת מוצר, לא באג.** לפי D2, המנגנון הראשי לתיקון טעויות הוא "הבמאי" (רעיון 4 ב-`IMPROVEMENT_IDEAS.md`), בסוף השיחה. הבועה שמוצעת כאן תהיה הגדרה אופציונלית, כבויה כברירת מחדל, ותיבנה רק אחרי רעיון 4. הלומד השקט צריך מקום בטוח לטעות, ותיקון באמצע משפט מלחיץ.
+
+**איפה:** `src/data/rolePlayTopics.js` (`systemInstruction`)
 
 **הבעיה:** המשוב היחיד בשיחה מגיע בסוף, ורק אם המשתמש לחץ "נתח". בזמן השיחה, טעות כמו "I go yesterday to the store" עוברת בלי שום תגובה. זה מחטיא את היתרון הגדול ביותר של AI מול תרגול עם חבר.
 
@@ -376,7 +419,9 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 ### 19. ה-streak מוצג לא נכון, וקל מדי לשמור עליו
 
-**איפה:** `src/pages/Home.jsx:78`, `src/pages/Progress.jsx:14,233`, `src/context/appState.js:64-75`
+> **עודכן (ACTION_PLAN):** הרף ליום פעיל לפי D1 (לפחות פעולת דיבור אחת), ולא 3 משפטים. הרצף הוא selector (`selectStreak`), שמחושב מהימים הפעילים (D5), ולא ערך שמור שמתקנים בתצוגה.
+
+**איפה:** `src/pages/Home.jsx` (תג ה-streak ב-`Home`), `src/pages/Progress.jsx` (ההישג "on-fire" ב-`ACHIEVEMENTS`, וכרטיס ה-streak ב-`Progress`), `src/context/appState.js` (`computeStreak`)
 
 **הבעיה:**
 - `streak.current` מתעדכן רק כשמתרגלים. מי שלא תרגל 5 ימים עדיין רואה "🔥 12 day streak", ורק כשהוא חוזר הוא רואה 1. ההישג "On Fire" נבדק על אותו ערך.
@@ -384,30 +429,42 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 **תיקון מוצע:**
 ```js
-export function displayStreak(streak, today) {
-  const y = toDateKey(addDays(parseDateKey(today), -1));
-  return streak.lastPracticeDate === today || streak.lastPracticeDate === y ? streak.current : 0;
+// selectors.js — הרצף נגזר מהימים הפעילים, ולא נשמר
+export function selectStreak(state, today) {
+  const active = new Set(Object.keys(state.sessions || {}).filter((d) => isActiveDay(state.sessions[d])));
+  let day = active.has(today) ? today : toDateKey(addDays(parseDateKey(today), -1));
+  let n = 0;
+  while (active.has(day)) { n++; day = toDateKey(addDays(parseDateKey(day), -1)); }
+  return n; // 0 אם היום הפעיל האחרון היה לפני אתמול
 }
 ```
-וכדי שיום ייחשב, צריך מינימום משמעותי: לפחות 3 משפטים בהקלטה, או שיחה עם 3 תורות.
+יום נחשב פעיל לפי D1: לפחות פעולת דיבור אחת, כלומר משפט שהוקלט בתרגול, או תור בשיחה שהמשתמש ניסח בעצמו (בדיבור או בהקלדה, לא מהצעה ולא מתרגום). תשובה בהשלמת משפטים, או שיחה בלי תור של המשתמש, לא נחשבות. ההישג "On Fire" נבדק על אותו ערך.
 
 ---
 
 ### 20. הישגים שנפתחים בלי מאמץ
 
-**איפה:** `src/pages/Progress.jsx:13-36`
+> **עודכן (ACTION_PLAN):** ה-XP לפי D3: על מאמץ דיבור, לא על ציון. XP לפי ציון מלמד לבחור תוכן קל, ולא מתיישב עם ה-North Star (דקות דיבור עצמאי). ההישגים הופכים ל-selectors.
+
+**איפה:** `src/pages/Progress.jsx` (`ACHIEVEMENTS`)
 
 - **Perfect Day:** `s.sentences.every(...)` על מערך ריק מחזיר `true`, כך שיום עם שיחה בלבד פותח "100% on all sentences". גם 5 תשובות נכונות בהשלמת משפטים פותחות אותו.
 - **Wordsmith:** 50 מילים שמורות נאספות לבד (סעיף 10).
-- **XP** (`Progress.jsx:39`): מתגמל כמות, לא איכות. משפט של 20 מקבל אותו XP כמו משפט של 100, ולחיצה בהשלמת משפטים שווה הקלטה.
+- **XP** (`computeLevel` ב-`Progress.jsx`): מתגמל כמות, ולחיצה בהשלמת משפטים שווה הקלטה.
 
-**תיקון מוצע:** `s.sentences.length > 0 && ...` ורק על `kind === "speak"`. XP לפי איכות: `score >= 70 ? 10 : 4`, השלמת משפטים 3, שיחה לפי מספר התורות.
+**תיקון מוצע:** ההישגים כ-selectors. Perfect Day דורש `s.sentences.length > 0`, ורק על `kind === "speak"`. Sharp Tongue רק על `speak`. Wordsmith מחכה לסעיף 10, שבו מילים נשמרות רק בבחירה. XP לפי D3:
+- משפט שנאמר בתרגול: 10, לכל משפט ולא לכל ניסיון, בלי קשר לציון. ניסיון שלא זוהה בו דיבור: 0.
+- תשובה בהשלמת משפטים: 2.
+- תור עצמאי בשיחה: 5. תור מהצעה או מתרגום: 1.
+- אחרי רעיון 1: בונוס לשליפה בלי רמז.
 
 ---
 
 ### 21. המשימה היומית מתעלמת משיחות
 
-**איפה:** `src/pages/Home.jsx:46-48`
+> **עודכן (ACTION_PLAN):** לא מתקנים בנפרד. יוחלף בסשן היומי (`IMPROVEMENT_IDEAS.md`, חלק ג׳).
+
+**איפה:** `src/pages/Home.jsx` (`completed` ב-`Home`)
 
 **הבעיה:** "Today's Mission" סופר רק את `todayProgress` (משפטים, כולל השלמת משפטים). משתמש שניהל שיחה של 10 דקות, שהיא התרגול הכי קשה והכי יעיל, רואה 0/5.
 
@@ -415,9 +472,9 @@ export function displayStreak(streak, today) {
 
 ---
 
-### 44. משפטים שה-AI יוצר מקבלים את אותם מזהים, ו"נקודות חלשות" מערבבות ביניהם ✅ אומת
+### 44. משפטים שה-AI יוצר מקבלים את אותם מזהים, ו"נקודות חלשות" מערבבות ביניהם 🧪 אומת
 
-**איפה:** `src/services/ai.service.js:80, 448`, ‏`src/pages/Practice.jsx:669`, ‏`src/utils/practiceHistory.js`
+**איפה:** `src/services/ai.service.js` (`GENERATE_SENTENCES_SYSTEM` ו-`generatePracticeSentences`), ‏`src/pages/Practice.jsx` (`handleSaveAndNext`), ‏`src/utils/practiceHistory.js` (`getWeakSentenceStats`)
 
 **הבעיה:** הפרומפט מורה למודל לתת מזהים `ai_001`, ‏`ai_002` וכן הלאה, וגם ברירת המחדל בקוד זהה. לכן כל נושא AI מייצר משפטים עם אותם מזהים. `SAVE_SESSION_RESULT` שומר אותם כ-`sentenceId`, ו-`getWeakSentenceStats` מקבץ לפי המזהה, כך שמשפטים שונים לגמרי מנושאים שונים מתמזגים לרשומה אחת. אותו דבר קורה בנושאים ששמרו ל"תרגול חוזר": כולם מתחילים ב-`ai_001`.
 
@@ -439,7 +496,7 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 22. מצב כהה שבור בחלק גדול מהמסכים
 
-**איפה:** `src/index.css:39-50` מול `src/pages/Practice.jsx` (למשל שורות 128, 177, 291, 329, 435), `src/pages/RolePlay.jsx` (49 צבעים קשיחים)
+**איפה:** `src/index.css` (בלוק `prefers-color-scheme: dark`) מול `src/pages/Practice.jsx` (למשל ב-`AITopicPanel`, ‏`TopicSetup` ו-`SessionSummary`), `src/pages/RolePlay.jsx` (49 צבעים קשיחים)
 
 **הבעיה:** ב-CSS יש `prefers-color-scheme: dark` שהופך את `--color-text` לבהיר (`#F0EFFF`). אבל כפתורים ברשימות כמו בחירת קטגוריה, רעיונות ל-AI וכרטיסי מילים מגדירים `background: "#fff"` או `"#F8F9FF"` קבוע, עם `color: var(--color-text)`. **במצב כהה זה טקסט כמעט לבן על רקע לבן**, כלומר בלתי קריא. ב-RolePlay יש 49 צבעים קשיחים (`#1E1B4B`, `#6B7280`, `#fff`...), והמסך כולו מתעלם מהמצב הכהה.
 
@@ -449,18 +506,20 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 23. שגיאות כתיב, ממשק בשתי שפות, והגדרה שלא עושה מה שהיא אומרת
 
-- `Practice.jsx:117`: **"טרוף AI אישי"**, צריך להיות "תרגול AI אישי".
-- `Practice.jsx:276`: **"יייצר"**, צריך להיות "ייצר".
-- `Practice.jsx:848`: "הקשיב קודם", צריך להיות "הקשב קודם" (ציווי).
-- `Settings.jsx:308`: medium מתואר כ-"Hints & sentence starters", אבל `DIFFICULTY_INSTRUCTIONS.medium` מחזיר 3 משפטים מלאים, כמו easy. ההגדרה לא עושה מה שהיא מבטיחה.
+> **עודכן (ACTION_PLAN):** שגיאות הכתיב מתוקנות כבר עכשיו, כ-23א (יחד עם 32א). המגדר לפי D11: לכל משפט תרגום בזכר ובנקבה, לפי העדפת המשתמש, ולא ניסוח ניטרלי.
+
+- `Practice.jsx` (`AITopicPanel`): **"טרוף AI אישי"**, צריך להיות "תרגול AI אישי".
+- `Practice.jsx` (`TopicSetup`): **"יייצר"**, צריך להיות "ייצר".
+- `Practice.jsx` (מסך ההקלטה ב-`Practice`): "הקשיב קודם", צריך להיות "הקשב קודם" (ציווי).
+- `Settings.jsx` (התיאור של Chat Difficulty ב-`Settings`): medium מתואר כ-"Hints & sentence starters", אבל `DIFFICULTY_INSTRUCTIONS.medium` מחזיר 3 משפטים מלאים, כמו easy. ההגדרה לא עושה מה שהיא מבטיחה.
 - דף הבית וההגדרות מערבבים עברית ואנגלית: "Today's Mission", "Try a Conversation!", "Slow/Normal/Fast", "🔴 Hard" לצד "תרגל את הנקודות החלשות שלך". קהל היעד הוא דוברי עברית, חלקם מתחילים. **כל הממשק צריך להיות בעברית, ורק התוכן באנגלית.**
-- כל התרגומים במאגר בלשון זכר ("אני צריך", "אני עובד"). כדאי לתת בפרופיל בחירה של מגדר ללשון הפנייה, או לנסח בצורה ניטרלית.
+- כל התרגומים במאגר בלשון זכר ("אני צריך", "אני עובד"). **תיקון (D11):** לכל משפט `translation_m` ו-`translation_f`, והאפליקציה בוחרת לפי העדפה שהמשתמש קובע (שאלה אופציונלית בהרשמה). ניסוח ניטרלי לא עובד כאן: בגוף ראשון בהווה העברית כמעט אף פעם לא ניטרלית.
 
 ---
 
 ### 24. כל תור בשיחה הוא 2 קריאות AI ברצף, גם כשהתרגום מוסתר
 
-**איפה:** `src/services/ai.service.js:328-363`
+**איפה:** `src/services/ai.service.js` (`sendMessage`)
 
 **הבעיה:** `sendMessage` קורא למודל השיחה (20b), ואחר כך למודל התרגום (120b), ברצף. לכל קריאה יש עד 3 ניסיונות. כל תור מחכה לתרגום של התשובה ושל 3 ההצעות **גם כש-`showChatTranslation` כבוי**. זה מכפיל את זמן ההמתנה בכל תור, בדיוק ברגע שבו השיחה אמורה להרגיש טבעית.
 
@@ -470,7 +529,7 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 25. תלות במפתח Groq יחיד, ואולי במגבלת קצב של חשבון חינמי
 
-**איפה:** `src/data/placementPrompt.js:2-4`, `netlify/functions/groq-proxy.js`
+**איפה:** `src/data/placementPrompt.js` (ההערה בראש הקובץ), `netlify/functions/groq-proxy.js`
 
 **הבעיה:** ההערה בקוד מציינת מגבלה של 8,000 טוקנים לדקה (tier חינמי). המגבלה חלה על **כל המשתמשים יחד**, כי כולם עוברים דרך מפתח אחד. פרומפט של שיחת היכרות עם היסטוריה, כפול 2-3 משתמשים במקביל, והם יקבלו 429. המשתמש יראה "לא הצלחנו", בלי שום הסבר. המכסה ל-600 קריאות ביום למשתמש לא עוזרת כאן, כי הבעיה היא קצב גלובלי.
 
@@ -480,7 +539,9 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 26. ה-proxy הוא נקודת גישה פתוחה ל-LLM לכל בעל חשבון Google
 
-**איפה:** `netlify/functions/groq-proxy.js:50-70`
+> **עודכן (ACTION_PLAN):** הסעיף מתפצל (D6). **26א (עכשיו):** רשימת משתמשים מורשים. **26ב:** פרומפטים בשרת, לפני הרחבת הבטא.
+
+**איפה:** `netlify/functions/groq-proxy.js` (`validateChat`)
 
 **הבעיה:** הלקוח שולח `messages` שלמים, כולל ה-system prompt. כל מי שנכנס עם חשבון Google כלשהו מקבל 600 קריאות ביום לכל מטרה שהיא, עד 8,192 טוקנים כל אחת במודל 120b. חשבונות Google בחינם, כך שאין בפועל תקרה.
 
@@ -490,7 +551,9 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 27. כל שינוי ב-state כותב את כל הנתונים ל-localStorage ול-Firestore
 
-**איפה:** `src/context/AppContext.jsx:148-161`
+> **עודכן (ACTION_PLAN):** תלוי ב-2א. לפני כן, השהיית הכתיבה תגרום לכך ששינויים מ-2 השניות האחרונות יידרסו בפתיחה הבאה. מתבצע בשלב 7, עם ה-migration.
+
+**איפה:** `src/context/AppContext.jsx` (ה-effect ששומר ל-localStorage ולענן, ב-`AppProvider`)
 
 **הבעיה:** ה-effect רץ בכל שינוי. בשיחה, כל הודעה עוברת דרך `UPSERT_ROLEPLAY_CHAT`, מה שגורם ל-`JSON.stringify` של כל ה-state ולכתיבה מלאה ל-Firestore. בתור אחד יש 2-3 כתיבות של מסמך שיכול להגיע לכמה מאות KB. זה איטי במכשירים חלשים, יקר ב-Firestore, וקרוב למגבלה של כתיבה אחת בשנייה למסמך.
 
@@ -500,7 +563,7 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 28. `todayProgress` לא מתאפס בחצות
 
-**איפה:** `src/context/AppContext.jsx:67`
+**איפה:** `src/context/AppContext.jsx` (`todayProgress` בטעינה מ-localStorage, ב-`AppProvider`)
 
 **הבעיה:** הערך מחושב רק בטעינה. PWA שנשארת פתוחה בטלפון מאתמול תציג בבוקר "5/5 🎉 Daily goal complete!" עד רענון. בנוסף, הסשן הראשון של היום משתמש ב-`excludeIds` של אתמול.
 
@@ -510,7 +573,7 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 29. שיחת ההיכרות: "דלג" יוצר רמה מזויפת שמתנהגת כאמיתית
 
-**איפה:** `src/pages/PlacementTest.jsx:88-103`
+**איפה:** `src/pages/PlacementTest.jsx` (`skipWithDefault`)
 
 **הבעיה:** דילוג קובע `overall_level: 'A1'` בלי תוכנית לימוד. ה-AI מקבל "English level: A1" בכל שיחה, ו-`ADJUST_LEVEL` יוצא מ-A1. אחרי הדילוג אין שום תזכורת לחזור ולבצע את שיחת ההיכרות.
 
@@ -520,7 +583,7 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 30. התור העשירי בשיחה נשאר בלי תשובה
 
-**איפה:** `src/hooks/useRolePlay.js:289-294`
+**איפה:** `src/hooks/useRolePlay.js` (הבדיקה של `MAX_TURNS` ב-`handleUserMessage`)
 
 **הבעיה:** בתור ה-10 השיחה עוברת ל-`DONE` מיד, בלי שהדמות עונה. המשתמש שואל שאלה ומקבל מסך "שיחה מצוינת!". זה קוטע את השיחה באמצע.
 
@@ -530,23 +593,25 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 31. השהיה מלאכותית, חלונות דפדפן חוסמים וכשלים שקטים
 
-- `Practice.jsx:601`: `setTimeout(..., 500)` בין קבלת התמלול לציון. זה עיכוב מזויף של "מנתח את ההגייה שלך…", כשהחישוב לוקח מיקרו-שניות.
-- `Practice.jsx:619`: `alert("המיקרופון לא נתמך...")` חוסם את הדף ונראה לא מקצועי. עדיף להציג הודעה בתוך המסך, עם מעבר להשלמת משפטים.
-- `RolePlay.jsx:667, 683, 748`: מחיקת שיחה, מחיקת נושא ו"שיחה חדשה" עוברות דרך `window.confirm`. זה חלון מערכת שחוסם את הדף, לא מעוצב, ואין אחריו דרך לבטל. **תיקון:** מחיקה מיידית עם הודעה קצרה בתחתית המסך ("השיחה נמחקה · ביטול"), שמשחזרת דרך `UPSERT_ROLEPLAY_CHAT` הקיים. אישור מפורש נשאר רק לפעולות שאי אפשר לבטל, כמו מחיקת חשבון (שכבר עובדת כך).
-- **"איך אומרים...?" נכשל בשקט:** כש-`translateToEnglish` נכשל הוא מחזיר `""` (`ai.service.js:500-501`), ו-`HowDoYouSay` (`RolePlay.jsx:49`) פשוט לא עושה כלום. המשתמש לוחץ "תרגם" ושום דבר לא קורה. זה סותר את הכלל ב-`CLAUDE.md` ("כשה-AI נכשל, מציגים שגיאה עם 'נסה שוב'"). **תיקון:** לזרוק שגיאה, ולהציג אותה ליד השדה עם "נסה שוב".
+- `Practice.jsx` (ה-`useEffect` שמחשב את הציון ב-`Practice`): `setTimeout(..., 500)` בין קבלת התמלול לציון. זה עיכוב מזויף של "מנתח את ההגייה שלך…", כשהחישוב לוקח מיקרו-שניות.
+- `Practice.jsx` (`handleStartRecord`): `alert("המיקרופון לא נתמך...")` חוסם את הדף ונראה לא מקצועי. עדיף להציג הודעה בתוך המסך, עם מעבר להשלמת משפטים.
+- `RolePlay.jsx` (`handleDeleteChat`, ‏`onDeleteTopic` שמועבר ל-`RolePlayHome`, וכפתור "שיחה חדשה" בכותרת השיחה ב-`RolePlay`): מחיקת שיחה, מחיקת נושא ו"שיחה חדשה" עוברות דרך `window.confirm`. זה חלון מערכת שחוסם את הדף, לא מעוצב, ואין אחריו דרך לבטל. **תיקון:** מחיקה מיידית עם הודעה קצרה בתחתית המסך ("השיחה נמחקה · ביטול"), שמשחזרת דרך `UPSERT_ROLEPLAY_CHAT` הקיים. אישור מפורש נשאר רק לפעולות שאי אפשר לבטל, כמו מחיקת חשבון (שכבר עובדת כך).
+- **"איך אומרים...?" נכשל בשקט:** כש-`translateToEnglish` נכשל הוא מחזיר `""` (`ai.service.js`), ו-`handleTranslate` ב-`HowDoYouSay` (`RolePlay.jsx`) פשוט לא עושה כלום. המשתמש לוחץ "תרגם" ושום דבר לא קורה. זה סותר את הכלל ב-`CLAUDE.md` ("כשה-AI נכשל, מציגים שגיאה עם 'נסה שוב'"). **תיקון:** לזרוק שגיאה, ולהציג אותה ליד השדה עם "נסה שוב".
 
 ---
 
 ### 32. נגישות
 
+> **עודכן (ACTION_PLAN):** תיקון חץ ה"חזרה" נעשה כבר עכשיו, כ-32א (יחד עם 23א). שאר הסעיף ב-backlog.
+
 - כרטיסים שלמים בדף הבית (`Home.jsx`, "נקודות חלשות", "מילים שמורות", "גלה את הרמה") הם `<div onClick>`. אי אפשר להגיע אליהם במקלדת, וקורא מסך לא מזהה אותם ככפתורים. צריך `<button>`, או לפחות `role="button" tabIndex={0}` עם `onKeyDown`.
 - כפתורים שהתוכן שלהם הוא רק אמוג'י (✕, ⏹️) בלי `aria-label` בחלק מהמקומות.
 - לחיצה על "📚 מילים שמורות" בדף הבית מובילה ל-`/practice` הכללי ולא לתרגול המילים (`autoCategory: "wordbank"` חסר).
-- **אין סימון פוקוס:** ב-`index.css:201` יש `outline: none` בלי תחליף, ואין אף כלל `:focus-visible`. משתמש מקלדת לא רואה איפה הוא נמצא.
+- **אין סימון פוקוס:** ב-`index.css` (למשל ב-`.mic-bar-input`) יש `outline: none` בלי תחליף, ואין אף כלל `:focus-visible`. משתמש מקלדת לא רואה איפה הוא נמצא.
 - **אין תמיכה ב-`prefers-reduced-motion`:** מסך הפתיחה, בועת "חושב" ומעברי הדפים מונפשים תמיד, גם אצל מי שביקש מהמערכת פחות תנועה.
-- **הודעות חדשות בשיחה לא מוכרזות:** ל-`.chat-shell-messages` (`RolePlay.jsx:785`) אין `aria-live`. משתמש בקורא מסך לא יודע שהדמות ענתה.
-- **בחירות בהגדרות:** `RadioGroup` (`Settings.jsx:22`) מגדיר `role="radio"` בלי `role="radiogroup"` סביבו, בלי ניווט בחיצים ובלי תמיכה במקש רווח.
-- **חץ "חזרה" הפוך:** `← חזרה` מצביע קדימה בממשק מימין לשמאל (`Practice.jsx:114, 249`, ‏`ClozePractice.jsx:77`, ‏`RolePlay.jsx:533, 728`). צריך `→`.
+- **הודעות חדשות בשיחה לא מוכרזות:** ל-`.chat-shell-messages` (ב-`RolePlay`, ‏`RolePlay.jsx`) אין `aria-live`. משתמש בקורא מסך לא יודע שהדמות ענתה.
+- **בחירות בהגדרות:** `RadioGroup` (`Settings.jsx`) מגדיר `role="radio"` בלי `role="radiogroup"` סביבו, בלי ניווט בחיצים ובלי תמיכה במקש רווח.
+- **חץ "חזרה" הפוך:** `← חזרה` מצביע קדימה בממשק מימין לשמאל (`AITopicPanel` ו-`TopicSetup` ב-`Practice.jsx`, ‏`CategoryPicker` ב-`ClozePractice.jsx`, ‏`SavedChatReview` וכותרת השיחה ב-`RolePlay` ב-`RolePlay.jsx`). צריך `→`.
 
 **תיקון לתוספות האלה:** כלל `:focus-visible` גלובלי עם `var(--color-primary)`, בלוק `@media (prefers-reduced-motion: reduce)` שמבטל אנימציות, `role="log" aria-live="polite"` על רשימת ההודעות, ו-`role="radiogroup"` עם ניווט בחיצים. כשיהיו בדיקות E2E (סעיף 43), להוסיף בדיקת axe אוטומטית ב-CI.
 
@@ -566,7 +631,7 @@ weak-spots practice shows: [ 'Where is gate 5?' ]
 
 ### 39. כל האפליקציה נטענת כקובץ JavaScript אחד
 
-**איפה:** `src/App.jsx:10-16` (כל הדפים מיובאים ישירות), `vite.config.js`
+**איפה:** `src/App.jsx` (ה-imports של הדפים בראש הקובץ: כל הדפים מיובאים ישירות), `vite.config.js`
 
 **הבעיה:**
 - אין `React.lazy` בשום מקום. ה-build מוציא קובץ JS אחד, כ-1MB לא דחוס וכ-**300KB ב-gzip**. כל משתמש מוריד את כל הדפים, את Firestore ואת מאגר המשפטים לפני שהמסך הראשון מוצג, גם אם נכנס רק לדף הבית.
@@ -591,7 +656,7 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
 
 ### 40. מדיניות האבטחה (CSP) רופפת, וקובצי deploy מיושנים
 
-**איפה:** `netlify.toml:57`, ‏`public/usage_dashboard.html`, ‏`vercel.json`, ‏`nginx.conf.example`
+**איפה:** `netlify.toml` (הכותרת `Content-Security-Policy`), ‏`public/usage_dashboard.html`, ‏`vercel.json`, ‏`nginx.conf.example`
 
 **הבעיה:**
 - `script-src` כולל `'unsafe-inline'` ו-`'unsafe-eval'`, ולכן ה-CSP לא עוצר הזרקת קוד: גם handler בתוך תגית ירוץ. זה הנתיב שאפשר את ה-XSS שנסגר ב-dashboard. `'unsafe-inline'` נחוץ היום רק בגלל הסקריפט וה-`onclick` שכתובים בתוך `usage_dashboard.html`.
@@ -612,7 +677,9 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
 
 ### 41. אנליטיקה: השם המלא נשמר, ומחיקת חשבון לא מוחקת אותו
 
-**איפה:** `src/utils/analytics.js:12-22`, ‏`netlify/functions/log-event.js:28-38`, ‏`src/context/AppContext.jsx:205`
+> **עודכן (ACTION_PLAN):** הסעיף מתפצל (D6). **41א (עכשיו):** לא שולחים שם (תיקון 1). **41ב:** מפתח לפי uid ומחיקה (תיקונים 2 ו-3), עם ה-migration.
+
+**איפה:** `src/utils/analytics.js` (`logEvent`), ‏`netlify/functions/log-event.js` (ה-handler), ‏`src/context/AppContext.jsx` (`deleteAccountData`)
 
 **הבעיה:**
 - כל אירוע שימוש שולח ושומר את השם המלא מחשבון Google (`userName`). זה מידע מזהה אישי, שנשמר ב-Netlify Blobs ומוצג ב-dashboard.
@@ -630,7 +697,7 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
 
 ### 45. אין דרך לדעת שמשהו נשבר, או כמה ה-AI עולה באמת
 
-**איפה:** `netlify/functions/_shared/http.js:31`, ‏`netlify/functions/groq-proxy.js:107`, ‏`netlify/functions/get-dashboard-data.js:22`, ‏`src/services/errorReporting.js`
+**איפה:** `netlify/functions/_shared/http.js` (`errorResponse`), ‏`netlify/functions/groq-proxy.js` (`forward`), ‏`netlify/functions/get-dashboard-data.js` (`EST_COST_PER_TURN_USD`), ‏`src/services/errorReporting.js`
 
 **הבעיה:**
 - הפונקציות כותבות `console.error` חופשי, בלי מזהה בקשה, בלי uid ובלי זמן תגובה. אי אפשר לענות מהלוגים של Netlify על שאלה כמו "כמה קריאות AI נכשלו אתמול, ואצל מי".
@@ -649,8 +716,8 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
 
 ## ⚪ קל
 
-### 34. המכסה נכתבת ברצף, בניגוד לכוונה ✅ אומת
-`groq-proxy.js:161-162`: `consumeDailyQuota` היא פונקציית `async` שמחזירה את ה-promise של הכתיבה (`quota.js:41`). פונקציית `async` שמחזירה promise ממתינה לו, ולכן `await` עליה מחכה גם לכתיבה ל-Blobs. ה-`Promise.all` שאחריה לא מריץ דבר במקביל, וכל קריאת AI מחכה לכתיבה ל-Blobs לפני שהיא יוצאת.
+### 34. המכסה נכתבת ברצף, בניגוד לכוונה 🧪 אומת
+`groq-proxy.js` (הקריאה ל-`consumeDailyQuota` ב-handler): `consumeDailyQuota` היא פונקציית `async` שמחזירה את ה-promise של הכתיבה (`quota.js`). פונקציית `async` שמחזירה promise ממתינה לו, ולכן `await` עליה מחכה גם לכתיבה ל-Blobs. ה-`Promise.all` שאחריה לא מריץ דבר במקביל, וכל קריאת AI מחכה לכתיבה ל-Blobs לפני שהיא יוצאת.
 
 **תוצאת ההרצה:** מול מאגר מדומה שהכתיבה בו לוקחת 400ms, `await consumeDailyQuota` לקח **415ms**.
 
@@ -663,15 +730,15 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
 יש טסטים ל-state, ל-services ולפונקציות, אבל **אין** ל-`pronunciationScorer`, ל-`practiceHistory`, ל-`ClozePractice` ול-`speechVoice`. זה בדיוק המקום של סעיפים 4, 6, 7 ו-8. **תיקון:** טסט רגרסיה לכל באג שמתוקן מהמסמך הזה, מבוסס על הדוגמאות שכבר מופיעות בו.
 
 ### 37. ערבוב מוטה
-`sort(() => Math.random() - 0.5)` מופיע ב-`sentences.js` וב-`ClozePractice.jsx`. הוא לא נותן התפלגות אחידה, וחלק מהמשפטים יופיעו בתדירות גבוהה יותר. **תיקון:** פונקציית `shuffle` אחת בשיטת Fisher-Yates ב-`utils/`.
+`sort(() => Math.random() - 0.5)` מופיע ב-`sentences.js` וב-`ClozePractice.jsx`. הוא לא נותן התפלגות אחידה, וחלק מהמשפטים יופיעו בתדירות גבוהה יותר. גם סעיף 12 הצביע על זה. **תיקון:** פונקציית `shuffle` אחת בשיטת Fisher-Yates ב-`utils/`.
 
 ### 38. המסיחים בהשלמת משפטים נבחרים רק לפי אורך
-`ClozePractice.jsx:47`: מסיח נבחר רק לפי הפרש אורך של עד 3 אותיות, ולכן לעיתים קרובות התשובה ברורה מהדקדוק לבד (פועל בין שמות עצם). אין גם מצב של שליפה אמיתית, כמו הקלדה או אמירת המילה. **תיקון:** מסיחים מאותו חלק דיבר (תיוג פשוט במאגר), ומצב "אמור את המילה החסרה".
+`ClozePractice.jsx` (`buildClozeItem`): מסיח נבחר רק לפי הפרש אורך של עד 3 אותיות, ולכן לעיתים קרובות התשובה ברורה מהדקדוק לבד (פועל בין שמות עצם). אין גם מצב של שליפה אמיתית, כמו הקלדה או אמירת המילה. **תיקון:** מסיחים מאותו חלק דיבר (תיוג פשוט במאגר), ומצב "אמור את המילה החסרה".
 
 ### 42. ה-dashboard קורא בכל טעינה את כל האירועים שנשמרו אי פעם
-`get-dashboard-data.js:48-50`: `store.list()` על כל האירועים, ואחריו קריאה נפרדת לכל אירוע (N+1). אין סינון לפי תאריך ואין מחיקה של אירועים ישנים. בבטא של 10–20 משתמשים זה מהיר, אבל כל משתמש פעיל מוסיף כמה אירועים ביום. אחרי כמה חודשים עם עשרות משתמשים יהיו עשרות אלפי אירועים, והפונקציה תחרוג מה-timeout של Netlify. ה-dashboard יפסיק לעבוד בדיוק כשיהיו בו הנתונים שחשוב לראות. **תיקון:** סיכום מצטבר לכל משתמש (`summary/${uid}`) שמתעדכן בכל כתיבה, כך שה-dashboard קורא מסמך אחד לכל משתמש ולא את כל האירועים. בנוסף, retention לאירועים הגולמיים (למשל 90 יום). נבנה על המפתח החדש מסעיף 41. לטווח ארוך אפשר לעבור לכלי אנליטיקה ייעודי (PostHog או Plausible), שפותר גם את סעיף 41.
+`get-dashboard-data.js` (ה-handler): `store.list()` על כל האירועים, ואחריו קריאה נפרדת לכל אירוע (N+1). אין סינון לפי תאריך ואין מחיקה של אירועים ישנים. בבטא של 10–20 משתמשים זה מהיר, אבל כל משתמש פעיל מוסיף כמה אירועים ביום. אחרי כמה חודשים עם עשרות משתמשים יהיו עשרות אלפי אירועים, והפונקציה תחרוג מה-timeout של Netlify. ה-dashboard יפסיק לעבוד בדיוק כשיהיו בו הנתונים שחשוב לראות. **תיקון:** סיכום מצטבר לכל משתמש (`summary/${uid}`) שמתעדכן בכל כתיבה, כך שה-dashboard קורא מסמך אחד לכל משתמש ולא את כל האירועים. בנוסף, retention לאירועים הגולמיים (למשל 90 יום). נבנה על המפתח החדש מסעיף 41. לטווח ארוך אפשר לעבור לכלי אנליטיקה ייעודי (PostHog או Plausible), שפותר גם את סעיף 41.
 
-**הגישה ל-dashboard:** סיסמה משותפת אחת (`ADMIN_SECRET`), בלי הגבלה על ניסיונות שגויים (`get-dashboard-data.js:43`). אם הסיסמה דולפת, יש גישה לכל נתוני השימוש, ואין דרך לדעת מי השתמש בה. **תיקון:** התחברות עם Google, כמו באפליקציה, ואימות עם `requireUser` הקיים מול רשימה סגורה של uid מנהלים (משתנה סביבה).
+**הגישה ל-dashboard:** סיסמה משותפת אחת (`ADMIN_SECRET`), בלי הגבלה על ניסיונות שגויים (בדיקת `secretMatches` ב-handler של `get-dashboard-data.js`). אם הסיסמה דולפת, יש גישה לכל נתוני השימוש, ואין דרך לדעת מי השתמש בה. **תיקון:** התחברות עם Google, כמו באפליקציה, ואימות עם `requireUser` הקיים מול רשימה סגורה של uid מנהלים (משתנה סביבה).
 
 ### 43. בשלות הנדסית: בדיקת טיפוסים, בדיקות E2E ובקרות על ה-build
 - צורת ה-state, התשובות מה-AI וה-payloads בין הלקוח לפונקציות לא מוגדרות כחוזה. הרבה מהבאגים במסמך הזה הם בדיוק "צורה לא צפויה", למשל סעיף 3, שבו רשומת יום נבנית בלי השדות שכבר קיימים בה.
@@ -690,12 +757,12 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
    - ב-GitHub: branch protection שדורש CI ירוק לפני merge ל-main.
    - ב-Netlify: לכבות deploy previews, כדי לחסוך דקות build.
 
-**מתי:** אחרי שלבים 1–3 בסדר העבודה. את סעיפים 3 ו-6 אפשר לעשות בכל שלב.
+**מתי:** אחרי ה-migration (שלב 7 ב-`STATUS.md`), כשמבנה הנתונים מתייצב. את תיקונים 3 ו-6 כאן אפשר לעשות בכל שלב.
 
 ### 46. רינדור מיותר, ותרגול באמצע שהולך לאיבוד
-- **כל `dispatch` מרנדר מחדש את כל מי שמשתמש ב-state:** ה-`value` של ה-Context נוצר מחדש בכל רינדור (`AppContext.jsx:231`). לכן כל קומפוננטה שקוראת ל-`useApp()` מתרנדרת, גם אם הנתון שהיא צריכה לא השתנה.
-- **חישובים כבדים בלי memo:** `getWeakSentenceStats` עובר על כל המשפטים של שנה שלמה בכל רינדור של Practice (`Practice.jsx:510`, ושוב בשורות 530 ו-534) ושל Progress (`Progress.jsx:112`). בזמן הקלטה המסך מתעדכן כמה פעמים בשנייה (תמלול חי), וזה מורגש במכשירים חלשים.
-- **תרגול באמצע הולך לאיבוד:** מצב הסשן נשמר רק ב-state מקומי (`Practice.jsx:494`). מעבר לטאב אחר באמצע מחזיר למסך הבחירה, והמשפטים שנשארו בסשן נעלמים.
+- **כל `dispatch` מרנדר מחדש את כל מי שמשתמש ב-state:** ה-`value` של ה-Context נוצר מחדש בכל רינדור (`AppContext.Provider` ב-`AppProvider`, ‏`AppContext.jsx`). לכן כל קומפוננטה שקוראת ל-`useApp()` מתרנדרת, גם אם הנתון שהיא צריכה לא השתנה.
+- **חישובים כבדים בלי memo:** `getWeakSentenceStats` עובר על כל המשפטים של שנה שלמה בכל רינדור של Practice (`weakStats`, ושוב פעמיים ב-`loadSentences`) ושל Progress (`weakSentences`). בזמן הקלטה המסך מתעדכן כמה פעמים בשנייה (תמלול חי), וזה מורגש במכשירים חלשים.
+- **תרגול באמצע הולך לאיבוד:** מצב הסשן נשמר רק ב-state מקומי (`practiceState` ב-`Practice`). מעבר לטאב אחר באמצע מחזיר למסך הבחירה, והמשפטים שנשארו בסשן נעלמים.
 
 **תיקון:** `useMemo` על ה-value של ה-Context, ופיצול ל-`StateContext` ול-`DispatchContext`. חישובים נגזרים ב-`useMemo` לפי `sessions`. שמירת הסשן הפעיל ב-`sessionStorage`, עם "המשך מאיפה שהפסקת".
 
@@ -703,22 +770,21 @@ const RolePlay = lazy(() => import("./pages/RolePlay"));
 - **משוב בזמן הקלטה:** אין חיווי עוצמת קול, ולכן המשתמש לא יודע אם המיקרופון שומע אותו עד שהתמלול חוזר. אפשר להוסיף `AnalyserNode` על הזרם ש-`useVoiceInput` כבר פותח. אין גם רטט (`navigator.vibrate`) בתחילת ההקלטה ובסופה.
 - **הציון** מופיע בבת אחת. ספירה קצרה עד הציון מדגישה את הרגע.
 - **טעינה:** spinner כללי בכל מקום. שלד (skeleton) בצורת התוכן מרגיש מהיר יותר, והוא נדרש ממילא בסעיף 39.
-- **טפסים:** לשדה התרחיש ב"נושא שיחה חדש" (`RolePlay.jsx:162`) אין `maxLength`. התרחיש נכנס ל-system prompt, וה-proxy דוחה הודעה של יותר מ-12,000 תווים (`groq-proxy.js:29`). תרחיש של יותר מכ-10,000 תווים יכשיל כל שיחה בנושא, ו"נסה שוב" לא יעזור. **תיקון:** `maxLength` (למשל 600) עם מונה תווים, ו-`enterKeyHint`/‏`inputMode` מתאימים בשדות.
+- **טפסים:** לשדה התרחיש ב"נושא שיחה חדש" (`AddTopicForm` ב-`RolePlay.jsx`) אין `maxLength`. התרחיש נכנס ל-system prompt, וה-proxy דוחה הודעה של יותר מ-12,000 תווים (`MAX_MESSAGE_CHARS` ב-`groq-proxy.js`). תרחיש של יותר מכ-10,000 תווים יכשיל כל שיחה בנושא, ו"נסה שוב" לא יעזור. **תיקון:** `maxLength` (למשל 600) עם מונה תווים, ו-`enterKeyHint`/‏`inputMode` מתאימים בשדות.
 
 ---
 
 ## סדר עבודה מומלץ
 
-| שלב | סעיפים | למה |
-|---|---|---|
-| **0. תיקונים מהירים** | 34, 40 | קטנים ובלי סיכון לנתונים. אפשר לצרף אותם ל-push של שלב אחר, כדי לא לבזבז דקות build. |
-| **1. נתוני משתמשים: אובדן ופרטיות** (דחוף) | 3, 11 ואחריהם 1, 2, 41 | באגים שמוחקים או לא שומרים מה שהמשתמש עשה, ומידע אישי שלא נמחק. 3 ו-11 הם תיקונים של כמה שורות. 1, 2 ו-41 משנים את מבנה הנתונים, ונבנים יחד עם migration אחד ומתוכנן מראש. |
-| **2. אמינות המדדים** | 4, 7, 44, 8, 9, 19, 20, 16 | בלי זה כל המספרים באפליקציה (ציון, חלשים, streak, XP) לא משקפים את המציאות. |
-| **3. שלמות השיחה** | 5, 14, 15, 13, 6 | שיחה ללא דיבור ורמה שעולה בזכות ה-AI פוגעים בליבת המוצר. |
-| **4. איכות פדגוגית** | 17, 18, 10, 12, 21 | כאן האפליקציה עוברת מ"כלי תרגול" ל"כלי שמלמד". |
-| **5. ליטוש ותשתית** | 39, 26, 45, 22, 23, 24, 25, 27, 28, 29–33, 35–38, 42, 46, 47 | 39 ראשון, לפני שמאגרי התוכן מ"חודש 1" מתחילים לגדול. 26 ו-45 לפני הרחבת הבטא. השאר חשוב, אבל לא פוגע בלמידה עצמה. |
-| **6. בשלות** | 43 | בדיקת טיפוסים ובדיקות E2E, כשהמבנה מתייצב אחרי השלבים הקודמים. |
+**הסדר והסטטוס של כל הסעיפים נמצאים ב-`STATUS.md`**, והפירוט המעודכן של כל משימה ב-`ACTION_PLAN.md` (§4). הטבלה שהייתה כאן הוחלפה בהפניה (D7), כדי שיהיה מקור אמת אחד לסדר.
 
-לכל תיקון בשלבים 1-2 צריך ללוות טסט שמשחזר את הבאג לפני התיקון. רוב הבאגים כאן הם בפונקציות טהורות, שקל לבדוק.
+ההיגיון מאחורי הסדר:
+- **תיקונים מהירים** (כמו 34 ו-40) קטנים ובלי סיכון לנתונים. מאחדים אותם ל-push אחד, כדי לא לבזבז דקות build.
+- **נתוני משתמשים: אובדן ופרטיות** (דחוף). באגים שמוחקים או לא שומרים מה שהמשתמש עשה, ומידע אישי שלא נמחק. 3 ו-11 הם תיקונים קטנים בפונקציות טהורות. 1, 2 ו-41 משנים את מבנה הנתונים, ולכן החלקים המבניים שלהם (1ב, 2ב, 41ב) נבנים יחד, ב-migration אחד ומתוכנן מראש, בסוף שלב התיקונים. עד אז, החלקים הקטנים (1א, 2א, 41א) נעשים מיד (D6).
+- **אמינות המדדים:** בלי זה כל המספרים באפליקציה (ציון, חלשים, streak, XP) לא משקפים את המציאות.
+- **שלמות השיחה:** שיחה בלי דיבור, ורמה שעולה בזכות ה-AI, פוגעים בליבת המוצר.
+- **איכות פדגוגית:** כאן האפליקציה עוברת מ"כלי תרגול" ל"כלי שמלמד". רוב זה נבנה בחודש 1 (`IMPROVEMENT_IDEAS.md`, חלק ו׳).
+- **ליטוש ותשתית:** 39 ראשון, לפני שמאגרי התוכן של חודש 1 מתחילים לגדול. 26ב ו-45 לפני הרחבת הבטא. השאר חשוב, אבל לא פוגע בלמידה עצמה.
+- **בשלות** (43): בדיקת טיפוסים ובדיקות E2E, כשהמבנה מתייצב אחרי ה-migration.
 
-**הסדר המבצעי**, כלומר מה עושים ראשון בפועל ומתי נכנס ה-migration, מופיע ב-`CLAUDE.md`. הוא שם את סעיפים 1, 2 ו-41 בסוף שלב התיקונים: הם דורשים תכנון והעברת נתונים, בזמן שהתיקונים שלפניהם הם בפונקציות טהורות ובסיכון נמוך.
+לכל תיקון באג צריך ללוות טסט שמשחזר את הבאג לפני התיקון. רוב הבאגים כאן הם בפונקציות טהורות, שקל לבדוק.
