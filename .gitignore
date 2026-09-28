@@ -26,3 +26,8 @@ dist-ssr
 # Local Netlify folder
 .netlify
 deno.lock
+
+# Firebase service account keys (scripts/measure-cloud-docs.mjs). Never commit.
+.secrets/
+*-firebase-adminsdk-*.json
+service-account*.json
