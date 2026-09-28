@@ -4,7 +4,7 @@ import { speakNaturally } from '../utils/speechVoice';
 import { PLACEMENT_MAX_TURNS } from '../data/placementPrompt';
 import { logEvent } from '../utils/analytics';
 
-export function usePlacementTest({ userId, userName, onComplete } = {}) {
+export function usePlacementTest({ userId, onComplete } = {}) {
   const [messages, setMessages] = useState([]);
   const [phase, setPhase] = useState('IDLE'); // IDLE | AI_THINKING | USER_TURN | DONE | ERROR
   const [turnCount, setTurnCount] = useState(0);
@@ -31,11 +31,11 @@ export function usePlacementTest({ userId, userName, onComplete } = {}) {
       setResult(response.result);
       setPhase('DONE');
       onComplete?.(response.result);
-      logEvent(userId, userName, 'placement_completed', { level: response.result.overall_level });
+      logEvent(userId, 'placement_completed', { level: response.result.overall_level });
     } else {
       setPhase('USER_TURN');
     }
-  }, [addMessage, onComplete, userId, userName]);
+  }, [addMessage, onComplete, userId]);
 
   const startPlacement = useCallback(async () => {
     setPhase('AI_THINKING');

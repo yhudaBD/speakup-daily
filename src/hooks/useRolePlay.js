@@ -13,7 +13,6 @@ export function useRolePlay({
   ttsSpeed = 1.0,
   placement = null,
   userId,
-  userName,
   onPersist,
   onSessionComplete,
 }) {
@@ -94,7 +93,7 @@ export function useRolePlay({
       helpUsedCount: helpUsedCountRef.current,
       completedAt: new Date().toISOString(),
     });
-    logEvent(userId, userName, 'session_ended', {
+    logEvent(userId, 'session_ended', {
       kind: 'roleplay',
       topicId: topic?.id,
       topicTitle: topic?.title,
@@ -102,7 +101,7 @@ export function useRolePlay({
       helpUsedCount: helpUsedCountRef.current,
       currentLevel: placement?.overall_level || null,
     });
-  }, [sessionId, topic, onSessionComplete, userId, userName, placement]);
+  }, [sessionId, topic, onSessionComplete, userId, placement]);
 
   const addMessage = useCallback((role, content, he) => {
     const msg = { role, content, ...(he ? { he } : {}) };
@@ -199,14 +198,14 @@ export function useRolePlay({
     setTurnCount(0);
     sessionSavedRef.current = false;
     helpUsedCountRef.current = 0;
-    logEvent(userId, userName, 'session_started', {
+    logEvent(userId, 'session_started', {
       kind: 'roleplay',
       topicId: topic.id,
       currentLevel: placement?.overall_level || null,
     });
 
     await requestOpening();
-  }, [topic, placement, setPhaseSafe, userId, userName, requestOpening]);
+  }, [topic, placement, setPhaseSafe, userId, requestOpening]);
 
   const resumeConversation = useCallback((chat) => {
     if (!chat?.messages?.length) return false;

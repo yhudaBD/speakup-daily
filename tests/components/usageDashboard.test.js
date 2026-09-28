@@ -14,9 +14,9 @@ const data = {
   generatedAt: "2026-09-28T10:00:00.000Z",
   summary: { totalUsers: 2, weeklyActiveUsers: 1, popularTopics: [], totalCostUsd: 0.5 },
   users: [
-    { userName: "Dana", activeDates: [], placementLevel: "A2", currentLevel: "B1", daysSinceActive: 0,
+    { userLabel: "…abc123", activeDates: [], placementLevel: "A2", currentLevel: "B1", daysSinceActive: 0,
       avgHelpUsed: null, helpTrend: null, topicCounts: { Cafe: 2 }, estimatedCostUsd: 0.2 },
-    { userName: "Noa", activeDates: [], placementLevel: null, currentLevel: null, daysSinceActive: 5,
+    { userLabel: "…xyz789", activeDates: [], placementLevel: null, currentLevel: null, daysSinceActive: 5,
       avgHelpUsed: 1, helpTrend: "down", topicCounts: {}, estimatedCostUsd: 0.3 },
   ],
 };
@@ -50,7 +50,7 @@ describe("usage dashboard", () => {
 
     click($("usersBody").querySelectorAll("tr[data-index]")[1].querySelector("td"));
     expect($("userModalBackdrop").hidden).toBe(false);
-    expect($("modalName").textContent).toBe("Noa");
+    expect($("modalName").textContent).toBe("…xyz789");
 
     click($("closeModalBtn"));
     expect($("userModalBackdrop").hidden).toBe(true);

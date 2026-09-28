@@ -107,7 +107,6 @@ export default function PlacementTest() {
     startPlacement, handleUserMessage, retry, replayMessage,
   } = usePlacementTest({
     userId: state.user?.id,
-    userName: state.user?.name,
     onComplete: (placementResult) => {
       dispatch({ type: 'SET_PLACEMENT_RESULT', payload: placementResult });
     },
