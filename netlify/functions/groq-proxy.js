@@ -158,8 +158,10 @@ export default async (req) => {
       throw badRequest("Unknown type");
     }
 
-    const counted = await consumeDailyQuota(uid);
-    const [response] = await Promise.all([run(), counted]);
+    // The Groq call starts while the quota write is still in flight, and the
+    // response waits for both, so the count isn't lost when the function ends.
+    const { write } = await consumeDailyQuota(uid);
+    const [response] = await Promise.all([run(), write]);
     return response;
   } catch (err) {
     return errorResponse(err);

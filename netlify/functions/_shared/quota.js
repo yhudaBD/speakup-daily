@@ -21,8 +21,11 @@ function dailyLimit() {
 }
 
 // Throws HttpError 429 once `uid` has used today's quota. Otherwise counts
-// this call and returns a promise for the count write, so the caller can
-// await it alongside the Groq request rather than before it.
+// this call and resolves to `{ write }`, the promise for the count write, so
+// the caller can await it alongside the Groq request rather than before it.
+// The promise is wrapped in an object on purpose: an async function that
+// returns a promise directly adopts it, and awaiting the call would then wait
+// for the write too.
 export async function consumeDailyQuota(uid, { store, now = new Date() } = {}) {
   const key = `${now.toISOString().slice(0, 10)}/${uid}`;
   let quotaStore = store;
@@ -32,13 +35,14 @@ export async function consumeDailyQuota(uid, { store, now = new Date() } = {}) {
     used = (await quotaStore.get(key, { type: "json" }))?.count || 0;
   } catch (err) {
     console.warn("AI quota check skipped (storage unavailable):", err?.message || err);
-    return Promise.resolve();
+    return { write: Promise.resolve() };
   }
 
   if (used >= dailyLimit()) {
     throw new HttpError(429, "daily_quota_exceeded", "Daily AI usage limit reached. Try again tomorrow.");
   }
-  return quotaStore
+  const write = quotaStore
     .setJSON(key, { count: used + 1 })
     .catch((err) => console.warn("AI quota write failed:", err?.message || err));
+  return { write };
 }
