@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { AppProvider } from "./context/AppContext";
 import { preloadVoices } from "./utils/speechVoice";
 import AuthGate from "./components/AuthGate";
@@ -16,6 +16,8 @@ import RolePlay from "./pages/RolePlay";
 import Progress from "./pages/Progress";
 import Settings from "./pages/Settings";
 import PlacementTest from "./pages/PlacementTest";
+// Loaded on demand: most visits never open it (CLAUDE.md, bundle size).
+const BaselineRecording = lazy(() => import("./pages/BaselineRecording"));
 import "./index.css";
 
 // Keyed by path, so navigating away from a page that crashed gives the
@@ -32,6 +34,10 @@ function AppRoutes() {
         <Route path="/progress" element={<Progress />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/placement" element={<PlacementTest />} />
+        <Route
+          path="/baseline"
+          element={<Suspense fallback={<p className="container text-muted" style={{ padding: 24 }}>טוען…</p>}><BaselineRecording /></Suspense>}
+        />
       </Routes>
     </RouteErrorBoundary>
   );

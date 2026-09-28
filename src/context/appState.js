@@ -121,6 +121,10 @@ export const initialState = {
   },
   lifetimeStats: { ...defaultLifetimeStats },
   placement: null,
+  // The "day 1" recording (T5): { status: "recorded" | "declined", at }, or
+  // null until the user does one or the other. The recordings themselves
+  // stay on the device (services/baselineRecordings.js).
+  baseline: null,
   // Firebase uid of the account this device's saved data belongs to. See
   // localDataOwnership() below.
   ownerUid: null,
@@ -374,6 +378,11 @@ export function reducer(state, action) {
     // (nothing just done here gets lost); the rest comes from the cloud,
     // since it represents the account's real history over time rather than
     // whatever happens to be in this particular browser right now.
+    case "SET_BASELINE": {
+      const { status } = action.payload || {};
+      if (status !== "recorded" && status !== "declined") return state;
+      return { ...state, baseline: { status, at: new Date().toISOString() } };
+    }
     case "MERGE_CLOUD_DATA": {
       const cloud = action.payload;
       if (!cloud) return state;
@@ -386,6 +395,7 @@ export function reducer(state, action) {
         practice: cloud.practice || state.practice,
         lifetimeStats: cloud.lifetimeStats || state.lifetimeStats,
         placement: cloud.placement || state.placement,
+        baseline: cloud.baseline || state.baseline,
       };
     }
     default:
@@ -407,6 +417,7 @@ export function snapshotForSync(state) {
     practice: state.practice,
     lifetimeStats: state.lifetimeStats,
     placement: state.placement,
+    baseline: state.baseline ?? null,
   };
 }
 

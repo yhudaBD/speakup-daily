@@ -1,5 +1,6 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import BaselineCard from "../components/home/BaselineCard";
 import { useApp } from "../context/AppContext";
 import { getGreeting, getTodayString, getLastNDays, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
@@ -96,6 +97,8 @@ export default function Home() {
             <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>→</span>
           </div>
         )}
+
+        <BaselineCard />
 
         {/* Today's Mission */}
         <div className="card mb-4">
