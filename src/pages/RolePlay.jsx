@@ -800,7 +800,7 @@ export default function RolePlay() {
       {phase === 'USER_TURN' && suggestedReplies.length > 0 && (
         <SuggestedReplies
           replies={suggestedReplies}
-          onSelect={(text) => { logHelpUsed(); handleUserMessage(text); }}
+          onSelect={(text) => { logHelpUsed(); handleUserMessage(text, { source: 'suggestion' }); }}
           disabled={phase !== 'USER_TURN'}
           showTranslation={showTranslation}
         />

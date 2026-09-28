@@ -14,11 +14,13 @@ export const SIZE_RANGES = ["700-800KB", "800-900KB", "900KB+"];
 const text = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
 const count = (v) => (Number.isFinite(v) && v >= 0 && v <= 1000 ? Math.floor(v) : undefined);
 const level = (v) => (CEFR_LEVELS.has(v) ? v : undefined);
+// Speaking time per session (T4), in whole seconds: at most 10 hours.
+const seconds = (v) => (Number.isFinite(v) && v >= 0 && v <= 36_000 ? Math.floor(v) : undefined);
 
 export function sanitizeDetails(details) {
   const d = details && typeof details === "object" ? details : {};
   const clean = {
-    kind: d.kind === "roleplay" ? "roleplay" : undefined,
+    kind: d.kind === "roleplay" || d.kind === "practice" ? d.kind : undefined,
     level: level(d.level),
     currentLevel: level(d.currentLevel),
     topicId: text(d.topicId, 80),
@@ -26,6 +28,8 @@ export function sanitizeDetails(details) {
     turnCount: count(d.turnCount),
     helpUsedCount: count(d.helpUsedCount),
     sizeRange: SIZE_RANGES.includes(d.sizeRange) ? d.sizeRange : undefined,
+    independent_sec: seconds(d.independent_sec),
+    repeat_sec: seconds(d.repeat_sec),
   };
   return Object.fromEntries(Object.entries(clean).filter(([, v]) => v !== undefined));
 }

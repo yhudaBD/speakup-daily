@@ -76,6 +76,39 @@ describe("freshStateFor", () => {
   });
 });
 
+// T4 in ACTION_PLAN.md: how each user turn was made and how long each
+// recording lasted are kept as given, and records from before T4 still load.
+describe("speaking source and duration (T4)", () => {
+  it("keeps source and durationMs on saved chat messages", () => {
+    const chat = {
+      id: "c1", topicId: "cafe",
+      messages: [
+        { role: "assistant", content: "Hi" },
+        { role: "user", content: "A coffee", source: "spoken", durationMs: 2100 },
+        { role: "user", content: "Milk", source: "typed" },
+      ],
+    };
+    const next = reducer(loaded(), { type: "UPSERT_ROLEPLAY_CHAT", payload: chat });
+    expect(next.rolePlay.chats[0].messages[1]).toEqual({ role: "user", content: "A coffee", source: "spoken", durationMs: 2100 });
+    expect(next.rolePlay.chats[0].messages[2].source).toBe("typed");
+  });
+
+  it("keeps durationMs on a saved practice attempt", () => {
+    const next = reducer(loaded(), { type: "SAVE_SESSION_RESULT", payload: { sentenceId: "s1", score: 80, durationMs: 1900 } });
+    const [day] = Object.values(next.sessions);
+    expect(day.sentences[0].durationMs).toBe(1900);
+  });
+
+  it("loads chats and attempts saved before T4 unchanged", () => {
+    const old = loaded({
+      rolePlay: { chats: [{ id: "c0", messages: [{ role: "user", content: "old" }] }], customTopics: [] },
+      sessions: { "2026-09-01": { sentences: [{ sentenceId: "s1", score: 70 }], averageScore: 70 } },
+    });
+    expect(old.rolePlay.chats[0].messages[0]).toEqual({ role: "user", content: "old" });
+    expect(old.sessions["2026-09-01"].sentences[0]).toEqual({ sentenceId: "s1", score: 70 });
+  });
+});
+
 // Verified bugs from CRITICAL_REVIEW.md. Each `it.fails` states the correct
 // behavior and fails today; the fix turns it into a plain `it`. The plain
 // test beside it keeps `it.fails` honest: a crash would also "fail".

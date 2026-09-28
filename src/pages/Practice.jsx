@@ -13,6 +13,7 @@ import {
 } from "../data/sentences";
 import { getWeakSentenceStats, sentencesFromWeakList } from "../utils/practiceHistory";
 import { aiService } from "../services/ai.service";
+import { reportSpeakingTime } from "../utils/speakingTime";
 
 function WaveAnimation() {
   return (
@@ -504,7 +505,7 @@ export default function Practice() {
   const [summaryError, setSummaryError] = useState(false);
   const [topicSaved, setTopicSaved] = useState(false);
 
-  const { transcript, liveTranscript, isListening, isTranscribing, error, isSupported, start, stop } = useSpeechRecognition();
+  const { transcript, durationMs, liveTranscript, isListening, isTranscribing, error, isSupported, start, stop } = useSpeechRecognition();
   const { speak } = useSpeechSynthesis();
 
   const weakStats = getWeakSentenceStats(sessions);
@@ -600,11 +601,11 @@ export default function Practice() {
       setPracticeState("ANALYZING");
       setTimeout(() => {
         const res = scorePronunciation(currentSentence.text, transcript);
-        setResult({ ...res, spoken: transcript });
+        setResult({ ...res, spoken: transcript, durationMs });
         setPracticeState("RESULT");
       }, 500);
     }
-  }, [transcript, practiceState, currentSentence]);
+  }, [transcript, durationMs, practiceState, currentSentence]);
 
   const handleListen = useCallback(() => {
     setPracticeState("LISTENING_EXAMPLE");
@@ -673,6 +674,7 @@ export default function Practice() {
       score: result.score,
       attempts: 1,
       wordResults: result.wordResults,
+      ...(result.durationMs > 0 ? { durationMs: Math.round(result.durationMs) } : {}),
     };
     dispatch({ type: "SAVE_SESSION_RESULT", payload: entry });
     const newResults = [...sessionResults, entry];
@@ -680,13 +682,14 @@ export default function Practice() {
 
     if (currentIdx + 1 >= sentences.length) {
       setPracticeState("DONE");
+      reportSpeakingTime(state.user?.id, "practice", { sentences: newResults });
       fetchSummary(newResults, selectedCategory, categoryLabel);
     } else {
       setCurrentIdx((i) => i + 1);
       setResult(null);
       setPracticeState("IDLE");
     }
-  }, [result, currentSentence, currentIdx, sentences.length, sessionResults, dispatch, fetchSummary, selectedCategory, categoryLabel]);
+  }, [result, currentSentence, currentIdx, sentences.length, sessionResults, dispatch, fetchSummary, selectedCategory, categoryLabel, state.user?.id]);
 
   const handleTryAgain = () => {
     setResult(null);

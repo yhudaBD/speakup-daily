@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { aiService, isAbortError } from '../services/ai.service';
 import { speakNaturally, getBestEnglishVoice, preloadVoices } from '../utils/speechVoice';
 import { logEvent } from '../utils/analytics';
+import { TURN_SOURCES } from '../context/selectors';
+import { reportSpeakingTime } from '../utils/speakingTime';
 
 const MAX_TURNS = 10;
 
@@ -101,10 +103,11 @@ export function useRolePlay({
       helpUsedCount: helpUsedCountRef.current,
       currentLevel: placement?.overall_level || null,
     });
+    reportSpeakingTime(userId, 'roleplay', { messages: messagesRef.current });
   }, [sessionId, topic, onSessionComplete, userId, placement]);
 
-  const addMessage = useCallback((role, content, he) => {
-    const msg = { role, content, ...(he ? { he } : {}) };
+  const addMessage = useCallback((role, content, he, extra = {}) => {
+    const msg = { role, content, ...(he ? { he } : {}), ...extra };
     messagesRef.current = [...messagesRef.current, msg];
     setMessages([...messagesRef.current]);
     syncToStorage({ messages: messagesRef.current });
@@ -274,13 +277,19 @@ export function useRolePlay({
     }
   }, [topic, sessionId, savedChat, resumeConversation, startConversation]);
 
-  const handleUserMessage = useCallback(async (userText) => {
+  // `source` says how the turn was made (TURN_SOURCES in selectors.js), and
+  // `durationMs` how long the recording ran, kept only for spoken turns (T4).
+  const handleUserMessage = useCallback(async (userText, { source = 'typed', durationMs } = {}) => {
     if (!userText.trim() || !topic) return;
     if (phaseRef.current !== 'USER_TURN') return;
 
     setSuggestedReplies([]);
 
-    const currentMessages = addMessage('user', userText);
+    const turn = { source: TURN_SOURCES.includes(source) ? source : 'typed' };
+    if (turn.source === 'spoken' && Number.isFinite(durationMs) && durationMs > 0) {
+      turn.durationMs = Math.round(durationMs);
+    }
+    const currentMessages = addMessage('user', userText, undefined, turn);
     const newTurn = turnCountRef.current + 1;
     turnCountRef.current = newTurn;
     setTurnCount(newTurn);

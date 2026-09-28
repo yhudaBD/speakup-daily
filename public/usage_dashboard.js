@@ -47,6 +47,12 @@ function last30Days() {
   return days;
 }
 
+// Seconds as m:ss, for the independent speaking column (the North Star, T4).
+function minutes(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
 function trendBadge(trend) {
   if (trend === 'down') return '<span class="pill ok">📉 ירידה</span>';
   if (trend === 'up') return '<span class="pill warn">📈 עלייה</span>';
@@ -75,7 +81,7 @@ function render(data) {
 
   const usersBody = document.getElementById('usersBody');
   if (!data.users.length) {
-    usersBody.innerHTML = '<tr><td colspan="6" class="empty">אין עדיין נתונים — ברגע שמישהו ישתמש באפליקציה, הוא יופיע כאן.</td></tr>';
+    usersBody.innerHTML = '<tr><td colspan="7" class="empty">אין עדיין נתונים — ברגע שמישהו ישתמש באפליקציה, הוא יופיע כאן.</td></tr>';
   } else {
     usersBody.innerHTML = data.users.map((u, i) => `
       <tr class="clickable" data-index="${i}">
@@ -83,6 +89,7 @@ function render(data) {
         <td><div class="grid30">${days.map(d => `<div class="cell${u.activeDates.includes(d) ? ' active' : ''}" title="${d}"></div>`).join('')}</div></td>
         <td>${escapeHtml(u.placementLevel || '—')} → ${escapeHtml(u.currentLevel || '—')}</td>
         <td>${u.avgHelpUsed !== null ? u.avgHelpUsed.toFixed(1) : '—'} ${trendBadge(u.helpTrend)}</td>
+        <td>${minutes(u.independentSec7d)}</td>
         <td>$${u.estimatedCostUsd.toFixed(3)}</td>
         <td>${u.daysSinceActive === 0 ? 'היום' : u.daysSinceActive === null ? '—' : `לפני ${u.daysSinceActive} ימים`}</td>
       </tr>
