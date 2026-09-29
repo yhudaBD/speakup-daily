@@ -10,10 +10,12 @@ import {
 import { getSentenceBank } from "../cloud/bank";
 import { cloudSchemaFor } from "../cloud/flags";
 import { openV3 } from "../cloud/openV3";
-import { deleteAllCloudData } from "../cloud/v3Store";
+import { startRealtime } from "../cloud/realtime";
+import { deleteAllCloudData, listenDoc } from "../cloud/v3Store";
 import { cloudSync, docSizeBytes, sizeRange } from "../services/cloudSync";
 import { clearLocalAccountData } from "../services/localAccountData";
 import { deleteMyEvents, logEvent } from "../utils/analytics";
+import { getTodayString } from "../utils/dateHelpers";
 
 const AppContext = createContext(null);
 
@@ -38,7 +40,15 @@ export function AppProvider({ children }) {
   // The schema 3 sync (cloud/v3Sync.js) when this account uses the new cloud
   // structure (cloud/flags.js), or null for the single document (schema 2).
   const v3SyncRef = useRef(null);
-  useEffect(() => () => v3SyncRef.current?.dispose(), []);
+  // Stops listening to the other device's changes (cloud/realtime.js).
+  const stopRealtimeRef = useRef(null);
+  const stopV3 = useCallback(() => {
+    stopRealtimeRef.current?.();
+    stopRealtimeRef.current = null;
+    v3SyncRef.current?.dispose();
+    v3SyncRef.current = null;
+  }, []);
+  useEffect(() => stopV3, [stopV3]);
 
   // Track the signed-in Firebase account, if any. AuthGate reads authReady
   // (below) from context instead of subscribing to this itself, so there is
@@ -132,15 +142,20 @@ export function AppProvider({ children }) {
       dispatch({ type: "CLAIM_LOCAL_DATA", payload: { uid } });
     }
 
-    v3SyncRef.current?.dispose();
-    v3SyncRef.current = null;
+    stopV3();
 
     (async () => {
       try {
         if (cloudSchemaFor(firebaseUser.email) === "v3") {
           // MIGRATION_PLAN.md §8: moves the account on its first open.
-          v3SyncRef.current = await openV3({
-            uid, local, dispatch, bank: getSentenceBank(), track: (p) => cloudSync.track(p),
+          const bank = getSentenceBank();
+          const sync = await openV3({ uid, local, dispatch, bank, track: (p) => cloudSync.track(p) });
+          v3SyncRef.current = sync;
+          // MIGRATION_PLAN.md §6: the other device's changes while open.
+          stopRealtimeRef.current = startRealtime({
+            sync, dispatch, bank,
+            listen: (path, onData) => listenDoc(uid, path, onData),
+            month: () => getTodayString().slice(0, 7),
           });
         } else {
           const cloud = await loadCloudProfile(uid);
@@ -161,7 +176,7 @@ export function AppProvider({ children }) {
         setSynced(true);
       }
     })();
-  }, [firebaseUser, state.isLoaded]);
+  }, [firebaseUser, state.isLoaded, stopV3]);
 
   // Persist to localStorage whenever state changes, and — once the
   // one-time merge/seed above has run for this account — mirror the same
@@ -250,8 +265,7 @@ export function AppProvider({ children }) {
     await deleteMyEvents();
     persistBlockedRef.current = true;
     cloudReadyUidRef.current = null;
-    v3SyncRef.current?.dispose();
-    v3SyncRef.current = null;
+    stopV3();
     try {
       // Both structures, the old document included (MIGRATION_PLAN.md §7).
       await deleteAllCloudData(uid);
@@ -263,7 +277,7 @@ export function AppProvider({ children }) {
     await clearLocalAccountData(uid);
     await deleteAuthAccountOrSignOut();
     window.location.replace("/");
-  }, [firebaseUser]);
+  }, [firebaseUser, stopV3]);
 
   const authReady = firebaseUser === undefined ? "checking"
     : firebaseUser === null ? "signed-out"

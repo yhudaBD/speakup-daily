@@ -2,7 +2,7 @@
 // §3-§5). The decisions are in pure modules: which documents (schemaV3.js)
 // and what to write (diffV3.js). This file only talks to Firestore.
 import {
-  FieldPath, collection, deleteField, doc, getDoc, getDocs, limit, orderBy, query, where, writeBatch,
+  FieldPath, collection, deleteField, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, where, writeBatch,
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 import { nestFields } from "./diffV3";
@@ -51,6 +51,17 @@ export async function loadV3(uid, { since } = {}) {
       : query(chats, orderBy("updatedAt", "desc"), limit(RECENT_CHATS))),
   ]);
   return { profile: profile.data(), months: byId(monthDocs), chats: byId(chatDocs) };
+}
+
+// One document as the other device changes it (realtime.js). This device's
+// own writes are skipped while they're on their way (hasPendingWrites): the
+// state already has them. A failed listen is left alone; the next open loads
+// everything anyway.
+export function listenDoc(uid, path, onData) {
+  return onSnapshot(ref(uid, path), (snapshot) => {
+    if (snapshot.metadata.hasPendingWrites || !snapshot.exists()) return;
+    onData(snapshot.data());
+  }, (e) => console.error("Cloud listen failed", path, e));
 }
 
 // Every document of the account, schema 3 and the old one (MIGRATION_PLAN.md

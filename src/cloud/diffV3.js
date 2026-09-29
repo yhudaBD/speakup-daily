@@ -59,7 +59,9 @@ function diffProfile(prev = {}, next = {}, now) {
   return operation("profile/main", fields, deleteFields, now);
 }
 
-function diffDay(date, before, after) {
+// A day is never written whole, a new one included: the other device may
+// have written that day already, and a whole day would replace its attempts.
+function diffDay(date, before = {}, after = {}) {
   const fields = [];
   for (const key of Object.keys(after)) {
     if (key === "attempts" || key === "chats") {
@@ -75,17 +77,12 @@ function diffDay(date, before, after) {
 }
 
 function diffMonth(month, before, after, now) {
-  if (!before) {
-    const fields = [[["month"], after.month ?? month]];
-    for (const [date, day] of Object.entries(after.days || {})) fields.push([["days", date], day]);
-    return operation(`months/${month}`, fields, [], now);
-  }
-  const fields = [];
+  const fields = before ? [] : [[["month"], after.month ?? month]];
   const deleteFields = [];
   for (const [date, day] of Object.entries(after.days || {})) {
-    if (!before.days?.[date]) fields.push([["days", date], day]);
-    else fields.push(...diffDay(date, before.days[date], day));
+    fields.push(...diffDay(date, before?.days?.[date], day));
   }
+  if (!before) return operation(`months/${month}`, fields, [], now);
   // A day that left the state was folded into the archive (older than a year).
   for (const date of Object.keys(before.days || {})) {
     if (!after.days?.[date]) deleteFields.push(["days", date]);

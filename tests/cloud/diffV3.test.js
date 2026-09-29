@@ -43,14 +43,15 @@ describe("diffV3", () => {
     }]);
   });
 
-  it("writes a whole new day, and a new month with its name", () => {
+  it("writes a new day's attempts at their keys, never the whole day, and a new month with its name", () => {
     const next = clone(base());
-    next.months["2026-10"] = { month: "2026-10", days: { "2026-10-01": { attempts: { a9: attempt("a9") }, chats: {} } } };
+    next.months["2026-10"] = { month: "2026-10", days: { "2026-10-01": { attempts: { a9: attempt("a9") }, chats: {}, completedAt: "T" } } };
     expect(diff(base(), next)).toEqual([{
       doc: "months/2026-10",
       fields: [
         [["month"], "2026-10"],
-        [["days", "2026-10-01"], { attempts: { a9: attempt("a9") }, chats: {} }],
+        [["days", "2026-10-01", "attempts", "a9"], attempt("a9")],
+        [["days", "2026-10-01", "completedAt"], "T"],
         [["updatedAt"], NOW],
       ],
     }]);

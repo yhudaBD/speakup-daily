@@ -88,4 +88,23 @@ describe("createV3Sync", () => {
     expect(track).toHaveBeenCalledTimes(1);
     tracked.dispose();
   });
+  it("diffs against a document the other device changed (setDoc)", async () => {
+    sync.setDoc("profile/main", { settings: { dailyGoal: 9 } });
+    sync.schedule({ settings: { dailyGoal: 9 } });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("keeps a change from the other device that arrived during a write", async () => {
+    let finish;
+    write.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    sync.schedule({ settings: { dailyGoal: 6 } });
+    await vi.advanceTimersByTimeAsync(2000);
+    sync.setDoc("profile/main", { settings: { dailyGoal: 8 } });
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    sync.schedule({ settings: { dailyGoal: 8 } });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(write).toHaveBeenCalledTimes(1);
+  });
 });

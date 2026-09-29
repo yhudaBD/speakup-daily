@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // A stand-in for the Firestore SDK that records what a batch would do.
 const batches = [];
 let stored = {};
+const snapshots = {};
 vi.mock("../../src/services/firebase", () => ({ db: { name: "db" } }));
 vi.mock("firebase/firestore", () => ({
   FieldPath: class { constructor(...segments) { this.segments = segments; } },
@@ -10,6 +11,10 @@ vi.mock("firebase/firestore", () => ({
   doc: (_db, ...path) => path.join("/"),
   collection: (_db, ...path) => path.join("/"),
   getDocs: async (path) => ({ docs: (stored[path] || []).map((id) => ({ ref: `${path}/${id}` })) }),
+  onSnapshot: (ref, onNext) => {
+    snapshots[ref] = onNext;
+    return () => { delete snapshots[ref]; };
+  },
   writeBatch: () => {
     const calls = [];
     batches.push(calls);
@@ -21,7 +26,7 @@ vi.mock("firebase/firestore", () => ({
   },
 }));
 
-const { BATCH_SIZE, deleteAllCloudData, writeOps } = await import("../../src/cloud/v3Store");
+const { BATCH_SIZE, deleteAllCloudData, listenDoc, writeOps } = await import("../../src/cloud/v3Store");
 
 beforeEach(() => { batches.length = 0; stored = {}; });
 
@@ -65,5 +70,27 @@ describe("deleteAllCloudData", () => {
       "users/uid-a", "users/uid-a/chats/c1", "users/uid-a/months/2026-08", "users/uid-a/months/2026-09", "users/uid-a/profile/main",
     ]);
     expect(batches.flat().every((c) => c.op === "delete")).toBe(true);
+  });
+});
+
+// MIGRATION_PLAN.md §6: the other device's changes, not this device's own
+// writes on their way (hasPendingWrites), and not a document not made yet.
+describe("listenDoc", () => {
+  const snap = (data, { pending = false } = {}) => ({
+    exists: () => data !== undefined,
+    data: () => data,
+    metadata: { hasPendingWrites: pending },
+  });
+
+  it("passes on the other device's changes only", () => {
+    const onData = vi.fn();
+    const stop = listenDoc("uid-a", "months/2026-09", onData);
+    const push = snapshots["users/uid-a/months/2026-09"];
+    push(snap({ days: {} }, { pending: true }));
+    push(snap(undefined));
+    push(snap({ days: { "2026-09-29": {} } }));
+    expect(onData.mock.calls).toEqual([[{ days: { "2026-09-29": {} } }]]);
+    stop();
+    expect(snapshots["users/uid-a/months/2026-09"]).toBeUndefined();
   });
 });
