@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { aiService, isAbortError } from '../services/ai.service';
 import { speakNaturally, getBestEnglishVoice, preloadVoices } from '../utils/speechVoice';
 import { logEvent } from '../utils/analytics';
-import { TURN_SOURCES } from '../context/selectors';
+import { MIN_CHAT_TURNS, TURN_SOURCES } from '../context/selectors';
 import { reportSpeakingTime } from '../utils/speakingTime';
 
 const MAX_TURNS = 10;
@@ -92,6 +92,8 @@ export function useRolePlay({
       topicTitle: topic?.title,
       emoji: topic?.emoji,
       turnCount: finalTurnCount,
+      // Fewer than 3 user turns isn't a finished conversation (§16).
+      status: finalTurnCount >= MIN_CHAT_TURNS ? 'completed' : 'abandoned',
       // Turns the user made themselves, spoken or typed (T4 sources). An
       // active day needs at least one (ACTION_PLAN.md D1, selectors.js).
       ownTurnCount: messagesRef.current.filter(

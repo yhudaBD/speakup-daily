@@ -5,7 +5,8 @@ import { useToday } from "../hooks/useToday";
 import { getTodayString, getLastNDays, formatDate, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
 import {
-  isSpoken, selectClozeStats, selectDaysActive, selectSentencesAbove90, selectSpeakAverage, selectStreak, speakAverage,
+  isSpoken, selectClozeStats, selectDaysActive, selectSentencesAbove90, selectSpeakAverage, selectStreak,
+  selectTotalChats, speakAverage,
 } from "../context/selectors";
 import { createCustomTopic } from "../data/rolePlayTopics";
 import LearningPath from "../components/progress/LearningPath";
@@ -26,7 +27,7 @@ const ACHIEVEMENTS = [
   { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => selectDaysActive(state) >= 1 },
   { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => selectDaysActive(state) >= 5 },
   { id: "century", icon: "💯", title: "Century Club", desc: "100 sentences practiced", check: (state) => state.lifetimeStats.totalSentences >= 100 },
-  { id: "chatterbox", icon: "💬", title: "Chatterbox", desc: "10 conversations completed", check: (state) => state.lifetimeStats.totalChats >= 10 },
+  { id: "chatterbox", icon: "💬", title: "Chatterbox", desc: "10 conversations completed", check: (state) => selectTotalChats(state) >= 10 },
   { id: "explorer", icon: "🗺️", title: "Category Explorer", desc: "Practiced 5+ different topics", check: (state) => {
     const cats = new Set(
       Object.values(state.sessions).flatMap(s => s.sentences || []).map(x => x.category).filter(Boolean)
@@ -41,7 +42,7 @@ const ACHIEVEMENTS = [
 
 function computeLevel(state) {
   const xp = state.lifetimeStats.totalSentences * 10
-    + state.lifetimeStats.totalChats * 25
+    + selectTotalChats(state) * 25
     + state.streak.longest * 5;
   const xpPerLevel = 200;
   const level = Math.floor(xp / xpPerLevel) + 1;
@@ -226,7 +227,7 @@ export default function Progress() {
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "#6C63FF" }}>
-                  {allChats.length}
+                  {selectTotalChats(state)}
                 </div>
                 <div className="text-muted">Chats Completed 💬</div>
               </div>

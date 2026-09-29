@@ -9,6 +9,7 @@ import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
 import { ReplyFailedBubble } from '../components/roleplay/ReplyFailedBubble';
 import { SuggestedReplies } from '../components/roleplay/SuggestedReplies';
 import { MicButton } from '../components/roleplay/MicButton';
+import { isCompletedChat } from '../context/selectors';
 
 function createSessionId() {
   return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -603,7 +604,8 @@ export default function RolePlay() {
 
   const handleSessionComplete = useCallback((record) => {
     dispatch({ type: 'SAVE_ROLEPLAY_SESSION', payload: record });
-    if (activeSession?.planModuleIndex != null) {
+    // Only a finished conversation advances the plan (CRITICAL_REVIEW.md §16).
+    if (activeSession?.planModuleIndex != null && isCompletedChat(record)) {
       dispatch({ type: 'UPDATE_PLAN_PROGRESS', payload: { moduleIndex: activeSession.planModuleIndex } });
     }
   }, [dispatch, activeSession]);

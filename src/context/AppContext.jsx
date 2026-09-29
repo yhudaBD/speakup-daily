@@ -67,7 +67,7 @@ export function AppProvider({ children }) {
         // Backfill lifetimeStats once for existing users from their full history.
         // Days older than a year are pruned (and archived) by LOAD_DATA itself.
         const lifetimeStats = isPreVersioned
-          ? computeLifetimeStats(parsed.sessions, parsed.rolePlay?.chats)
+          ? computeLifetimeStats(parsed.sessions)
           : parsed.lifetimeStats || defaultLifetimeStats;
         dispatch({
           type: "LOAD_DATA",

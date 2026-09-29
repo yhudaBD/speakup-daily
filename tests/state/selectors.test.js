@@ -174,3 +174,29 @@ describe("streak and today's progress (§19, §28)", () => {
     expect(selectors.selectTodayProgress({}, "2026-09-29")).toEqual([]);
   });
 });
+
+// CRITICAL_REVIEW.md §16: only a conversation with 3 or more user turns is a
+// finished one. A shorter one still makes the day active (D1).
+describe("finished conversations (§16)", () => {
+  const chat = (turnCount, extra = {}) => ({ chatId: `c${turnCount}`, turnCount, ownTurnCount: turnCount, ...extra });
+
+  it("finishes a conversation at 3 user turns", () => {
+    expect(selectors.isCompletedChat(chat(3))).toBe(true);
+    expect(selectors.isCompletedChat(chat(2))).toBe(false);
+    expect(selectors.isCompletedChat(chat(5, { status: "abandoned" }))).toBe(false);
+    expect(selectors.isCompletedChat(chat(0))).toBe(false);
+  });
+
+  it("counts only finished conversations, the archive included", () => {
+    const state = {
+      sessions: { "2026-09-20": { chats: [chat(0), chat(1), chat(4)] }, "2026-09-21": { chats: [chat(3)] } },
+      archive: { chats: 9, completedChats: 5 },
+    };
+    expect(selectors.selectTotalChats(state)).toBe(7);
+    expect(selectors.selectTotalChats({ ...state, archive: { chats: 3 } })).toBe(5);
+  });
+
+  it("still makes the day active with one turn of the user's own", () => {
+    expect(selectors.isActiveDay({ chats: [chat(1, { status: "abandoned" })] })).toBe(true);
+  });
+});

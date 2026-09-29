@@ -219,3 +219,33 @@ describe("session record", () => {
     expect(onSessionComplete).toHaveBeenCalledWith(expect.objectContaining({ turnCount: 3, ownTurnCount: 2 }));
   });
 });
+
+// CRITICAL_REVIEW.md §16: a conversation ended before 3 turns of the user is
+// saved as abandoned, and doesn't count as a finished one.
+describe("short conversations", () => {
+  it("marks a conversation with fewer than 3 user turns abandoned", async () => {
+    const onSessionComplete = vi.fn();
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null, onSessionComplete });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+    await act(async () => { await result.current.handleUserMessage("Coffee", { source: "typed" }); });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    act(() => { result.current.endConversation(); });
+    expect(onSessionComplete).toHaveBeenCalledWith(expect.objectContaining({ turnCount: 1, status: "abandoned" }));
+  });
+
+  it("marks a conversation with 3 user turns completed", async () => {
+    const onSessionComplete = vi.fn();
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null, onSessionComplete });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    for (const text of ["Coffee", "Tea", "Cake"]) {
+      aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+      await act(async () => { await result.current.handleUserMessage(text, { source: "typed" }); });
+      await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    }
+    act(() => { result.current.endConversation(); });
+    expect(onSessionComplete).toHaveBeenCalledWith(expect.objectContaining({ turnCount: 3, status: "completed" }));
+  });
+});
