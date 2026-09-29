@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getDailySentences, categories, categoryMeta, sentences as allSentences } from "../data/sentences";
 import { ClozeQuestion } from "../components/practice/ClozeQuestion";
+import { newAttemptId } from "../utils/attemptId";
 
 // Short/function words make poor blanks (too easy, or ambiguous without
 // context) — only pull content words long enough to actually test recall.
@@ -141,6 +142,7 @@ export default function ClozePractice() {
     setChosen(option);
     const correct = option.toLowerCase() === current.answer.toLowerCase();
     const entry = {
+      id: newAttemptId(),
       sentenceId: current.id,
       text: current.fullText,
       translation: current.translation,

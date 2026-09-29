@@ -155,7 +155,7 @@ describe("v3ToState", () => {
   it("gives back every day, sentence and chat, in order", () => {
     expect(Object.keys(after.sessions).sort()).toEqual(Object.keys(before.sessions).sort());
     for (const date of Object.keys(before.sessions)) {
-      const strip = ({ wordResults: _w, missedWords: _m, ...rest }) => rest;
+      const strip = ({ wordResults: _w, missedWords: _m, id: _id, ...rest }) => rest;
       expect((after.sessions[date].sentences || []).map(strip)).toEqual((before.sessions[date].sentences || []).map(strip));
       expect(after.sessions[date].chats?.map((c) => c.chatId)).toEqual(before.sessions[date].chats?.map((c) => c.chatId));
     }
@@ -191,5 +191,23 @@ describe("v3ToState", () => {
     const state = v3ToState(docs, { bank });
     expect(state.practice.wordBank.map((w) => w.word)).toEqual(["e.g."]);
     expect(state.rolePlay.chats).toEqual([]);
+  });
+});
+
+// Two devices practicing on the same day must not overwrite each other's
+// attempts: a record made with an id keeps it, and the id survives the
+// round trip; only records saved before ids get one from their position.
+describe("attempt ids", () => {
+  it("keeps a record's own id and gives it back", () => {
+    const own = { ...legacy.sessions["2026-09-28"].sentences[0], id: "a-1234" };
+    const docs = migrateToV3({ ...legacy, sessions: { "2026-09-28": { sentences: [own] } } }, { bank });
+    expect(Object.keys(docs.months["2026-09"].days["2026-09-28"].attempts)).toEqual(["a-1234"]);
+    expect(v3ToState(docs, { bank }).sessions["2026-09-28"].sentences[0].id).toBe("a-1234");
+  });
+
+  it("gives an older record the same position-based id every time", () => {
+    const first = Object.keys(migrated().months["2026-09"].days["2026-09-28"].attempts);
+    expect(first).toEqual(Object.keys(migrated().months["2026-09"].days["2026-09-28"].attempts));
+    expect(first[0]).toMatch(/^2026-09-28_000_/);
   });
 });
