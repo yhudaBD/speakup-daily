@@ -166,38 +166,67 @@ function getRate(baseRate, pitchHint) {
   return Math.min(1.05, Math.max(0.82, baseRate + modifier + jitter(0.02)));
 }
 
+// Utterances being spoken. Some browsers never fire onend for an utterance
+// that was garbage-collected mid-speech, so each is kept here until its
+// playback is over (CRITICAL_REVIEW.md §6).
+const liveUtterances = new Set();
+
+// How long a playback may take before it's taken as stuck: about 120ms a
+// character at rate 1, plus the pauses and a margin.
+function watchdogMs(segments, rate) {
+  const chars = segments.reduce((n, s) => n + s.text.length, 0);
+  const pauses = segments.reduce((n, s) => n + s.pauseMs, 0);
+  return (chars * 120) / Math.max(rate, 0.5) + pauses + 3000;
+}
+
 /**
  * Speaks text naturally with human-like prosody:
  * - pauses between clauses
  * - varied pitch per segment
  * - slight rate variation
+ *
+ * Every way out calls onEnd exactly once and resolves: the last segment
+ * ending, an error, being interrupted by another playback, no speech API, and
+ * a watchdog for browsers that never report the end (CRITICAL_REVIEW.md §6).
+ * Callers can rely on onEnd to move on.
  */
 export function speakNaturally(text, { rate = 0.92, onEnd, onStart } = {}) {
   return new Promise((resolve) => {
-    if (!text?.trim() || typeof window === "undefined" || !window.speechSynthesis) {
-      resolve();
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const segments = splitSpeechText(text);
-    if (!segments.length) {
+    let ended = false;
+    let watchdog = null;
+    let current = null;
+    const finish = () => {
+      if (ended) return;
+      ended = true;
+      clearTimeout(watchdog);
+      liveUtterances.delete(current);
       onEnd?.();
       resolve();
+    };
+
+    const synth = typeof window === "undefined" ? null : window.speechSynthesis;
+    const segments = text?.trim() ? splitSpeechText(text) : [];
+    if (!synth || !segments.length) {
+      finish();
       return;
     }
+
+    synth.cancel();
 
     const voice = getBestEnglishVoice();
     let idx = 0;
-    let cancelled = false;
+
+    watchdog = setTimeout(() => {
+      if (ended) return;
+      console.warn("TTS never reported the end; stopping it");
+      finish();
+      synth.cancel();
+    }, watchdogMs(segments, rate));
 
     const speakNext = () => {
-      if (cancelled || idx >= segments.length) {
-        if (!cancelled) {
-          onEnd?.();
-          resolve();
-        }
+      if (ended) return;
+      if (idx >= segments.length) {
+        finish();
         return;
       }
 
@@ -227,11 +256,13 @@ export function speakNaturally(text, { rate = 0.92, onEnd, onStart } = {}) {
         if (e.error !== "interrupted" && e.error !== "canceled") {
           console.warn("TTS error:", e.error);
         }
-        cancelled = true;
-        resolve();
+        finish();
       };
 
-      window.speechSynthesis.speak(utter);
+      liveUtterances.delete(current);
+      current = utter;
+      liveUtterances.add(utter);
+      synth.speak(utter);
     };
 
     speakNext();

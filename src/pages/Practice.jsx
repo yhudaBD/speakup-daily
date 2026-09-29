@@ -866,6 +866,10 @@ export default function Practice() {
               <button className="btn btn-primary btn-lg" onClick={handleListen} id="listen-btn">
                 🔊 האזן
               </button>
+              {/* Trying before hearing it, and a way past a failed playback (§6). */}
+              <button className="btn btn-ghost" onClick={handleStartRecord} id="try-first-btn">
+                🎙️ נסה לבד קודם
+              </button>
             </>
           )}
 
