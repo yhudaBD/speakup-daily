@@ -34,7 +34,11 @@ export function summarize(results) {
   return { agreement, farOff, pass: agreement >= MIN_AGREEMENT && farOff.length === 0 };
 }
 
-async function analyze(example, apiKey) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Groq's free tier limits tokens a minute. On 429 wait as long as it says
+// (retry-after, in seconds), up to a few times.
+async function analyze(example, apiKey, attempt = 0) {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -50,6 +54,11 @@ async function analyze(example, apiKey) {
   });
   if (response.status === 401 || response.status === 403) {
     throw Object.assign(new Error(`Groq refused the key (${response.status}). Use the key set in Netlify.`), { fatal: true });
+  }
+  if (response.status === 429 && attempt < 5) {
+    const wait = Number(response.headers.get("retry-after")) || 20;
+    await sleep((wait + 1) * 1000);
+    return analyze(example, apiKey, attempt + 1);
   }
   if (!response.ok) throw new Error(`Groq ${response.status}`);
   const data = await response.json();
