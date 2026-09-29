@@ -256,3 +256,84 @@ describe("archiving old days", () => {
     expect(snapshotForSync(state).archive).toEqual(state.archive);
   });
 });
+
+// CRITICAL_REVIEW.md §2א: merging the cloud copy unites the two sides
+// instead of letting the cloud overwrite whole fields.
+describe("MERGE_CLOUD_DATA unites local and cloud (§2א)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 28, 12, 0));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const word = (w, learnedAt) => ({ id: `id_${w}`, word: w, meaning_he: "", learnedAt });
+  const chat = (id, updatedAt, extra = {}) => ({ id, topicId: "cafe", messages: [], updatedAt, ...extra });
+  const merge = (local, cloud) => reducer(loaded(local), { type: "MERGE_CLOUD_DATA", payload: cloud });
+
+  it("the train: words and a chat added offline survive a stale cloud copy", () => {
+    const local = {
+      practice: { wordBank: [word("apple", "2026-09-20T08:00:00Z"), word("ticket", "2026-09-28T07:00:00Z")], customTopics: [] },
+      rolePlay: { chats: [chat("c_new", "2026-09-28T07:30:00Z"), chat("c_old", "2026-09-20T09:00:00Z")], customTopics: [] },
+    };
+    const staleCloud = {
+      practice: { wordBank: [word("apple", "2026-09-20T08:00:00Z")], customTopics: [] },
+      rolePlay: { chats: [chat("c_old", "2026-09-20T09:00:00Z")], customTopics: [] },
+    };
+    const merged = merge(local, staleCloud);
+    expect(merged.practice.wordBank.map((w) => w.word).sort()).toEqual(["apple", "ticket"]);
+    expect(merged.rolePlay.chats.map((c) => c.id)).toEqual(["c_new", "c_old"]);
+  });
+
+  it("two devices: each side's words, chats and custom topics are kept", () => {
+    const local = {
+      practice: { wordBank: [word("phone", "2026-09-27T08:00:00Z")], customTopics: [{ id: "pt_a", label: "A" }] },
+      rolePlay: { chats: [chat("c_phone", "2026-09-27T09:00:00Z")], customTopics: [{ id: "rt_a", title: "A" }] },
+    };
+    const cloud = {
+      practice: { wordBank: [word("laptop", "2026-09-26T08:00:00Z")], customTopics: [{ id: "pt_b", label: "B" }] },
+      rolePlay: { chats: [chat("c_laptop", "2026-09-26T09:00:00Z")], customTopics: [{ id: "rt_b", title: "B" }] },
+    };
+    const merged = merge(local, cloud);
+    expect(merged.practice.wordBank.map((w) => w.word).sort()).toEqual(["laptop", "phone"]);
+    expect(merged.rolePlay.chats.map((c) => c.id)).toEqual(["c_phone", "c_laptop"]);
+    expect(merged.practice.customTopics.map((t) => t.id).sort()).toEqual(["pt_a", "pt_b"]);
+    expect(merged.rolePlay.customTopics.map((t) => t.id).sort()).toEqual(["rt_a", "rt_b"]);
+  });
+
+  it("on a conflict the newer copy wins: a word by learnedAt, a chat by updatedAt", () => {
+    const local = {
+      practice: { wordBank: [{ ...word("apple", "2026-09-20T08:00:00Z"), meaning_he: "old" }], customTopics: [] },
+      rolePlay: { chats: [chat("c1", "2026-09-28T10:00:00Z", { turnCount: 6 })], customTopics: [] },
+    };
+    const cloud = {
+      practice: { wordBank: [{ ...word("Apple", "2026-09-25T08:00:00Z"), meaning_he: "new" }], customTopics: [] },
+      rolePlay: { chats: [chat("c1", "2026-09-27T10:00:00Z", { turnCount: 2 })], customTopics: [] },
+    };
+    const merged = merge(local, cloud);
+    expect(merged.practice.wordBank).toHaveLength(1);
+    expect(merged.practice.wordBank[0].meaning_he).toBe("new");
+    expect(merged.rolePlay.chats[0].turnCount).toBe(6);
+  });
+
+  it("recomputes the streak from the merged days instead of copying the cloud's", () => {
+    const spoke = { sentences: [{ sentenceId: "s", score: 80 }] };
+    const local = {
+      sessions: { "2026-09-27": spoke, "2026-09-28": spoke },
+      streak: { current: 2, longest: 2, lastPracticeDate: "2026-09-28" },
+    };
+    const cloud = {
+      sessions: { "2026-09-26": spoke },
+      streak: { current: 1, longest: 9, lastPracticeDate: "2026-09-26" },
+    };
+    const merged = merge(local, cloud);
+    expect(merged.streak).toEqual({ current: 3, longest: 9, lastPracticeDate: "2026-09-28" });
+  });
+
+  it("keeps the larger of each stored counter until they become selectors (stage 5)", () => {
+    const merged = merge(
+      { lifetimeStats: { totalSentences: 12, sentencesAbove90: 1, totalChats: 4 } },
+      { lifetimeStats: { totalSentences: 9, sentencesAbove90: 3, totalChats: 2 } },
+    );
+    expect(merged.lifetimeStats).toMatchObject({ totalSentences: 12, sentencesAbove90: 3, totalChats: 4 });
+  });
+});

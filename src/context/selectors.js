@@ -1,3 +1,5 @@
+import { addDays, parseDateKey, toDateKey } from "../utils/dateHelpers";
+
 // Values derived from the saved data, computed rather than stored
 // (ACTION_PLAN.md, D5). A stored counter drifts from the data it summarizes;
 // a pure function over the data fixes the past too when it's corrected.
@@ -52,4 +54,25 @@ export function isActiveDay(day) {
 export function selectDaysActive(state) {
   const kept = Object.values(state?.sessions || {}).filter(isActiveDay).length;
   return (state?.archive?.daysActive || 0) + kept;
+}
+
+const dayBefore = (dateKey) => toDateKey(addDays(parseDateKey(dateKey), -1));
+
+// The run of consecutive active days ending at the last active one, and
+// that day. Derived from the days, so merging two devices' days gives the
+// right streak without copying either side's counter (CRITICAL_REVIEW.md §2א).
+export function streakRun(sessions) {
+  const active = new Set(Object.keys(sessions || {}).filter((d) => isActiveDay(sessions[d])));
+  if (!active.size) return { current: 0, lastPracticeDate: null };
+  const last = [...active].sort().at(-1);
+  let current = 0;
+  for (let day = last; active.has(day); day = dayBefore(day)) current++;
+  return { current, lastPracticeDate: last };
+}
+
+// The streak to show on `today`: the run, while its last day is today or
+// yesterday, otherwise 0 (§19 uses this for display).
+export function selectStreak(state, today) {
+  const { current, lastPracticeDate } = streakRun(state?.sessions);
+  return lastPracticeDate === today || lastPracticeDate === dayBefore(today) ? current : 0;
 }
