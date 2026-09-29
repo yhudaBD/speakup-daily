@@ -9,6 +9,7 @@ import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
 import { ReplyFailedBubble } from '../components/roleplay/ReplyFailedBubble';
 import { HintLadder } from '../components/roleplay/HintLadder';
 import { useHintLadder } from '../hooks/useHintLadder';
+import { chatPhaseIsImmersive, useImmersiveChat } from '../hooks/useImmersiveChat';
 import { MicButton } from '../components/roleplay/MicButton';
 import { isCompletedChat } from '../context/selectors';
 import { actionsForFeedback } from '../context/feedbackActions';
@@ -625,12 +626,7 @@ export default function RolePlay() {
     if (toSend) handleUserMessage(toSend.text, toSend.turn);
   }, [route, handleUserMessage]);
 
-  useEffect(() => {
-    if (activeSession) {
-      document.documentElement.classList.add('immersive-chat');
-      return () => document.documentElement.classList.remove('immersive-chat');
-    }
-  }, [activeSession]);
+  useImmersiveChat(Boolean(activeSession) && chatPhaseIsImmersive(phase));
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
