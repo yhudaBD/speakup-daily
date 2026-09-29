@@ -3,6 +3,7 @@
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
 import { getTodayString, daysSince } from "../utils/dateHelpers";
+import { toCefr } from "../services/aiSchemas";
 import { dayXp } from "./achievements";
 import { migrateSessions } from "./migrations";
 import { isActiveDay, isCompletedChat, isSpoken, streakRun } from "./selectors";
@@ -23,6 +24,15 @@ export function ensureUser(user) {
 }
 
 const CEFR_LEVELS = ["Pre-A1", "A1", "A2", "B1", "B2", "C1"];
+
+// A level saved before toCefr existed ("A1 (usually the lower)", "C2") is
+// one adjustLevel can't find, which turned level adjustment off for good
+// (CRITICAL_REVIEW.md §14).
+function normalizePlacement(placement) {
+  const level = toCefr(placement?.overall_level);
+  if (!level || level === placement.overall_level) return placement ?? null;
+  return { ...placement, overall_level: level };
+}
 
 // A single strong/weak conversation shouldn't whipsaw the level, but two in a
 // row without a mixed result in between is a real signal — nudge one CEFR
@@ -321,6 +331,7 @@ export function reducer(state, action) {
           ...action.payload.practice,
         },
         lifetimeStats: action.payload.lifetimeStats || defaultLifetimeStats,
+        placement: normalizePlacement("placement" in action.payload ? action.payload.placement : state.placement),
         isLoaded: true,
       };
     }
@@ -528,7 +539,7 @@ export function reducer(state, action) {
           customTopics: unionBy(state.practice.customTopics, cloudPractice.customTopics, byId),
         },
         lifetimeStats,
-        placement: cloud.placement || state.placement,
+        placement: normalizePlacement(cloud.placement || state.placement),
         baseline: cloud.baseline || state.baseline,
       };
     }

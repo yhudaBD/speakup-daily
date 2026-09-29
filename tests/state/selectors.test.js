@@ -216,3 +216,23 @@ describe("helpedTurnShare", () => {
     expect(selectors.helpedTurnShare([])).toBe(0);
   });
 });
+
+// CRITICAL_REVIEW.md §14: only a conversation with 4 or more turns of the
+// user's own (spoken or typed) says anything about their level.
+describe("levelAdjustment", () => {
+  const own = (n, source = "spoken") => Array.from({ length: n }, (_, i) => ({ role: "user", content: `t${i}`, source }));
+
+  it("adjusts the level from a conversation with 4 turns of the user's own", () => {
+    const messages = [...own(4), ...own(1, "suggestion")];
+    expect(selectors.levelAdjustment(messages, { overall_score: 90 })).toEqual({ score: 90, helpedShare: 0.2 });
+  });
+
+  it("doesn't adjust it from a shorter conversation or without a score", () => {
+    expect(selectors.levelAdjustment([...own(3), ...own(3, "suggestion")], { overall_score: 90 })).toBeNull();
+    expect(selectors.levelAdjustment(own(5), {})).toBeNull();
+  });
+
+  it("counts every user turn saved before T4 as the user's own", () => {
+    expect(selectors.levelAdjustment(own(4, undefined), { overall_score: 50 })).toEqual({ score: 50, helpedShare: 0 });
+  });
+});

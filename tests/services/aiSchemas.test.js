@@ -99,18 +99,30 @@ describe("placementTurnSchema", () => {
   });
 });
 
+// CRITICAL_REVIEW.md §14: the model gives a 1-5 rubric and the score is
+// computed from it in code, not a number the model "feels".
 describe("conversationAnalysisSchema", () => {
-  it("clamps and coerces the score and filters lists", () => {
+  it("computes the score from the rubric, ignoring the model's own, and filters lists", () => {
     expect(conversationAnalysisSchema.parse({
-      overall_score: "140", summary: "טוב", strengths: ["a", 5, ""], improvements: "not a list",
+      overall_score: 99, rubric: { fluency: 4, grammar: "3", vocabulary: 5 },
+      summary: "טוב", strengths: ["a", 5, ""], improvements: "not a list",
     })).toEqual({
-      overall_score: 100, summary: "טוב", strengths: ["a"], improvements: [], grammar_notes: [], vocabulary_suggestions: [],
+      rubric: { fluency: 4, grammar: 3, vocabulary: 5 }, overall_score: 75,
+      summary: "טוב", strengths: ["a"], improvements: [], grammar_notes: [], vocabulary_suggestions: [],
     });
   });
 
-  it("rejects a missing or null score instead of treating it as 0", () => {
-    expect(conversationAnalysisSchema.safeParse({ summary: "x" }).success).toBe(false);
-    expect(conversationAnalysisSchema.safeParse({ overall_score: null, summary: "x" }).success).toBe(false);
+  it("maps the rubric's range onto 0-100 and clamps each part to 1-5", () => {
+    const score = (rubric) => conversationAnalysisSchema.parse({ rubric, summary: "x" }).overall_score;
+    expect(score({ fluency: 1, grammar: 1, vocabulary: 1 })).toBe(0);
+    expect(score({ fluency: 5, grammar: 5, vocabulary: 5 })).toBe(100);
+    expect(score({ fluency: 9, grammar: 0, vocabulary: 3.4 })).toBe(50);
+  });
+
+  it("rejects a missing or partial rubric instead of guessing", () => {
+    expect(conversationAnalysisSchema.safeParse({ summary: "x", overall_score: 80 }).success).toBe(false);
+    expect(conversationAnalysisSchema.safeParse({ summary: "x", rubric: { fluency: 3, grammar: 3 } }).success).toBe(false);
+    expect(conversationAnalysisSchema.safeParse({ summary: "x", rubric: { fluency: null, grammar: 3, vocabulary: 3 } }).success).toBe(false);
   });
 });
 

@@ -433,3 +433,17 @@ describe("level sets the difficulty (§13)", () => {
     expect(raised.settings.difficulty).toBe("easy");
   });
 });
+
+// CRITICAL_REVIEW.md §14: a level saved before toCefr existed ("A1 (usually
+// the lower)", "C2") is normalized on load, so ADJUST_LEVEL recognizes it.
+describe("saved placement level (§14)", () => {
+  it("normalizes a saved level on load and from the cloud", () => {
+    expect(loaded({ placement: { overall_level: "A1 (usually the lower)" } }).placement.overall_level).toBe("A1");
+    expect(loaded({ placement: { overall_level: "C2" } }).placement.overall_level).toBe("C1");
+    expect(loaded({ placement: { overall_level: "B1" } }).placement.overall_level).toBe("B1");
+    expect(loaded({ placement: null }).placement).toBeNull();
+
+    const merged = reducer(loaded(), { type: "MERGE_CLOUD_DATA", payload: { placement: { overall_level: "b2+" } } });
+    expect(merged.placement.overall_level).toBe("B2");
+  });
+});
