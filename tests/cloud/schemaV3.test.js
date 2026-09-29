@@ -232,3 +232,15 @@ describe("deletion markers", () => {
     expect(state.practice.wordBank.map((w) => w.word)).toEqual(["schedule"]);
   });
 });
+
+// A document saved before schema 2 has records without `kind`: the move
+// brings its days to schema 2 first, as LOAD_DATA does, or the spoken
+// sentences stop counting (found by the dry run).
+describe("an older document", () => {
+  it("gives records without a kind their kind before moving them", () => {
+    const old = { streak: { longest: 1 }, sessions: { "2026-09-17": { sentences: [{ sentenceId: "s1", score: 95, wordResults: words(["hello", "correct"]) }] } } };
+    const docs = migrateToV3(old, { bank });
+    expect(Object.values(docs.months["2026-09"].days["2026-09-17"].attempts)[0].kind).toBe("speak");
+    expect(selectDaysActive(loadedFrom(v3ToState(docs, { bank })))).toBe(selectDaysActive(loadedFrom(old)));
+  });
+});
