@@ -39,7 +39,7 @@ describe("repeatSpeakingMs", () => {
   it("adds up the recorded time of practice attempts, skipping old ones", () => {
     const sentences = [
       { sentenceId: "s1", score: 80, durationMs: 1800 },
-      { sentenceId: "s2", score: 60 },
+      { sentenceId: "s2", score: 60, kind: "speak" },
       { sentenceId: "s3", score: 90, durationMs: 2200 },
     ];
     expect(repeatSpeakingMs(sentences)).toBe(4000);
@@ -53,7 +53,7 @@ describe("isActiveDay", () => {
   const { isActiveDay } = selectors;
 
   it("counts a day with a sentence said out loud", () => {
-    expect(isActiveDay({ sentences: [{ sentenceId: "s1", score: 40 }] })).toBe(true);
+    expect(isActiveDay({ sentences: [{ sentenceId: "s1", score: 40, wordResults: [] }] })).toBe(true);
     expect(isActiveDay({ sentences: [{ sentenceId: "s1", score: 40, kind: "speak" }] })).toBe(true);
   });
 
@@ -82,7 +82,7 @@ describe("selectDaysActive", () => {
     const state = {
       archive: { daysActive: 4 },
       sessions: {
-        "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80 }] },
+        "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80, kind: "speak" }] },
         "2026-09-21": { chats: [{ chatId: "c1", turnCount: 2 }] },
         "2026-09-22": { chats: [{ chatId: "c2", turnCount: 0 }] },
       },
@@ -94,7 +94,7 @@ describe("selectDaysActive", () => {
 
 // §2א (and §19 later): the streak is computed from the active days.
 describe("streakRun / selectStreak", () => {
-  const spoke = { sentences: [{ sentenceId: "s", score: 80 }] };
+  const spoke = { sentences: [{ sentenceId: "s", score: 80, kind: "speak" }] };
   const sessions = {
     "2026-09-20": spoke,
     "2026-09-22": spoke,
@@ -112,5 +112,41 @@ describe("streakRun / selectStreak", () => {
     expect(selectors.selectStreak({ sessions }, "2026-09-25")).toBe(3);
     expect(selectors.selectStreak({ sessions }, "2026-09-24")).toBe(3);
     expect(selectors.selectStreak({ sessions }, "2026-09-26")).toBe(0);
+  });
+});
+
+// CRITICAL_REVIEW.md §8: sentence-completion answers (100 or 0) stay out of
+// the pronunciation numbers and get a count and average of their own.
+describe("speaking and sentence-completion numbers", () => {
+  const speak = (score) => ({ kind: "speak", score });
+  const cloze = (score) => ({ kind: "cloze", score });
+  const state = {
+    sessions: {
+      "2026-09-20": { sentences: [speak(80), cloze(100), speak(95)] },
+      "2026-09-21": { sentences: [cloze(0), cloze(100), speak(91)] },
+      "2026-09-22": { sentences: [cloze(100)] },
+    },
+    archive: { speakAbove90: 4 },
+  };
+
+  it("averages only spoken sentences", () => {
+    expect(selectors.speakAverage(state.sessions["2026-09-20"].sentences)).toBe(88);
+    expect(selectors.speakAverage(state.sessions["2026-09-22"].sentences)).toBeNull();
+    expect(selectors.selectSpeakAverage(state)).toBe(89);
+  });
+
+  it("counts spoken sentences above 90, the archive included", () => {
+    expect(selectors.selectSentencesAbove90(state)).toBe(6);
+    expect(selectors.selectSentencesAbove90({ sessions: state.sessions })).toBe(2);
+  });
+
+  it("keeps a separate count and average for sentence completion", () => {
+    expect(selectors.selectClozeStats(state)).toEqual({ answers: 4, correct: 3, average: 75 });
+    expect(selectors.selectClozeStats({ sessions: {} })).toEqual({ answers: 0, correct: 0, average: null });
+  });
+
+  it("doesn't count a day with only sentence completion as active (D1)", () => {
+    expect(selectors.isActiveDay(state.sessions["2026-09-22"])).toBe(false);
+    expect(selectors.isActiveDay({ sentences: [{ score: 70, wordResults: [] }] })).toBe(true);
   });
 });

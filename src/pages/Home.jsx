@@ -1,7 +1,7 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import BaselineCard from "../components/home/BaselineCard";
-import { isActiveDay } from "../context/selectors";
+import { isActiveDay, speakAverage } from "../context/selectors";
 import { useApp } from "../context/AppContext";
 import { getGreeting, getTodayString, getLastNDays, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
@@ -16,7 +16,8 @@ function WeeklyChart({ sessions }) {
       <div className="chart-container">
         {days.map((day) => {
           const session = sessions[day];
-          const score = session?.averageScore || 0;
+          // Spoken sentences only (CRITICAL_REVIEW.md §8).
+          const score = speakAverage(session?.sentences) || 0;
           const isToday = day === getTodayString();
           const date = parseDateKey(day);
           const label = dayLabels[date.getDay()];
@@ -53,6 +54,7 @@ export default function Home() {
   const goal = settings.dailyGoal;
   const pct = Math.min(100, Math.round((completed / goal) * 100));
   const todayChats = todaySession?.chats?.length || 0;
+  const todayAverage = speakAverage(todaySession?.sentences);
   const greeting = useMemo(() => getGreeting(user?.name || ""), [user]);
   const weakCount = useMemo(() => Object.keys(getWeakSentenceStats(sessions)).length, [sessions]);
 
@@ -125,7 +127,7 @@ export default function Home() {
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
               <p dir="ltr" style={{ fontWeight: 700, color: "var(--color-success)", marginBottom: 12 }}>
-                Daily goal complete! Average: {todaySession?.averageScore || 0}%
+                Daily goal complete!{todayAverage !== null && ` Average: ${todayAverage}%`}
               </p>
               <button className="btn btn-ghost btn-block" onClick={() => navigate("/practice")}>
                 Practice More

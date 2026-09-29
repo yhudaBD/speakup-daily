@@ -3,10 +3,11 @@
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
 import { getTodayString, daysSince, toDateKey, parseDateKey, addDays } from "../utils/dateHelpers";
-import { isActiveDay, streakRun } from "./selectors";
+import { migrateSessions } from "./migrations";
+import { isActiveDay, isSpoken, streakRun } from "./selectors";
 
 export const STORAGE_KEY = "speakup_data";
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 const SESSION_RETENTION_DAYS = 365;
 const WORD_BANK_LIMIT = 100;
 
@@ -92,12 +93,14 @@ export function archiveOldSessions(sessions, archive) {
     daysActive: archive?.daysActive || 0,
     sentences: archive?.sentences || 0,
     chats: archive?.chats || 0,
+    speakAbove90: archive?.speakAbove90 || 0,
   };
   for (const [date, day] of entries.filter(isOld)) {
     if (archive?.throughDate && date <= archive.throughDate) continue;
     if (isActiveDay(day)) next.daysActive++;
     next.sentences += (day?.sentences || []).length;
     next.chats += (day?.chats || []).length;
+    next.speakAbove90 += (day?.sentences || []).filter((s) => isSpoken(s) && s.score >= 90).length;
     if (!next.throughDate || date > next.throughDate) next.throughDate = date;
   }
   return { sessions: Object.fromEntries(entries.filter((e) => !isOld(e))), archive: next };
@@ -146,14 +149,12 @@ export function computeLifetimeStats(sessions, rolePlayChats) {
   const allSentences = Object.values(sessions || {}).flatMap((s) => s.sentences || []);
   return {
     totalSentences: allSentences.length,
-    sentencesAbove90: allSentences.filter((s) => s.score >= 90).length,
     totalChats: (rolePlayChats || []).filter((c) => c.status === "completed").length,
   };
 }
 
 export const defaultLifetimeStats = {
   totalSentences: 0,
-  sentencesAbove90: 0,
   totalChats: 0,
 };
 
@@ -217,10 +218,10 @@ export function reducer(state, action) {
       // Keeps the rest of the day, its chats included (CRITICAL_REVIEW.md §3).
       const day = state.sessions[today] || {};
       const updated = [...(day.sentences || []), action.payload];
-      const avg = Math.round(updated.reduce((s, x) => s + x.score, 0) / updated.length);
+      // The day's average is derived (speakAverage), not stored (§8).
       const newSessions = {
         ...state.sessions,
-        [today]: { ...day, sentences: updated, averageScore: avg, completedAt: new Date().toISOString() },
+        [today]: { ...day, sentences: updated, completedAt: new Date().toISOString() },
       };
       return {
         ...state,
@@ -230,14 +231,13 @@ export function reducer(state, action) {
         lifetimeStats: {
           ...state.lifetimeStats,
           totalSentences: state.lifetimeStats.totalSentences + 1,
-          sentencesAbove90: state.lifetimeStats.sentencesAbove90 + (action.payload.score >= 90 ? 1 : 0),
         },
       };
     }
     case "SAVE_ROLEPLAY_SESSION": {
       const today = getTodayString();
       const record = action.payload;
-      const daySession = state.sessions[today] || { sentences: [], averageScore: 0, chats: [] };
+      const daySession = state.sessions[today] || { sentences: [], chats: [] };
       const chats = [...(daySession.chats || []), record];
       const newSessions = {
         ...state.sessions,
@@ -285,7 +285,9 @@ export function reducer(state, action) {
     case "LOAD_DATA": {
       const user = ensureUser(action.payload.user);
       const { sessions, archive } = archiveOldSessions(
-        action.payload.sessions ?? state.sessions,
+        action.payload.sessions
+          ? migrateSessions(action.payload.sessions, action.payload.schemaVersion)
+          : state.sessions,
         action.payload.archive ?? state.archive,
       );
       return {
@@ -460,7 +462,7 @@ export function reducer(state, action) {
       // something deleted on one side while the other was offline comes back
       // (§2ב adds them with the migration).
       const { sessions, archive } = archiveOldSessions(
-        { ...(cloud.sessions || {}), ...state.sessions },
+        { ...(migrateSessions(cloud.sessions, cloud.schemaVersion) || {}), ...state.sessions },
         moreCompleteArchive(state.archive, cloud.archive),
       );
       const byId = (x) => x.id;

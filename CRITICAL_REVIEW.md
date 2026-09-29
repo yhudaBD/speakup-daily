@@ -282,7 +282,7 @@ export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 
 
 **תיקון מוצע:** להוסיף `kind: "cloze" | "speak"` לכל רשומה חדשה, ולסווג רשומות ישנות לפי כלל ההשלמה. ממוצעים, רשימת החלשים ו-`sentencesAbove90` יהיו selectors שמחושבים רק על `speak`. להשלמת משפטים יהיו מונה וממוצע משלה, ו-XP נמוך יותר (2, לפי D3).
 
-**כלל ההשלמה לרשומות ישנות:** ייקבע בשלב 5.
+**כלל ההשלמה לרשומות ישנות** (אושר בשלב 5): רשומה בלי `kind` עם מערך `wordResults` היא `speak`, ובלעדיו היא `cloze`. `Practice.jsx` תמיד שמר `wordResults` עם ניסיון מדובר, ו-`ClozePractice.jsx` אף פעם לא, ואלה שני הכותבים היחידים של `SAVE_SESSION_RESULT`. ה-migration לגרסה 2 (`migrateSessions` ב-`src/context/migrations.js`) מוסיף `kind` לרשומות ישנות, גם בעותק שמגיע מהענן. ארכיון שקופל לפני התיקון לא סופר משפטים מעל 90.
 
 ---
 

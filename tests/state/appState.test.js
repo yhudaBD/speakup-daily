@@ -29,7 +29,7 @@ describe("account isolation in the reducer", () => {
   const accountA = loaded({
     ownerUid: "uid-a",
     user: { id: "user_a", name: "Avi", email: "a@example.com" },
-    sessions: { "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80 }], averageScore: 80 } },
+    sessions: { "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80, kind: "speak" }], averageScore: 80 } },
     lifetimeStats: { totalSentences: 1, sentencesAbove90: 0, daysActive: 1, totalChats: 0 },
     placement: { overall_level: "B1" },
   });
@@ -103,10 +103,10 @@ describe("speaking source and duration (T4)", () => {
   it("loads chats and attempts saved before T4 unchanged", () => {
     const old = loaded({
       rolePlay: { chats: [{ id: "c0", messages: [{ role: "user", content: "old" }] }], customTopics: [] },
-      sessions: { "2026-09-01": { sentences: [{ sentenceId: "s1", score: 70 }], averageScore: 70 } },
+      sessions: { "2026-09-01": { sentences: [{ sentenceId: "s1", score: 70, wordResults: [] }], averageScore: 70 } },
     });
     expect(old.rolePlay.chats[0].messages[0]).toEqual({ role: "user", content: "old" });
-    expect(old.sessions["2026-09-01"].sentences[0]).toEqual({ sentenceId: "s1", score: 70 });
+    expect(old.sessions["2026-09-01"].sentences[0]).toEqual({ sentenceId: "s1", score: 70, wordResults: [], kind: "speak" });
   });
 });
 
@@ -148,7 +148,7 @@ describe("verified bugs (CRITICAL_REVIEW.md)", () => {
 
   const today = "2026-09-28";
   const chat = { chatId: "c1", topicId: "t1", turnCount: 4, helpUsedCount: 0, completedAt: "2026-09-28T09:00:00.000Z" };
-  const sentence = { sentenceId: "s1", text: "I need water", score: 80 };
+  const sentence = { sentenceId: "s1", text: "I need water", score: 80, kind: "speak" };
 
   it("§3 setup: a chat is saved under today's session", () => {
     const next = reducer(loaded(), { type: "SAVE_ROLEPLAY_SESSION", payload: chat });
@@ -224,16 +224,16 @@ describe("archiving old days", () => {
   afterEach(() => vi.useRealTimers());
 
   const oldDays = {
-    "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80 }, { sentenceId: "s2", score: 70 }] },
+    "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80, kind: "speak" }, { sentenceId: "s2", score: 70, kind: "speak" }] },
     "2026-09-21": { chats: [{ chatId: "c1", turnCount: 3 }] },
     "2026-09-22": { sentences: [{ sentenceId: "s3", score: 100, kind: "cloze" }] },
   };
-  const recent = { "2027-11-30": { sentences: [{ sentenceId: "s4", score: 90 }] } };
+  const recent = { "2027-11-30": { sentences: [{ sentenceId: "s4", score: 90, kind: "speak" }] } };
 
   it("folds days older than a year into the archive on load, keeping the totals", () => {
     const state = loaded({ sessions: { ...oldDays, ...recent } });
     expect(Object.keys(state.sessions)).toEqual(["2027-11-30"]);
-    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1 });
+    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1, speakAbove90: 0 });
     expect(selectDaysActive(state)).toBe(3);
   });
 
@@ -316,7 +316,7 @@ describe("MERGE_CLOUD_DATA unites local and cloud (§2א)", () => {
   });
 
   it("recomputes the streak from the merged days instead of copying the cloud's", () => {
-    const spoke = { sentences: [{ sentenceId: "s", score: 80 }] };
+    const spoke = { sentences: [{ sentenceId: "s", score: 80, kind: "speak" }] };
     const local = {
       sessions: { "2026-09-27": spoke, "2026-09-28": spoke },
       streak: { current: 2, longest: 2, lastPracticeDate: "2026-09-28" },

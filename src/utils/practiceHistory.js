@@ -1,3 +1,5 @@
+import { isSpoken } from "../context/selectors";
+
 /**
  * practiceHistory.js — derives review-worthy content from a user's session
  * history (state.sessions). Shared by Progress.jsx (the "Review" tab) and
@@ -9,11 +11,13 @@
  * with { sentenceId, text, translation, score, count, bestScore } —
  * count = how many times it's been attempted below the threshold,
  * bestScore = the highest score achieved among those attempts.
+ * Only spoken sentences count: a sentence-completion answer isn't a
+ * pronunciation attempt (CRITICAL_REVIEW.md §8).
  */
 export function getWeakSentenceStats(sessions, { threshold = 70 } = {}) {
   const allSentences = Object.values(sessions || {}).flatMap((s) => s.sentences || []);
   return allSentences
-    .filter((x) => x.score < threshold)
+    .filter((x) => isSpoken(x) && x.score < threshold)
     .reduce((acc, x) => {
       const key = x.sentenceId;
       if (!acc[key]) acc[key] = { ...x, count: 0, bestScore: x.score };

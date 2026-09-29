@@ -144,6 +144,7 @@ export default function ClozePractice() {
       text: current.fullText,
       translation: current.translation,
       category: current.category,
+      kind: "cloze",
       score: correct ? 100 : 0,
       attempts: 1,
     };

@@ -63,7 +63,9 @@ export function AppProvider({ children }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         const today = getTodayString();
-        const isPreVersioned = !parsed.schemaVersion || parsed.schemaVersion < SCHEMA_VERSION;
+        // Saved before lifetimeStats existed (schema 1). Later versions have
+        // their own migrations (migrations.js), run by LOAD_DATA.
+        const isPreVersioned = !parsed.schemaVersion;
         // Backfill lifetimeStats once for existing users from their full history.
         // Days older than a year are pruned (and archived) by LOAD_DATA itself.
         const lifetimeStats = isPreVersioned
