@@ -10,11 +10,9 @@ import {
   selectTotalChats, speakAverage,
 } from "../context/selectors";
 import { createCustomTopic } from "../data/rolePlayTopics";
+import { LEVEL_TO_DIFFICULTY } from "../context/appState";
 import LearningPath from "../components/progress/LearningPath";
 
-const LEVEL_TO_DIFFICULTY = {
-  "Pre-A1": "easy", A1: "easy", A2: "medium", B1: "medium", B2: "advanced", C1: "advanced",
-};
 
 // What each achievement looks like; whether it's earned is ACHIEVEMENT_RULES
 // in achievements.js (CRITICAL_REVIEW.md §20).
