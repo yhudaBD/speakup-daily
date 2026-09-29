@@ -1015,3 +1015,23 @@ h3 { font-size: clamp(1rem, 3vw, 1.25rem); }
     margin: 0 auto;
   }
 }
+
+/* PageSkeleton.jsx: while a page's code loads. */
+.page-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 24px;
+}
+.page-skeleton-bar {
+  border-radius: 16px;
+  background: var(--color-border);
+  opacity: 0.6;
+  animation: page-skeleton-pulse 1.2s ease-in-out infinite;
+}
+@keyframes page-skeleton-pulse {
+  50% { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-skeleton-bar { animation: none; }
+}
