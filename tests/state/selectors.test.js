@@ -222,17 +222,44 @@ describe("helpedTurnShare", () => {
 describe("levelAdjustment", () => {
   const own = (n, source = "spoken") => Array.from({ length: n }, (_, i) => ({ role: "user", content: `t${i}`, source }));
 
+  const rubric = (fluency, grammar, vocabulary) => ({ rubric: { fluency, grammar, vocabulary } });
+
   it("adjusts the level from a conversation with 4 turns of the user's own", () => {
     const messages = [...own(4), ...own(1, "suggestion")];
-    expect(selectors.levelAdjustment(messages, { overall_score: 90 })).toEqual({ score: 90, helpedShare: 0.2 });
+    expect(selectors.levelAdjustment(messages, rubric(4, 4, 4))).toEqual({ level: "B2", helpedShare: 0.2 });
   });
 
-  it("doesn't adjust it from a shorter conversation or without a score", () => {
-    expect(selectors.levelAdjustment([...own(3), ...own(3, "suggestion")], { overall_score: 90 })).toBeNull();
-    expect(selectors.levelAdjustment(own(5), {})).toBeNull();
+  it("doesn't adjust it from a shorter conversation or without a rubric", () => {
+    expect(selectors.levelAdjustment([...own(3), ...own(3, "suggestion")], rubric(4, 4, 4))).toBeNull();
+    expect(selectors.levelAdjustment(own(5), { overall_score: 90 })).toBeNull();
   });
 
   it("counts every user turn saved before T4 as the user's own", () => {
-    expect(selectors.levelAdjustment(own(4, undefined), { overall_score: 50 })).toEqual({ score: 50, helpedShare: 0 });
+    expect(selectors.levelAdjustment(own(4, undefined), rubric(3, 3, 3))).toEqual({ level: "B1", helpedShare: 0 });
+  });
+});
+
+// CRITICAL_REVIEW.md §14: the CEFR level a conversation's rubric shows, from
+// the mean of its three parts.
+describe("rubricLevel", () => {
+  const level = (f, g, v) => selectors.rubricLevel({ fluency: f, grammar: g, vocabulary: v });
+
+  it("maps the rubric's mean onto a level", () => {
+    expect(level(1, 1, 1)).toBe("Pre-A1");
+    expect(level(2, 1, 2)).toBe("A1");
+    expect(level(2, 2, 2)).toBe("A1");
+    expect(level(3, 2, 2)).toBe("A2");
+    expect(level(3, 3, 2)).toBe("A2");
+    expect(level(3, 3, 3)).toBe("B1");
+    expect(level(4, 3, 3)).toBe("B1");
+    expect(level(4, 4, 3)).toBe("B2");
+    expect(level(4, 4, 4)).toBe("B2");
+    expect(level(5, 5, 4)).toBe("C1");
+    expect(level(5, 5, 5)).toBe("C1");
+  });
+
+  it("has no level without a full rubric", () => {
+    expect(selectors.rubricLevel(undefined)).toBeUndefined();
+    expect(selectors.rubricLevel({ fluency: 3, grammar: 3 })).toBeUndefined();
   });
 });

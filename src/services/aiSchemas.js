@@ -127,6 +127,18 @@ export function rubricScore({ fluency, grammar, vocabulary }) {
   return Math.round(((fluency + grammar + vocabulary - 3) / 12) * 100);
 }
 
+// The CEFR level a conversation's rubric (1-5 each) shows, by the sum of
+// its three parts: 3-4 Pre-A1, 5-6 A1, 7-8 A2, 9-10 B1, 11-13 B2, 14-15 C1.
+// Checked against the examples in scripts/eval/conversation-rubric.json.
+const RUBRIC_LEVELS = [[4, "Pre-A1"], [6, "A1"], [8, "A2"], [10, "B1"], [13, "B2"], [15, "C1"]];
+
+export function rubricLevel(rubric) {
+  const parts = [rubric?.fluency, rubric?.grammar, rubric?.vocabulary];
+  if (!parts.every((n) => typeof n === "number")) return undefined;
+  const sum = parts.reduce((a, b) => a + b, 0);
+  return RUBRIC_LEVELS.find(([max]) => sum <= max)?.[1];
+}
+
 // The model's own overall_score is dropped: the score is computed in code
 // from the rubric, so it means the same thing every time.
 export const conversationAnalysisSchema = z.pipe(

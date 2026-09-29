@@ -34,19 +34,29 @@ function normalizePlacement(placement) {
   return { ...placement, overall_level: level };
 }
 
-// A single strong/weak conversation shouldn't whipsaw the level, but two in a
-// row without a mixed result in between is a real signal — nudge one CEFR
-// step and reset both streaks so the next adjustment needs fresh evidence.
-// A conversation where more than 30% of the turns came from a suggestion or a
-// translation is no evidence for a higher level (CRITICAL_REVIEW.md §5).
+// `observed` is the level a conversation showed (rubricLevel), compared with
+// the user's: above it is strong, below it weak. It used to be an absolute
+// score, which lowered an A2 learner for talking like one (CRITICAL_REVIEW.md
+// §14). A single strong/weak conversation shouldn't whipsaw the level, but two
+// in a row without a mixed result in between is a real signal — nudge one
+// CEFR step and reset both streaks so the next adjustment needs fresh
+// evidence. A conversation where more than 30% of the turns came from a
+// suggestion or a translation is no evidence for a higher level (§5).
 const MAX_HELPED_SHARE_TO_RAISE = 0.3;
 
-function adjustLevel(placement, score, helpedShare = 0) {
+function adjustLevel(placement, observed, helpedShare = 0) {
   const currentIdx = CEFR_LEVELS.indexOf(placement.overall_level);
-  if (currentIdx === -1) return placement;
+  const observedIdx = CEFR_LEVELS.indexOf(observed);
+  if (currentIdx === -1 || observedIdx === -1) return placement;
 
-  const strong = score >= 85 && helpedShare <= MAX_HELPED_SHARE_TO_RAISE;
-  const weak = score < 45;
+  // At the ends of the scale one step is noise: the rubric examples read C1
+  // speakers as B2 and Pre-A1 ones as A1 at times, which would pull every
+  // C1 user down and push Pre-A1 users up (scripts/eval-conversation-rubric.mjs).
+  const top = CEFR_LEVELS.length - 1;
+  const stepsUp = currentIdx === 0 ? 2 : 1;
+  const stepsDown = currentIdx === top ? 2 : 1;
+  const strong = observedIdx >= currentIdx + stepsUp && helpedShare <= MAX_HELPED_SHARE_TO_RAISE;
+  const weak = observedIdx <= currentIdx - stepsDown;
   const highStreak = strong ? (placement.highStreak || 0) + 1 : 0;
   const lowStreak = weak ? (placement.lowStreak || 0) + 1 : 0;
 
@@ -386,7 +396,8 @@ export function reducer(state, action) {
     }
     case "ADJUST_LEVEL": {
       if (!state.placement) return state;
-      const placement = adjustLevel(state.placement, action.payload.score, action.payload.helpedShare);
+      const placement = adjustLevel(state.placement, action.payload.level, action.payload.helpedShare);
+      if (placement === state.placement) return state;
       const moved = placement.overall_level !== state.placement.overall_level;
       return {
         ...state,

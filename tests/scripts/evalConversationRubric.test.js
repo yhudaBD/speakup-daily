@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { compareRubric, summarize } from "../../scripts/eval-conversation-rubric.mjs";
+import { compareRubric, levelSteps, summarize } from "../../scripts/eval-conversation-rubric.mjs";
 
 const { examples } = JSON.parse(readFileSync(resolve("scripts/eval/conversation-rubric.json"), "utf8"));
 
@@ -37,14 +37,31 @@ describe("rubric agreement", () => {
       .toEqual({ fluency: 1, grammar: 0, vocabulary: -3 });
   });
 
-  it("passes at 85% of parts within 1 and nothing off by 3", () => {
-    const close = (id) => ({ id, diff: { fluency: 0, grammar: 1, vocabulary: -1 } });
-    expect(summarize([close("a"), close("b")])).toEqual({ agreement: 1, farOff: [], pass: true });
+  const r = (f, g, v) => ({ fluency: f, grammar: g, vocabulary: v });
+  const result = (id, expected, actual) => ({ id, expected, actual });
 
-    const far = { id: "c", diff: { fluency: 3, grammar: 0, vocabulary: 0 } };
-    expect(summarize([close("a"), far])).toMatchObject({ farOff: ["c"], pass: false });
+  it("passes when parts are close, unbiased and at the right level", () => {
+    const close = (id) => result(id, r(3, 3, 3), r(3, 4, 2));
+    expect(summarize([close("a"), close("b")])).toEqual({ agreement: 1, bias: 0, farOff: [], levelOff: [], pass: true });
+  });
 
-    const off = (id) => ({ id, diff: { fluency: 2, grammar: 2, vocabulary: 0 } });
-    expect(summarize([off("a"), off("b")]).pass).toBe(false);
+  it("fails a part off by 3 or too many parts off by 2", () => {
+    expect(summarize([result("c", r(1, 3, 3), r(4, 3, 3))])).toMatchObject({ farOff: ["c"], pass: false });
+    expect(summarize([result("a", r(1, 1, 3), r(3, 3, 3))]).pass).toBe(false);
+  });
+
+  it("fails a model that rates everyone in the middle", () => {
+    const middle = [r(1, 1, 1), r(2, 2, 2), r(3, 3, 3), r(4, 4, 4), r(5, 5, 5)].map((e, i) => result(`e${i}`, e, r(3, 3, 3)));
+    const high = [r(4, 4, 4), r(5, 5, 5), r(4, 5, 4)].map((e, i) => result(`h${i}`, e, r(e.fluency - 1, e.grammar - 1, e.vocabulary - 1)));
+    const summary = summarize(high);
+    expect(summary.agreement).toBe(1);
+    expect(summary.bias).toBe(-1);
+    expect(summary.pass).toBe(false);
+    expect(summarize(middle).levelOff).toEqual(["e0", "e1", "e4"]);
+  });
+
+  it("counts level steps between two rubrics", () => {
+    expect(levelSteps(r(4, 4, 4), r(3, 3, 3))).toBe(-1);
+    expect(levelSteps(r(1, 1, 1), r(3, 3, 3))).toBe(3);
   });
 });
