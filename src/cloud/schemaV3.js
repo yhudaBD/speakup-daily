@@ -79,6 +79,7 @@ export function toAttempt(sentence, { id, ts, bank }) {
 export function fromAttempt(attempt, bank) {
   const fromBank = bank?.get(attempt.itemId) || {};
   return compact({
+    id: attempt.id,
     sentenceId: attempt.itemId,
     text: attempt.text ?? fromBank.text,
     translation: attempt.translation ?? fromBank.translation,
@@ -140,7 +141,7 @@ export function migrateToV3(doc, { bank } = {}) {
     const day = doc.sessions[date] || {};
     const month = (months[monthOf(date)] ||= { month: monthOf(date), days: {} });
     const attempts = Object.fromEntries((day.sentences || []).map((s, i) => {
-      const id = legacyAttemptId(date, i, s.sentenceId);
+      const id = s.id || legacyAttemptId(date, i, s.sentenceId);
       return [id, toAttempt(s, { id, ts: legacyAttemptTs(date, i), bank })];
     }));
     const chats = Object.fromEntries((day.chats || []).map((c, i) => {

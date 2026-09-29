@@ -16,6 +16,7 @@ import { aiService } from "../services/ai.service";
 import { reportSpeakingTime } from "../utils/speakingTime";
 import { addAttempt, attemptFields } from "../utils/practiceAttempts";
 import { useToday } from "../hooks/useToday";
+import { newAttemptId } from "../utils/attemptId";
 import { WordHighlight } from "../components/practice/WordHighlight";
 import { WordHelp } from "../components/practice/WordHelp";
 import { selectTodayProgress } from "../context/selectors";
@@ -669,6 +670,7 @@ export default function Practice() {
   const handleSaveAndNext = useCallback(() => {
     if (!result || !currentSentence) return;
     const entry = {
+      id: newAttemptId(),
       sentenceId: currentSentence.id,
       text: currentSentence.text,
       translation: currentSentence.translation,
