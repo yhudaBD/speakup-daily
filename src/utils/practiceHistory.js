@@ -1,4 +1,4 @@
-import { isSpoken } from "../context/selectors";
+import { attemptScores, isSpoken } from "../context/selectors";
 
 /**
  * practiceHistory.js — derives review-worthy content from a user's session
@@ -7,24 +7,37 @@ import { isSpoken } from "../context/selectors";
  */
 
 /**
- * Returns weak sentences (score below threshold) keyed by sentenceId, each
- * with { sentenceId, text, translation, score, count, bestScore } —
- * count = how many times it's been attempted below the threshold,
- * bestScore = the highest score achieved among those attempts.
- * Only spoken sentences count: a sentence-completion answer isn't a
- * pronunciation attempt (CRITICAL_REVIEW.md §8).
+ * Returns weak sentences keyed by sentenceId, each with { sentenceId, text,
+ * translation, ..., count, bestScore }: count = how many times it's been
+ * practiced, bestScore = the highest score it ever reached.
+ *
+ * Weak = failed (first try below threshold) at least once and not passed
+ * `clearAfter` times in a row since (CRITICAL_REVIEW.md §7). Judged by the
+ * first try, since a retry after hearing the sentence again isn't what the
+ * user knows (§9). Only spoken sentences count: a sentence-completion answer
+ * isn't a pronunciation attempt (§8). A minimal fix (D12): FSRS replaces it.
  */
-export function getWeakSentenceStats(sessions, { threshold = 70 } = {}) {
-  const allSentences = Object.values(sessions || {}).flatMap((s) => s.sentences || []);
-  return allSentences
-    .filter((x) => isSpoken(x) && x.score < threshold)
-    .reduce((acc, x) => {
-      const key = x.sentenceId;
-      if (!acc[key]) acc[key] = { ...x, count: 0, bestScore: x.score };
-      acc[key].count++;
-      acc[key].bestScore = Math.max(acc[key].bestScore, x.score);
-      return acc;
-    }, {});
+export function getWeakSentenceStats(sessions, { threshold = 70, clearAfter = 2 } = {}) {
+  const attempts = Object.entries(sessions || {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([, day]) => day?.sentences || [])
+    .filter(isSpoken);
+  const byId = {};
+  for (const x of attempts) {
+    const { firstScore, bestScore } = attemptScores(x);
+    const w = (byId[x.sentenceId] ||= { ...x, count: 0, bestScore: 0, fails: 0, passStreak: 0 });
+    w.count++;
+    w.bestScore = Math.max(w.bestScore, bestScore);
+    if (firstScore < threshold) {
+      w.fails++;
+      w.passStreak = 0;
+    } else {
+      w.passStreak++;
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(byId).filter(([, w]) => w.fails > 0 && w.passStreak < clearAfter),
+  );
 }
 
 /**
