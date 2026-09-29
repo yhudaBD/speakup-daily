@@ -3,14 +3,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // A stand-in for the Firestore SDK that records what a batch would do.
 const batches = [];
 let stored = {};
+// Document data by path, for loadV3; syncedAt is a stand-in Timestamp.
+let data = {};
+const ts = (ms) => ({ toMillis: () => ms, ms });
 const snapshots = {};
 vi.mock("../../src/services/firebase", () => ({ db: { name: "db" } }));
 vi.mock("firebase/firestore", () => ({
   FieldPath: class { constructor(...segments) { this.segments = segments; } },
   deleteField: () => "DELETE",
+  serverTimestamp: () => "SERVER_TS",
+  Timestamp: { fromMillis: (ms) => ts(ms) },
+  getDoc: async (ref) => ({ exists: () => ref in data, data: () => data[ref] }),
+  query: (path, ...parts) => ({ path, parts }),
+  where: (field, op, value) => ({ where: [field, op, value] }),
+  orderBy: () => ({}),
+  limit: () => ({}),
   doc: (_db, ...path) => path.join("/"),
   collection: (_db, ...path) => path.join("/"),
-  getDocs: async (path) => ({ docs: (stored[path] || []).map((id) => ({ ref: `${path}/${id}` })) }),
+  getDocs: async (q) => {
+    const path = q.path ?? q;
+    const after = q.parts?.find((p) => p.where)?.where[2].ms;
+    const docs = (stored[path] || []).map((id) => ({ id, ref: `${path}/${id}`, data: () => data[`${path}/${id}`] }));
+    return { docs: after === undefined ? docs : docs.filter((d) => d.data().syncedAt?.ms > after) };
+  },
   onSnapshot: (ref, onNext) => {
     snapshots[ref] = onNext;
     return () => { delete snapshots[ref]; };
@@ -26,9 +41,9 @@ vi.mock("firebase/firestore", () => ({
   },
 }));
 
-const { BATCH_SIZE, deleteAllCloudData, listenDoc, writeOps } = await import("../../src/cloud/v3Store");
+const { BATCH_SIZE, deleteAllCloudData, listenDoc, loadV3, writeOps } = await import("../../src/cloud/v3Store");
 
-beforeEach(() => { batches.length = 0; stored = {}; });
+beforeEach(() => { batches.length = 0; stored = {}; data = {}; });
 
 // MIGRATION_PLAN.md §5.
 describe("writeOps", () => {
@@ -41,10 +56,10 @@ describe("writeOps", () => {
     expect(batches).toEqual([[
       {
         op: "set", ref: "users/uid-a/months/2026-09",
-        data: { days: { "2026-09-29": { attempts: { a2: { score: 80 } } }, "2025-09-01": "DELETE" }, updatedAt: "T" },
-        mergeFields: [["days", "2026-09-29", "attempts", "a2"], ["updatedAt"], ["days", "2025-09-01"]],
+        data: { days: { "2026-09-29": { attempts: { a2: { score: 80 } } }, "2025-09-01": "DELETE" }, updatedAt: "T", syncedAt: "SERVER_TS" },
+        mergeFields: [["days", "2026-09-29", "attempts", "a2"], ["updatedAt"], ["syncedAt"], ["days", "2025-09-01"]],
       },
-      { op: "set", ref: "users/uid-a/chats/c1", data: { id: "c1", messages: [] }, mergeFields: undefined },
+      { op: "set", ref: "users/uid-a/chats/c1", data: { id: "c1", messages: [], syncedAt: "SERVER_TS" }, mergeFields: undefined },
       { op: "delete", ref: "users/uid-a/months/2025-08" },
     ]]);
   });
@@ -92,5 +107,42 @@ describe("listenDoc", () => {
     expect(onData.mock.calls).toEqual([[{ days: { "2026-09-29": {} } }]]);
     stop();
     expect(snapshots["users/uid-a/months/2026-09"]).toBeUndefined();
+  });
+});
+
+// ACTION_PLAN.md 7ג2: every write stamps the server's time (syncedAt), so
+// an open reads only what was written after the last read, whatever the
+// devices' clocks say.
+describe("loadV3", () => {
+  beforeEach(() => {
+    data = {
+      "users/uid-a/profile/main": { settings: {}, syncedAt: ts(300) },
+      "users/uid-a/months/2026-08": { days: {}, syncedAt: ts(100) },
+      "users/uid-a/months/2026-09": { days: {}, syncedAt: ts(500) },
+      "users/uid-a/chats/c1": { id: "c1", syncedAt: ts(200) },
+      "users/uid-a/chats/old": { id: "old" }, // written before syncedAt existed
+    };
+    stored = { "users/uid-a/months": ["2026-08", "2026-09"], "users/uid-a/chats": ["c1", "old"] };
+  });
+
+  it("reads everything, without the stamps, and gives the newest server time", async () => {
+    const loaded = await loadV3("uid-a");
+    expect(Object.keys(loaded.months)).toEqual(["2026-08", "2026-09"]);
+    expect(Object.keys(loaded.chats)).toEqual(["c1", "old"]);
+    expect(loaded.profile).toEqual({ settings: {} });
+    expect(loaded.months["2026-09"]).toEqual({ days: {} });
+    expect(loaded.syncedAt).toBe(500);
+  });
+
+  it("with since, reads the profile and only what was written after it", async () => {
+    const loaded = await loadV3("uid-a", { since: 250 });
+    expect(Object.keys(loaded.months)).toEqual(["2026-09"]);
+    expect(loaded.chats).toEqual({});
+    expect(loaded.syncedAt).toBe(500);
+  });
+
+  it("is null for an account that hasn't moved", async () => {
+    data = {};
+    expect(await loadV3("uid-a")).toBeNull();
   });
 });

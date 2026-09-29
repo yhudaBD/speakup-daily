@@ -9,6 +9,7 @@ import {
 } from "../services/firebase";
 import { getSentenceBank } from "../cloud/bank";
 import { cloudSchemaFor } from "../cloud/flags";
+import { clearBaseline, readBaseline, saveBaseline } from "../cloud/localBaseline";
 import { openV3 } from "../cloud/openV3";
 import { startRealtime } from "../cloud/realtime";
 import { deleteAllCloudData, listenDoc } from "../cloud/v3Store";
@@ -149,7 +150,11 @@ export function AppProvider({ children }) {
         if (await cloudSchemaFor(firebaseUser.email) === "v3") {
           // MIGRATION_PLAN.md §8: moves the account on its first open.
           const bank = await getSentenceBank();
-          const sync = await openV3({ uid, local, dispatch, bank, track: (p) => cloudSync.track(p) });
+          const sync = await openV3({
+            uid, local, dispatch, bank, track: (p) => cloudSync.track(p),
+            // What the cloud holds, kept between opens (ACTION_PLAN.md 7ג2).
+            baselineStore: { read: () => readBaseline(uid), save: (b) => saveBaseline(uid, b) },
+          });
           v3SyncRef.current = sync;
           // MIGRATION_PLAN.md §6: the other device's changes while open.
           stopRealtimeRef.current = startRealtime({
@@ -243,6 +248,7 @@ export function AppProvider({ children }) {
       } catch {
         // Storage blocked: nothing we can clear anyway.
       }
+      clearBaseline(uid);
     }
     // A full reload drops every trace of this account from memory too.
     window.location.replace("/");

@@ -89,4 +89,60 @@ describe("openV3", () => {
     expect(fingerprintWrite.fields).toContainEqual([["legacyFingerprint"], legacyFingerprint(legacyDoc)]);
     sync.dispose();
   });
+  // ACTION_PLAN.md 7ג2.
+  describe("with what this device kept from the last open", () => {
+    const keptDocs = () => {
+      const merged = reducer(local, { type: "MERGE_CLOUD_DATA", payload: legacyDoc });
+      const docs = migrateToV3(snapshotForSync(merged), { bank });
+      return { ...docs, profile: { ...docs.profile, legacyFingerprint: legacyFingerprint(legacyDoc) } };
+    };
+    const store = (kept) => {
+      const saved = [];
+      return { saved, read: () => kept, save: (b) => saved.push(structuredClone(b)) };
+    };
+
+    it("reads only what changed since, and keeps the rest from the device", async () => {
+      const kept = { since: 1000, docs: keptDocs() };
+      // The month another device wrote to comes back whole.
+      const changedMonth = structuredClone(kept.docs.months["2026-09"]);
+      changedMonth.days["2026-09-30"] = { attempts: { other: { id: "other", itemId: "ai_2", text: "Yo", kind: "speak", score: 90, ts: "T" } } };
+      loadV3.mockResolvedValue({ profile: kept.docs.profile, months: { "2026-09": changedMonth }, chats: {}, syncedAt: 2000 });
+      loadCloudProfile.mockResolvedValue(legacyDoc);
+      const baselineStore = store(kept);
+
+      const sync = await openV3({ uid: "uid-a", local, dispatch, bank, now: () => "T", baselineStore });
+      expect(loadV3).toHaveBeenCalledWith("uid-a", { since: 1000 });
+      const payload = dispatched[0].payload;
+      expect(Object.keys(payload.sessions).sort()).toEqual(["2026-09-28", "2026-09-29", "2026-09-30"]);
+      expect(payload.sessions["2026-09-30"].sentences[0].id).toBe("other");
+      expect(baselineStore.saved.at(-1).since).toBe(2000);
+      expect(baselineStore.saved.at(-1).docs.months["2026-09"]).toEqual(changedMonth);
+      sync.dispose();
+    });
+
+    it("keeps what it wrote, for the next open", async () => {
+      const kept = { since: 1000, docs: keptDocs() };
+      loadV3.mockResolvedValue({ profile: kept.docs.profile, months: {}, chats: {}, syncedAt: 1000 });
+      loadCloudProfile.mockResolvedValue(legacyDoc);
+      const baselineStore = store(kept);
+      const sync = await openV3({ uid: "uid-a", local, dispatch, bank, now: () => "T", baselineStore });
+      const merged = reducer(reducer(local, { type: "MERGE_CLOUD_DATA", payload: legacyDoc }), { type: "UPDATE_SETTINGS", payload: { dailyGoal: 12 } });
+      sync.schedule(merged);
+      await sync.flush();
+      expect(writeOps).toHaveBeenCalledTimes(1);
+      expect(baselineStore.saved.at(-1).docs.profile.settings.dailyGoal).toBe(12);
+      expect(baselineStore.saved.at(-1).since).toBe(1000);
+      sync.dispose();
+    });
+
+    it("reads everything when nothing was kept, and keeps it", async () => {
+      loadV3.mockResolvedValue({ ...keptDocs(), syncedAt: 3000 });
+      loadCloudProfile.mockResolvedValue(legacyDoc);
+      const baselineStore = store(null);
+      const sync = await openV3({ uid: "uid-a", local, dispatch, bank, now: () => "T", baselineStore });
+      expect(loadV3).toHaveBeenCalledWith("uid-a", { since: undefined });
+      expect(baselineStore.saved.at(-1).since).toBe(3000);
+      sync.dispose();
+    });
+  });
 });
