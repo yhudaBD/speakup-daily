@@ -10,7 +10,8 @@ import { ReplyFailedBubble } from '../components/roleplay/ReplyFailedBubble';
 import { HintLadder } from '../components/roleplay/HintLadder';
 import { useHintLadder } from '../hooks/useHintLadder';
 import { MicButton } from '../components/roleplay/MicButton';
-import { isCompletedChat, levelAdjustment } from '../context/selectors';
+import { isCompletedChat } from '../context/selectors';
+import { actionsForFeedback } from '../context/feedbackActions';
 import { useConversationAnalysis } from '../hooks/useConversationAnalysis';
 
 function createSessionId() {
@@ -596,15 +597,8 @@ export default function RolePlay() {
   }, [dispatch, activeSession]);
 
   const handleFeedbackSaved = useCallback((chatId, feedback) => {
-    dispatch({ type: 'UPDATE_ROLEPLAY_FEEDBACK', payload: { chatId, feedback } });
-    const newGaps = [...(feedback.grammar_notes || []), ...(feedback.improvements || [])];
-    if (newGaps.length) {
-      dispatch({ type: 'MERGE_PLACEMENT_GAPS', payload: newGaps });
-    }
-    // Only a conversation with 4 turns of the user's own moves the level
-    // (§14), and one leaning on suggestions can't raise it (§5).
-    const adjustment = levelAdjustment(chats.find((c) => c.id === chatId)?.messages, feedback);
-    if (adjustment) dispatch({ type: 'ADJUST_LEVEL', payload: adjustment });
+    const messages = chats.find((c) => c.id === chatId)?.messages;
+    for (const action of actionsForFeedback({ chatId, feedback, messages })) dispatch(action);
   }, [dispatch, chats]);
 
   const {

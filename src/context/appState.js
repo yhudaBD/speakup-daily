@@ -394,21 +394,6 @@ export function reducer(state, action) {
         settings: moved ? settingsForLevel(state.settings, placement.overall_level) : state.settings,
       };
     }
-    case "MERGE_PLACEMENT_GAPS": {
-      if (!state.placement) return state;
-      const incoming = action.payload || [];
-      const existing = state.placement.gaps || [];
-      const merged = [...existing];
-      for (const gap of incoming) {
-        if (gap && !merged.some((g) => g.toLowerCase() === gap.toLowerCase())) {
-          merged.push(gap);
-        }
-      }
-      return {
-        ...state,
-        placement: { ...state.placement, gaps: merged.slice(-20) },
-      };
-    }
     case "ADD_CUSTOM_TOPIC":
       return {
         ...state,
