@@ -3,6 +3,7 @@
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
 import { getTodayString, daysSince } from "../utils/dateHelpers";
+import { dayXp } from "./achievements";
 import { migrateSessions } from "./migrations";
 import { isActiveDay, isCompletedChat, isSpoken, streakRun } from "./selectors";
 
@@ -88,6 +89,8 @@ export function archiveOldSessions(sessions, archive) {
     chats: archive?.chats || 0,
     completedChats: archive?.completedChats ?? archive?.chats ?? 0,
     speakAbove90: archive?.speakAbove90 || 0,
+    speakSentences: archive?.speakSentences ?? archive?.sentences ?? 0,
+    xp: archive?.xp || 0,
   };
   for (const [date, day] of entries.filter(isOld)) {
     if (archive?.throughDate && date <= archive.throughDate) continue;
@@ -96,6 +99,8 @@ export function archiveOldSessions(sessions, archive) {
     next.chats += (day?.chats || []).length;
     next.completedChats += (day?.chats || []).filter(isCompletedChat).length;
     next.speakAbove90 += (day?.sentences || []).filter((s) => isSpoken(s) && s.score >= 90).length;
+    next.speakSentences += (day?.sentences || []).filter(isSpoken).length;
+    next.xp += dayXp(day);
     if (!next.throughDate || date > next.throughDate) next.throughDate = date;
   }
   return { sessions: Object.fromEntries(entries.filter((e) => !isOld(e))), archive: next };
@@ -463,9 +468,8 @@ export function reducer(state, action) {
       const run = streakRun(sessions);
       const localStats = state.lifetimeStats || {};
       const cloudStats = cloud.lifetimeStats || {};
-      // Counters still stored until stage 5 turns them into selectors: the
-      // larger side, which is better than the cloud's alone but can still
-      // lose additions made on both devices.
+      // The one counter still stored, totalSentences (Home's first-launch
+      // check); everything else is a selector. The larger side wins.
       const lifetimeStats = { ...cloudStats, ...localStats };
       for (const k of Object.keys(lifetimeStats)) {
         lifetimeStats[k] = Math.max(Number(localStats[k]) || 0, Number(cloudStats[k]) || 0);

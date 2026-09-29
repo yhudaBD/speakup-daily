@@ -233,7 +233,7 @@ describe("archiving old days", () => {
   it("folds days older than a year into the archive on load, keeping the totals", () => {
     const state = loaded({ sessions: { ...oldDays, ...recent } });
     expect(Object.keys(state.sessions)).toEqual(["2027-11-30"]);
-    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1, completedChats: 1, speakAbove90: 0 });
+    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1, completedChats: 1, speakAbove90: 0, speakSentences: 2, xp: 37 });
     expect(selectDaysActive(state)).toBe(3);
   });
 
