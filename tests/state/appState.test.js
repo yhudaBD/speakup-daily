@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { selectDaysActive } from "../../src/context/selectors";
 import {
   freshStateFor,
   initialState,
@@ -154,10 +155,24 @@ describe("verified bugs (CRITICAL_REVIEW.md)", () => {
     expect(next.sessions[today].chats).toHaveLength(1);
   });
 
-  it.fails("§3: practicing a sentence after a chat keeps the day's chats", () => {
+  it("§3: practicing a sentence after a chat keeps the day's chats", () => {
     const afterChat = reducer(loaded(), { type: "SAVE_ROLEPLAY_SESSION", payload: chat });
     const next = reducer(afterChat, { type: "SAVE_SESSION_RESULT", payload: sentence });
     expect(next.sessions[today].chats).toHaveLength(1);
+    expect(next.sessions[today].sentences).toHaveLength(1);
+  });
+
+  it("§3: a day that starts with a chat and goes on to a sentence is one active day", () => {
+    const afterChat = reducer(loaded(), { type: "SAVE_ROLEPLAY_SESSION", payload: chat });
+    expect(selectDaysActive(afterChat)).toBe(1);
+    const next = reducer(afterChat, { type: "SAVE_SESSION_RESULT", payload: sentence });
+    expect(selectDaysActive(next)).toBe(1);
+  });
+
+  it("§3: days active is no longer stored (D5)", () => {
+    const before = loaded({ lifetimeStats: { totalSentences: 0, sentencesAbove90: 0, daysActive: 7, totalChats: 0 } });
+    const next = reducer(before, { type: "SAVE_SESSION_RESULT", payload: sentence });
+    expect(next.lifetimeStats.daysActive).toBe(7);
   });
 
   const bankOf = (n) =>
@@ -173,5 +188,49 @@ describe("verified bugs (CRITICAL_REVIEW.md)", () => {
     const state = loaded({ practice: { wordBank: bankOf(100) } });
     const next = reducer(state, { type: "ADD_PRACTICE_WORDS", payload: [{ word: "schedule" }] });
     expect(next.practice.wordBank.map((w) => w.word)).toContain("schedule");
+  });
+});
+
+// CRITICAL_REVIEW.md §3 / ACTION_PLAN.md D5: days pruned after a year are
+// folded into an archive, so the totals don't drop, and days the cloud still
+// holds (it never deletes, §1) aren't counted twice.
+describe("archiving old days", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2027, 11, 1, 12, 0));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const oldDays = {
+    "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80 }, { sentenceId: "s2", score: 70 }] },
+    "2026-09-21": { chats: [{ chatId: "c1", turnCount: 3 }] },
+    "2026-09-22": { sentences: [{ sentenceId: "s3", score: 100, kind: "cloze" }] },
+  };
+  const recent = { "2027-11-30": { sentences: [{ sentenceId: "s4", score: 90 }] } };
+
+  it("folds days older than a year into the archive on load, keeping the totals", () => {
+    const state = loaded({ sessions: { ...oldDays, ...recent } });
+    expect(Object.keys(state.sessions)).toEqual(["2027-11-30"]);
+    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1 });
+    expect(selectDaysActive(state)).toBe(3);
+  });
+
+  it("doesn't count archived days again when the cloud sends them back", () => {
+    const state = loaded({ sessions: { ...oldDays, ...recent } });
+    const merged = reducer(state, { type: "MERGE_CLOUD_DATA", payload: { sessions: { ...oldDays } } });
+    expect(merged.sessions["2026-09-20"]).toBeUndefined();
+    expect(selectDaysActive(merged)).toBe(3);
+  });
+
+  it("keeps the more complete archive when merging with the cloud copy", () => {
+    const state = loaded({ sessions: { ...recent } });
+    const cloudArchive = { throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1 };
+    const merged = reducer(state, { type: "MERGE_CLOUD_DATA", payload: { sessions: {}, archive: cloudArchive } });
+    expect(merged.archive).toEqual(cloudArchive);
+  });
+
+  it("saves the archive with the rest", () => {
+    const state = loaded({ sessions: { ...oldDays } });
+    expect(snapshotForSync(state).archive).toEqual(state.archive);
   });
 });

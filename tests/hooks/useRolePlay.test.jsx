@@ -201,3 +201,21 @@ describe("speaking source and time (T4)", () => {
     expect(logEvent).not.toHaveBeenCalledWith("user_1", "speaking_time", expect.anything());
   });
 });
+
+// CRITICAL_REVIEW.md §3 / ACTION_PLAN.md D1: a conversation makes the day
+// active only with a turn of the user's own.
+describe("session record", () => {
+  it("counts the turns the user made themselves", async () => {
+    const onSessionComplete = vi.fn();
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const { result } = renderRolePlay({ sessionId: "chat_a", savedChat: null, onSessionComplete });
+    await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    for (const [text, source] of [["Coffee", "spoken"], ["Tea", "suggestion"], ["Cake", "typed"]]) {
+      aiService.sendMessage.mockResolvedValueOnce(reply("Ok"));
+      await act(async () => { await result.current.handleUserMessage(text, { source, durationMs: 1000 }); });
+      await waitFor(() => expect(result.current.phase).toBe("USER_TURN"));
+    }
+    act(() => { result.current.endConversation(); });
+    expect(onSessionComplete).toHaveBeenCalledWith(expect.objectContaining({ turnCount: 3, ownTurnCount: 2 }));
+  });
+});

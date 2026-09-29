@@ -3,6 +3,7 @@
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
 import { getTodayString, daysSince, toDateKey, parseDateKey, addDays } from "../utils/dateHelpers";
+import { isActiveDay } from "./selectors";
 
 export const STORAGE_KEY = "speakup_data";
 export const SCHEMA_VERSION = 1;
@@ -74,11 +75,38 @@ export function computeStreak(streak, today) {
   return { current, longest, lastPracticeDate: today };
 }
 
-export function pruneOldSessions(sessions) {
+// Drops days older than SESSION_RETENTION_DAYS and folds them into
+// `archive` ({ throughDate, daysActive, sentences, chats }), so totals
+// computed from the days (selectors.js) don't shrink when a day is pruned
+// (CRITICAL_REVIEW.md §3, ACTION_PLAN.md D5). A day on or before throughDate
+// is already counted: the cloud copy never deletes days (§1), so a merge
+// brings them back, and they're dropped without being counted twice.
+export function archiveOldSessions(sessions, archive) {
   const entries = Object.entries(sessions || {});
-  const kept = entries.filter(([date]) => daysSince(date) <= SESSION_RETENTION_DAYS);
-  if (kept.length === entries.length) return sessions;
-  return Object.fromEntries(kept);
+  const isOld = ([date]) => daysSince(date) > SESSION_RETENTION_DAYS;
+  if (!entries.some(isOld)) return { sessions: sessions || {}, archive: archive ?? null };
+
+  const next = {
+    throughDate: archive?.throughDate ?? null,
+    daysActive: archive?.daysActive || 0,
+    sentences: archive?.sentences || 0,
+    chats: archive?.chats || 0,
+  };
+  for (const [date, day] of entries.filter(isOld)) {
+    if (archive?.throughDate && date <= archive.throughDate) continue;
+    if (isActiveDay(day)) next.daysActive++;
+    next.sentences += (day?.sentences || []).length;
+    next.chats += (day?.chats || []).length;
+    if (!next.throughDate || date > next.throughDate) next.throughDate = date;
+  }
+  return { sessions: Object.fromEntries(entries.filter((e) => !isOld(e))), archive: next };
+}
+
+// Of a local and a cloud archive, the one folded further forward.
+function moreCompleteArchive(local, cloud) {
+  if (!local) return cloud ?? null;
+  if (!cloud) return local;
+  return (cloud.throughDate || "") > (local.throughDate || "") ? cloud : local;
 }
 
 // One-time backfill for users whose saved data predates lifetimeStats — derives
@@ -89,7 +117,6 @@ export function computeLifetimeStats(sessions, rolePlayChats) {
   return {
     totalSentences: allSentences.length,
     sentencesAbove90: allSentences.filter((s) => s.score >= 90).length,
-    daysActive: Object.keys(sessions || {}).length,
     totalChats: (rolePlayChats || []).filter((c) => c.status === "completed").length,
   };
 }
@@ -97,7 +124,6 @@ export function computeLifetimeStats(sessions, rolePlayChats) {
 export const defaultLifetimeStats = {
   totalSentences: 0,
   sentencesAbove90: 0,
-  daysActive: 0,
   totalChats: 0,
 };
 
@@ -125,6 +151,8 @@ export const initialState = {
   // null until the user does one or the other. The recordings themselves
   // stay on the device (services/baselineRecordings.js).
   baseline: null,
+  // Totals of days pruned after a year (archiveOldSessions), or null.
+  archive: null,
   // Firebase uid of the account this device's saved data belongs to. See
   // localDataOwnership() below.
   ownerUid: null,
@@ -156,13 +184,13 @@ export function reducer(state, action) {
       return { ...state, settings: { ...state.settings, ...action.payload } };
     case "SAVE_SESSION_RESULT": {
       const today = getTodayString();
-      const isNewDay = !state.sessions[today];
-      const existing = state.sessions[today]?.sentences || [];
-      const updated = [...existing, action.payload];
+      // Keeps the rest of the day, its chats included (CRITICAL_REVIEW.md §3).
+      const day = state.sessions[today] || {};
+      const updated = [...(day.sentences || []), action.payload];
       const avg = Math.round(updated.reduce((s, x) => s + x.score, 0) / updated.length);
       const newSessions = {
         ...state.sessions,
-        [today]: { sentences: updated, averageScore: avg, completedAt: new Date().toISOString() },
+        [today]: { ...day, sentences: updated, averageScore: avg, completedAt: new Date().toISOString() },
       };
       return {
         ...state,
@@ -173,7 +201,6 @@ export function reducer(state, action) {
           ...state.lifetimeStats,
           totalSentences: state.lifetimeStats.totalSentences + 1,
           sentencesAbove90: state.lifetimeStats.sentencesAbove90 + (action.payload.score >= 90 ? 1 : 0),
-          daysActive: state.lifetimeStats.daysActive + (isNewDay ? 1 : 0),
         },
       };
     }
@@ -227,9 +254,15 @@ export function reducer(state, action) {
       return { ...state, todayProgress: [] };
     case "LOAD_DATA": {
       const user = ensureUser(action.payload.user);
+      const { sessions, archive } = archiveOldSessions(
+        action.payload.sessions ?? state.sessions,
+        action.payload.archive ?? state.archive,
+      );
       return {
         ...state,
         ...action.payload,
+        sessions,
+        archive,
         user,
         settings: { ...defaultSettings, ...action.payload.settings },
         rolePlay: action.payload.rolePlay || { chats: [], customTopics: [] },
@@ -386,11 +419,16 @@ export function reducer(state, action) {
     case "MERGE_CLOUD_DATA": {
       const cloud = action.payload;
       if (!cloud) return state;
+      const { sessions, archive } = archiveOldSessions(
+        { ...(cloud.sessions || {}), ...state.sessions },
+        moreCompleteArchive(state.archive, cloud.archive),
+      );
       return {
         ...state,
         settings: cloud.settings || state.settings,
         streak: cloud.streak || state.streak,
-        sessions: { ...(cloud.sessions || {}), ...state.sessions },
+        sessions,
+        archive,
         rolePlay: cloud.rolePlay || state.rolePlay,
         practice: cloud.practice || state.practice,
         lifetimeStats: cloud.lifetimeStats || state.lifetimeStats,
@@ -412,7 +450,8 @@ export function snapshotForSync(state) {
     user: state.user,
     settings: state.settings,
     streak: state.streak,
-    sessions: pruneOldSessions(state.sessions),
+    sessions: state.sessions,
+    archive: state.archive ?? null,
     rolePlay: state.rolePlay,
     practice: state.practice,
     lifetimeStats: state.lifetimeStats,
