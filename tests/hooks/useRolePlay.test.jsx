@@ -249,3 +249,49 @@ describe("short conversations", () => {
     expect(onSessionComplete).toHaveBeenCalledWith(expect.objectContaining({ turnCount: 3, status: "completed" }));
   });
 });
+
+// CRITICAL_REVIEW.md §30: the 10th turn used to end the conversation at
+// once, leaving the user's last message unanswered.
+describe("the last turn", () => {
+  async function talkTo(turns, onSessionComplete) {
+    aiService.sendMessage.mockResolvedValueOnce(reply("Hi"));
+    const hook = renderRolePlay({ sessionId: "chat_a", savedChat: null, onSessionComplete });
+    await waitFor(() => expect(hook.result.current.phase).toBe("USER_TURN"));
+    for (let i = 1; i < turns; i++) {
+      aiService.sendMessage.mockResolvedValueOnce(reply(`Answer ${i}`));
+      await act(async () => { await hook.result.current.handleUserMessage(`Turn ${i}`, { source: "typed" }); });
+      await waitFor(() => expect(hook.result.current.phase).toBe("USER_TURN"));
+    }
+    return hook;
+  }
+
+  it("gets a closing reply from the character before the conversation ends", async () => {
+    const onSessionComplete = vi.fn();
+    const { result } = await talkTo(10, onSessionComplete);
+    aiService.sendMessage.mockResolvedValueOnce({ ...reply("Enjoy your coffee, see you!"), hint_he: "x", starter: "y" });
+    await act(async () => { await result.current.handleUserMessage("Thanks, bye!", { source: "typed" }); });
+
+    await waitFor(() => expect(result.current.phase).toBe("DONE"));
+    const last = aiService.sendMessage.mock.calls.at(-1)[0];
+    expect(last.systemPrompt).toMatch(/last turn.*wrap up/is);
+    expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", content: "Enjoy your coffee, see you!" });
+    expect(result.current.turnHelp).toBeNull();
+    expect(onSessionComplete).toHaveBeenCalledWith(expect.objectContaining({ turnCount: 10 }));
+    expect(persisted.at(-1)).toMatchObject({ status: "completed", turnCount: 10 });
+  });
+
+  it("offers a retry when the closing reply fails, and ends after it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const onSessionComplete = vi.fn();
+    const { result } = await talkTo(10, onSessionComplete);
+    aiService.sendMessage.mockRejectedValueOnce(new Error("down"));
+    await act(async () => { await result.current.handleUserMessage("Thanks, bye!", { source: "typed" }); });
+    expect(result.current.phase).toBe("REPLY_FAILED");
+    expect(onSessionComplete).not.toHaveBeenCalled();
+
+    aiService.sendMessage.mockResolvedValueOnce(reply("Bye!"));
+    await act(async () => { await result.current.retryReply(); });
+    await waitFor(() => expect(result.current.phase).toBe("DONE"));
+    expect(onSessionComplete).toHaveBeenCalledTimes(1);
+  });
+});

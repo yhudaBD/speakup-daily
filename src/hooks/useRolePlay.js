@@ -7,6 +7,11 @@ import { reportSpeakingTime } from '../utils/speakingTime';
 import { helpFrom } from '../utils/hintLadder';
 
 const MAX_TURNS = 10;
+// Added to the character's prompt for the answer to the last turn, which
+// used to go unanswered (CRITICAL_REVIEW.md §30).
+const WRAP_UP = `
+
+This is the last turn of the conversation. Answer what the user just said, then wrap up the conversation naturally in character. Do not ask a question.`;
 
 export function useRolePlay({
   topic,
@@ -127,9 +132,9 @@ export function useRolePlay({
     msgs.map(({ role, content }) => ({ role, content })),
   []);
 
-  const fetchAiReply = useCallback(async (currentMessages, signal) => {
+  const fetchAiReply = useCallback(async (currentMessages, signal, { final = false } = {}) => {
     const response = await aiService.sendMessage({
-      systemPrompt: topic.systemPrompt,
+      systemPrompt: final ? topic.systemPrompt + WRAP_UP : topic.systemPrompt,
       messages: toApiMessages(currentMessages),
       chatDifficulty,
       placement,
@@ -137,7 +142,7 @@ export function useRolePlay({
     });
     if (signal.aborted) return null;
     addMessage('assistant', response.ai_reply, response.ai_reply_he);
-    setTurnHelp(helpFrom(response));
+    setTurnHelp(final ? null : helpFrom(response));
     return response;
   }, [topic, toApiMessages, chatDifficulty, placement, addMessage]);
 
@@ -147,12 +152,14 @@ export function useRolePlay({
   // REPLY_FAILED and nothing is added: the UI offers retryReply(). It used
   // to insert a canned "Got it. How can I help you further?" as if the
   // character had said it.
+  // The answer to the last turn (MAX_TURNS) closes the conversation.
   const requestReply = useCallback(async (currentMessages, turn) => {
+    const final = turn >= MAX_TURNS;
     setPhaseSafe('AI_THINKING');
     const signal = beginRequest();
 
     try {
-      await fetchAiReply(currentMessages, signal);
+      await fetchAiReply(currentMessages, signal, { final });
     } catch (err) {
       if (isAbortError(err) || signal.aborted) return;
       console.error('AI reply failed:', err);
@@ -161,9 +168,15 @@ export function useRolePlay({
     }
     if (signal.aborted) return;
 
+    if (final) {
+      setPhaseSafe('DONE');
+      syncToStorage({ turnCount: turn, status: 'completed' });
+      completeSession(turn);
+      return;
+    }
     setPhaseSafe('USER_TURN');
     syncToStorage({ turnCount: turn, status: 'active' });
-  }, [beginRequest, fetchAiReply, setPhaseSafe, syncToStorage]);
+  }, [beginRequest, fetchAiReply, setPhaseSafe, syncToStorage, completeSession]);
 
   // The character's first line. Same failure handling as requestReply.
   const requestOpening = useCallback(async () => {
@@ -233,12 +246,15 @@ export function useRolePlay({
     setTurnHelp(null);
     sessionSavedRef.current = chat.status === 'completed';
 
-    if (chat.status === 'completed' || turns >= MAX_TURNS) {
+    if (chat.status === 'completed') {
       setPhaseSafe('DONE');
     } else if (chat.messages[chat.messages.length - 1].role === 'user') {
       // Left (or the tab closed) while the AI was still answering. Ask again
       // rather than leaving the user facing their own unanswered message.
+      // On the last turn, that answer closes the conversation.
       requestReply(chat.messages, turns);
+    } else if (turns >= MAX_TURNS) {
+      setPhaseSafe('DONE');
     } else {
       setPhaseSafe('USER_TURN');
     }
@@ -303,15 +319,8 @@ export function useRolePlay({
     turnCountRef.current = newTurn;
     setTurnCount(newTurn);
 
-    if (newTurn >= MAX_TURNS) {
-      setPhaseSafe('DONE');
-      syncToStorage({ turnCount: newTurn, status: 'completed' });
-      completeSession(newTurn);
-      return;
-    }
-
     await requestReply(currentMessages, newTurn);
-  }, [topic, addMessage, requestReply, setPhaseSafe, syncToStorage, completeSession]);
+  }, [topic, addMessage, requestReply]);
 
   const endConversation = useCallback(() => {
     window.speechSynthesis.cancel();
