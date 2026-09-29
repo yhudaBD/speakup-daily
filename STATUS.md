@@ -8,7 +8,7 @@
 
 ## הבא בתור
 
-שלב 7: `MIGRATION_PLAN.md` אושר (2026-09-29). הבא: 7ז, הדלקת המבנה החדש לחשבון שלך לשבוע (`VITE_CLOUD_V3_EMAILS` ב-Netlify).
+שלב 7: `MIGRATION_PLAN.md` אושר (2026-09-29). הבא: 7ז, הדלקת המבנה החדש לחשבון שלך לשבוע (`VITE_CLOUD_V3_EMAIL_HASHES` ב-Netlify).
 
 ## ממתין למשתמש
 
