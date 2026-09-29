@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffV3 } from "../../src/cloud/diffV3";
+import { diffV3, nestFields } from "../../src/cloud/diffV3";
 import { mapKey } from "../../src/cloud/schemaV3";
 
 // MIGRATION_PLAN.md §5: only what changed is written, each change at its
@@ -114,5 +114,22 @@ describe("diffV3", () => {
     prev.months["2026-09"].updatedAt = "2026-09-28T00:00:00.000Z";
     prev.profile.updatedAt = "2026-09-28T00:00:00.000Z";
     expect(diff(prev, base())).toEqual([]);
+  });
+});
+
+// v3Store.js writes each operation as one set() with mergeFields: it works
+// on a document that doesn't exist yet, and touches only the listed fields.
+describe("nestFields", () => {
+  it("builds the nested data and the exact field paths to merge", () => {
+    const { data, paths } = nestFields({
+      doc: "months/2026-09",
+      fields: [[["days", "2026-09-29", "attempts", "a2"], { score: 80 }], [["updatedAt"], NOW]],
+      deleteFields: [["days", "2026-09-01"]],
+    }, { deleteValue: "DELETE" });
+    expect(data).toEqual({
+      days: { "2026-09-29": { attempts: { a2: { score: 80 } } }, "2026-09-01": "DELETE" },
+      updatedAt: NOW,
+    });
+    expect(paths).toEqual([["days", "2026-09-29", "attempts", "a2"], ["updatedAt"], ["days", "2026-09-01"]]);
   });
 });

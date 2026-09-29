@@ -119,3 +119,20 @@ export function diffV3(prev = {}, next = {}, { now = new Date().toISOString() } 
 
   return ops.filter(Boolean);
 }
+
+// A field operation → the nested data and the field paths for one
+// set(ref, data, { mergeFields }). `deleteValue` is Firestore's
+// deleteField(), passed in so this stays pure.
+export function nestFields(op, { deleteValue }) {
+  const data = {};
+  const paths = [];
+  const put = (path, value) => {
+    let node = data;
+    path.slice(0, -1).forEach((segment) => { node = node[segment] ||= {}; });
+    node[path.at(-1)] = value;
+    paths.push(path);
+  };
+  for (const [path, value] of op.fields || []) put(path, value);
+  for (const path of op.deleteFields || []) put(path, deleteValue);
+  return { data, paths };
+}
