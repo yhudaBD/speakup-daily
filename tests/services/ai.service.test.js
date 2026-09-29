@@ -271,3 +271,24 @@ describe("sendMessage hints", () => {
     expect(out).toMatchObject({ hint_he: "", starter: "", suggested_user_responses: [] });
   });
 });
+
+// CRITICAL_REVIEW.md §17: the conversation partner speaks natural English,
+// contractions included. Easy mode asks for simple words instead.
+describe("conversation prompt style", () => {
+  const sentPrompt = async (chatDifficulty) => {
+    fetchMock
+      .mockResolvedValueOnce(groqReply({ ai_reply: "Hi!", suggested_user_responses: [] }))
+      .mockResolvedValueOnce(groqReply({ translations: ["היי!"] }));
+    await aiService.sendMessage({ systemPrompt: "You are a barista.", messages: [{ role: "user", content: "Hi" }], chatDifficulty });
+    return JSON.parse(fetchMock.mock.calls.at(-2)[1].body).messages[0].content;
+  };
+
+  it.each(["easy", "medium", "hard"])("doesn't forbid contractions (%s)", async (difficulty) => {
+    const prompt = await sentPrompt(difficulty);
+    expect(prompt).not.toMatch(/contraction|full forms|full words/i);
+  });
+
+  it("asks for simple words in easy mode", async () => {
+    expect(await sentPrompt("easy")).toMatch(/prefer simple words/i);
+  });
+});
