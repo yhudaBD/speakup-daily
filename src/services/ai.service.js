@@ -381,7 +381,7 @@ export const aiService = {
   },
 
   // No fallback: a made-up score here used to be saved as the real result
-  // and fed ADJUST_LEVEL / MERGE_PLACEMENT_GAPS. On failure this throws, and
+  // and fed ADJUST_LEVEL and the placement gaps. On failure this throws, and
   // RolePlay's DoneScreen shows an error with a retry.
   async analyzeConversation({ messages, topicTitle, signal }) {
     if (!messages.some((m) => m.role === "user")) {
