@@ -14,6 +14,7 @@ import {
 import { getWeakSentenceStats, sentencesFromWeakList } from "../utils/practiceHistory";
 import { aiService } from "../services/ai.service";
 import { reportSpeakingTime } from "../utils/speakingTime";
+import { addAttempt, attemptFields } from "../utils/practiceAttempts";
 
 function WaveAnimation() {
   return (
@@ -498,6 +499,8 @@ export default function Practice() {
   const [sentences, setSentences] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [result, setResult] = useState(null);
+  // Every attempt at the current sentence, "try again" included (§9).
+  const [attemptTally, setAttemptTally] = useState(null);
   const [sessionResults, setSessionResults] = useState([]);
   const [showTranslation, setShowTranslation] = useState(settings.showTranslation);
   const [sessionSummary, setSessionSummary] = useState(null);
@@ -553,6 +556,7 @@ export default function Practice() {
     setSentences(loaded);
     setCurrentIdx(0);
     setResult(null);
+    setAttemptTally(null);
     setSessionResults([]);
     setSessionSummary(null);
     setSummaryError(false);
@@ -580,6 +584,7 @@ export default function Practice() {
     setAiTopicLabel(topic);
     setCurrentIdx(0);
     setResult(null);
+    setAttemptTally(null);
     setSessionResults([]);
     setSessionSummary(null);
     setSummaryError(false);
@@ -602,6 +607,7 @@ export default function Practice() {
       setTimeout(() => {
         const res = scorePronunciation(currentSentence.text, transcript);
         setResult({ ...res, spoken: transcript, durationMs });
+        setAttemptTally((tally) => addAttempt(tally, { score: res.score, durationMs }));
         setPracticeState("RESULT");
       }, 500);
     }
@@ -672,9 +678,8 @@ export default function Practice() {
       translation: currentSentence.translation,
       category: currentSentence.category || selectedCategory,
       score: result.score,
-      attempts: 1,
+      ...attemptFields(attemptTally || addAttempt(null, result)),
       wordResults: result.wordResults,
-      ...(result.durationMs > 0 ? { durationMs: Math.round(result.durationMs) } : {}),
     };
     dispatch({ type: "SAVE_SESSION_RESULT", payload: entry });
     const newResults = [...sessionResults, entry];
@@ -687,9 +692,10 @@ export default function Practice() {
     } else {
       setCurrentIdx((i) => i + 1);
       setResult(null);
+      setAttemptTally(null);
       setPracticeState("IDLE");
     }
-  }, [result, currentSentence, currentIdx, sentences.length, sessionResults, dispatch, fetchSummary, selectedCategory, categoryLabel, state.user?.id]);
+  }, [result, attemptTally, currentSentence, currentIdx, sentences.length, sessionResults, dispatch, fetchSummary, selectedCategory, categoryLabel, state.user?.id]);
 
   const handleTryAgain = () => {
     setResult(null);
