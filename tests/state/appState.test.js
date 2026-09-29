@@ -337,3 +337,30 @@ describe("MERGE_CLOUD_DATA unites local and cloud (§2א)", () => {
     expect(merged.lifetimeStats).toMatchObject({ totalSentences: 12, sentencesAbove90: 3, totalChats: 4 });
   });
 });
+
+// CRITICAL_REVIEW.md §19: the stored streak follows the active days (D1),
+// so a sentence-completion answer alone doesn't start or keep one.
+describe("streak on save (§19)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 28, 12, 0));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("starts with a spoken sentence and not with a sentence-completion answer", () => {
+    const cloze = reducer(loaded(), { type: "SAVE_SESSION_RESULT", payload: { sentenceId: "c", score: 100, kind: "cloze" } });
+    expect(cloze.streak.current).toBe(0);
+
+    const spoken = reducer(cloze, { type: "SAVE_SESSION_RESULT", payload: { sentenceId: "s", score: 80, kind: "speak" } });
+    expect(spoken.streak).toEqual({ current: 1, longest: 1, lastPracticeDate: "2026-09-28" });
+  });
+
+  it("continues yesterday's run and keeps the longest", () => {
+    const state = loaded({
+      sessions: { "2026-09-27": { sentences: [{ sentenceId: "s", score: 80, kind: "speak" }] } },
+      streak: { current: 1, longest: 6, lastPracticeDate: "2026-09-27" },
+    });
+    const next = reducer(state, { type: "SAVE_ROLEPLAY_SESSION", payload: { chatId: "c", turnCount: 3, ownTurnCount: 3 } });
+    expect(next.streak).toEqual({ current: 2, longest: 6, lastPracticeDate: "2026-09-28" });
+  });
+});

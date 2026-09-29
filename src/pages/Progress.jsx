@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
-import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
+import { useToday } from "../hooks/useToday";
+import { getTodayString, getLastNDays, formatDate, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
 import {
-  isSpoken, selectClozeStats, selectDaysActive, selectSentencesAbove90, selectSpeakAverage, speakAverage,
+  isSpoken, selectClozeStats, selectDaysActive, selectSentencesAbove90, selectSpeakAverage, selectStreak, speakAverage,
 } from "../context/selectors";
 import { createCustomTopic } from "../data/rolePlayTopics";
 import LearningPath from "../components/progress/LearningPath";
@@ -14,7 +15,7 @@ const LEVEL_TO_DIFFICULTY = {
 };
 
 const ACHIEVEMENTS = [
-  { id: "on-fire", icon: "🔥", title: "On Fire", desc: "7 days in a row", check: (state) => state.streak.current >= 7 },
+  { id: "on-fire", icon: "🔥", title: "On Fire", desc: "7 days in a row", check: (state) => selectStreak(state, getTodayString()) >= 7 },
   { id: "perfect-day", icon: "⭐", title: "Perfect Day", desc: "100% on all sentences", check: (state) => {
     const today = getTodayString();
     const s = state.sessions[today];
@@ -117,7 +118,8 @@ export default function Progress() {
   const weakSentences = getWeakSentenceStats(sessions);
   const { level, xpIntoLevel, xpPerLevel } = computeLevel(state);
 
-  const days = getLastNDays(7);
+  const today = useToday();
+  const days = getLastNDays(7, parseDateKey(today));
 
   return (
     <div className="page-enter" style={{ padding: "20px 0 8px" }}>
@@ -147,7 +149,7 @@ export default function Progress() {
             <div style={{ display: "grid", gap: 12 }}>
               {days.map(day => {
                 const session = sessions[day];
-                const isToday = day === getTodayString();
+                const isToday = day === today;
                 const dayAverage = speakAverage(session?.sentences);
                 return (
                   <div key={day} className="card" style={{
@@ -236,7 +238,7 @@ export default function Progress() {
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-error)" }}>
-                  🔥 {streak.current}
+                  🔥 {selectStreak(state, today)}
                 </div>
                 <div className="text-muted">Current Streak</div>
               </div>

@@ -4,7 +4,6 @@ import {
   STORAGE_KEY, SCHEMA_VERSION, ensureUser, computeLifetimeStats, defaultLifetimeStats,
   initialState, reducer, snapshotForSync, localDataOwnership, freshStateFor,
 } from "./appState";
-import { getTodayString } from "../utils/dateHelpers";
 import {
   auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle, deleteCloudProfile, deleteAuthAccountOrSignOut,
 } from "../services/firebase";
@@ -62,7 +61,6 @@ export function AppProvider({ children }) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const today = getTodayString();
         // Saved before lifetimeStats existed (schema 1). Later versions have
         // their own migrations (migrations.js), run by LOAD_DATA.
         const isPreVersioned = !parsed.schemaVersion;
@@ -71,13 +69,11 @@ export function AppProvider({ children }) {
         const lifetimeStats = isPreVersioned
           ? computeLifetimeStats(parsed.sessions, parsed.rolePlay?.chats)
           : parsed.lifetimeStats || defaultLifetimeStats;
-        const todayProgress = parsed.sessions?.[today]?.sentences || [];
         dispatch({
           type: "LOAD_DATA",
           payload: {
             ...parsed,
             sessions: parsed.sessions || {},
-            todayProgress,
             lifetimeStats,
             user: parsed.user || ensureUser(null),
             rolePlay: parsed.rolePlay || { chats: [], customTopics: [] },
