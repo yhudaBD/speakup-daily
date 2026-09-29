@@ -109,10 +109,10 @@ describe("diffV3", () => {
     expect(diff(withAugust, base())).toEqual([{ doc: "months/2025-08", delete: true }]);
   });
 
-  it("doesn't write the times it adds itself as a change", () => {
+  it("doesn't write or delete the fields the sync keeps itself", () => {
     const prev = base();
     prev.months["2026-09"].updatedAt = "2026-09-28T00:00:00.000Z";
-    prev.profile.updatedAt = "2026-09-28T00:00:00.000Z";
+    Object.assign(prev.profile, { updatedAt: "2026-09-28T00:00:00.000Z", migratedAt: "2026-09-28", legacyFingerprint: "abc" });
     expect(diff(prev, base())).toEqual([]);
   });
 });

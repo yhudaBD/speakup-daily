@@ -52,3 +52,24 @@ export async function loadV3(uid, { since } = {}) {
   ]);
   return { profile: profile.data(), months: byId(monthDocs), chats: byId(chatDocs) };
 }
+
+// Every document of the account, schema 3 and the old one (MIGRATION_PLAN.md
+// §7). Firestore doesn't delete subcollections with their parent document,
+// so each is listed and deleted.
+export const SUBCOLLECTIONS = ["months", "chats", "srs", "profile"];
+
+export async function deleteAllCloudData(uid) {
+  if (!db) return 0; // Firebase isn't configured: nothing in the cloud
+  const refs = [];
+  for (const name of SUBCOLLECTIONS) {
+    const snapshot = await getDocs(collection(db, "users", uid, name));
+    refs.push(...snapshot.docs.map((d) => d.ref));
+  }
+  refs.push(doc(db, "users", uid));
+  for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+    const batch = writeBatch(db);
+    refs.slice(i, i + BATCH_SIZE).forEach((r) => batch.delete(r));
+    await batch.commit();
+  }
+  return refs.length;
+}

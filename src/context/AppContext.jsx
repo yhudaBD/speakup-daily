@@ -5,8 +5,12 @@ import {
   initialState, reducer, snapshotForSync, localDataOwnership, freshStateFor,
 } from "./appState";
 import {
-  auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle, deleteCloudProfile, deleteAuthAccountOrSignOut,
+  auth, loadCloudProfile, saveCloudProfile, signOutOfGoogle, deleteAuthAccountOrSignOut,
 } from "../services/firebase";
+import { getSentenceBank } from "../cloud/bank";
+import { cloudSchemaFor } from "../cloud/flags";
+import { openV3 } from "../cloud/openV3";
+import { deleteAllCloudData } from "../cloud/v3Store";
 import { cloudSync, docSizeBytes, sizeRange } from "../services/cloudSync";
 import { clearLocalAccountData } from "../services/localAccountData";
 import { deleteMyEvents, logEvent } from "../utils/analytics";
@@ -31,6 +35,10 @@ export function AppProvider({ children }) {
   // The cloud document size range last reported this session, so a large
   // document is reported once per range, not on every save.
   const reportedSizeRangeRef = useRef(null);
+  // The schema 3 sync (cloud/v3Sync.js) when this account uses the new cloud
+  // structure (cloud/flags.js), or null for the single document (schema 2).
+  const v3SyncRef = useRef(null);
+  useEffect(() => () => v3SyncRef.current?.dispose(), []);
 
   // Track the signed-in Firebase account, if any. AuthGate reads authReady
   // (below) from context instead of subscribing to this itself, so there is
@@ -124,13 +132,23 @@ export function AppProvider({ children }) {
       dispatch({ type: "CLAIM_LOCAL_DATA", payload: { uid } });
     }
 
+    v3SyncRef.current?.dispose();
+    v3SyncRef.current = null;
+
     (async () => {
       try {
-        const cloud = await loadCloudProfile(uid);
-        if (cloud) {
-          dispatch({ type: "MERGE_CLOUD_DATA", payload: cloud });
+        if (cloudSchemaFor(firebaseUser.email) === "v3") {
+          // MIGRATION_PLAN.md §8: moves the account on its first open.
+          v3SyncRef.current = await openV3({
+            uid, local, dispatch, bank: getSentenceBank(), track: (p) => cloudSync.track(p),
+          });
         } else {
-          await saveCloudProfile(uid, snapshotForSync(local));
+          const cloud = await loadCloudProfile(uid);
+          if (cloud) {
+            dispatch({ type: "MERGE_CLOUD_DATA", payload: cloud });
+          } else {
+            await saveCloudProfile(uid, snapshotForSync(local));
+          }
         }
         // Set before the MERGE_CLOUD_DATA re-render commits, so that render's
         // persist effect writes the merged result back to the cloud.
@@ -160,7 +178,10 @@ export function AppProvider({ children }) {
       console.error("Failed to save data", e);
     }
     const uid = firebaseUser?.uid;
-    if (uid && cloudReadyUidRef.current === uid) {
+    if (uid && cloudReadyUidRef.current === uid && v3SyncRef.current) {
+      // Schema 3: only what changed, 2 seconds later (cloud/v3Sync.js).
+      v3SyncRef.current.schedule(state);
+    } else if (uid && cloudReadyUidRef.current === uid) {
       // Firestore refuses documents over 1MB (CRITICAL_REVIEW.md §1).
       // Report, as a range only, when this one is getting close.
       const range = sizeRange(docSizeBytes(serialized));
@@ -183,7 +204,12 @@ export function AppProvider({ children }) {
     let savedToCloud = false;
     if (uid && cloudReadyUidRef.current === uid) {
       try {
-        await saveCloudProfile(uid, snapshotForSync(state));
+        if (v3SyncRef.current) {
+          v3SyncRef.current.schedule(state);
+          await v3SyncRef.current.flush();
+        } else {
+          await saveCloudProfile(uid, snapshotForSync(state));
+        }
         savedToCloud = true;
       } catch (e) {
         console.error("Final cloud save before sign-out failed; keeping local data", e);
@@ -224,8 +250,11 @@ export function AppProvider({ children }) {
     await deleteMyEvents();
     persistBlockedRef.current = true;
     cloudReadyUidRef.current = null;
+    v3SyncRef.current?.dispose();
+    v3SyncRef.current = null;
     try {
-      await deleteCloudProfile(uid);
+      // Both structures, the old document included (MIGRATION_PLAN.md §7).
+      await deleteAllCloudData(uid);
     } catch (e) {
       persistBlockedRef.current = false;
       cloudReadyUidRef.current = uid;

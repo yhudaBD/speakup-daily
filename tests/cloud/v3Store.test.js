@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // A stand-in for the Firestore SDK that records what a batch would do.
 const batches = [];
+let stored = {};
 vi.mock("../../src/services/firebase", () => ({ db: { name: "db" } }));
 vi.mock("firebase/firestore", () => ({
   FieldPath: class { constructor(...segments) { this.segments = segments; } },
   deleteField: () => "DELETE",
   doc: (_db, ...path) => path.join("/"),
+  collection: (_db, ...path) => path.join("/"),
+  getDocs: async (path) => ({ docs: (stored[path] || []).map((id) => ({ ref: `${path}/${id}` })) }),
   writeBatch: () => {
     const calls = [];
     batches.push(calls);
@@ -18,9 +21,9 @@ vi.mock("firebase/firestore", () => ({
   },
 }));
 
-const { BATCH_SIZE, writeOps } = await import("../../src/cloud/v3Store");
+const { BATCH_SIZE, deleteAllCloudData, writeOps } = await import("../../src/cloud/v3Store");
 
-beforeEach(() => { batches.length = 0; });
+beforeEach(() => { batches.length = 0; stored = {}; });
 
 // MIGRATION_PLAN.md §5.
 describe("writeOps", () => {
@@ -45,5 +48,22 @@ describe("writeOps", () => {
     const ops = Array.from({ length: BATCH_SIZE + 5 }, (_, i) => ({ doc: `chats/c${i}`, set: { id: `c${i}` } }));
     await writeOps("uid-a", ops);
     expect(batches.map((b) => b.length)).toEqual([BATCH_SIZE, 5]);
+  });
+});
+
+// MIGRATION_PLAN.md §7: Firestore doesn't delete subcollections with their
+// parent, so "delete account" lists and deletes every document.
+describe("deleteAllCloudData", () => {
+  it("deletes every month, chat, FSRS and profile document, and the old document", async () => {
+    stored = {
+      "users/uid-a/months": ["2026-08", "2026-09"],
+      "users/uid-a/chats": ["c1"],
+      "users/uid-a/profile": ["main"],
+    };
+    expect(await deleteAllCloudData("uid-a")).toBe(5);
+    expect(batches.flat().map((c) => c.ref).sort()).toEqual([
+      "users/uid-a", "users/uid-a/chats/c1", "users/uid-a/months/2026-08", "users/uid-a/months/2026-09", "users/uid-a/profile/main",
+    ]);
+    expect(batches.flat().every((c) => c.op === "delete")).toBe(true);
   });
 });

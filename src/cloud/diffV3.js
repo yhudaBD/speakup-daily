@@ -15,6 +15,9 @@
 // entry removed here becomes a tombstone (deletedAt) rather than vanishing,
 // so the other device doesn't bring it back (MIGRATION_PLAN.md §6).
 const MAP_FIELDS = new Set(["wordBank", "practiceTopics", "chatTopics"]);
+// Profile fields the sync keeps itself, not part of the state: never
+// written as a change or deleted for being missing from it.
+const META_FIELDS = new Set(["updatedAt", "migratedAt", "legacyFingerprint"]);
 
 // Equal as data, whatever the key order.
 function same(a, b) {
@@ -35,7 +38,7 @@ function diffProfile(prev = {}, next = {}, now) {
   const fields = [];
   const deleteFields = [];
   for (const key of unionKeys(prev, next)) {
-    if (key === "updatedAt") continue;
+    if (META_FIELDS.has(key)) continue;
     if (MAP_FIELDS.has(key)) {
       const before = prev[key] || {};
       const after = next[key] || {};
