@@ -91,3 +91,26 @@ describe("selectDaysActive", () => {
     expect(selectors.selectDaysActive({ sessions: {} })).toBe(0);
   });
 });
+
+// §2א (and §19 later): the streak is computed from the active days.
+describe("streakRun / selectStreak", () => {
+  const spoke = { sentences: [{ sentenceId: "s", score: 80 }] };
+  const sessions = {
+    "2026-09-20": spoke,
+    "2026-09-22": spoke,
+    "2026-09-23": { chats: [{ chatId: "c", turnCount: 2 }] },
+    "2026-09-24": spoke,
+    "2026-09-25": { sentences: [{ sentenceId: "s", score: 100, kind: "cloze" }] },
+  };
+
+  it("counts the run of active days ending at the last one", () => {
+    expect(selectors.streakRun(sessions)).toEqual({ current: 3, lastPracticeDate: "2026-09-24" });
+    expect(selectors.streakRun({})).toEqual({ current: 0, lastPracticeDate: null });
+  });
+
+  it("shows the run only while it's still alive (last active day today or yesterday)", () => {
+    expect(selectors.selectStreak({ sessions }, "2026-09-25")).toBe(3);
+    expect(selectors.selectStreak({ sessions }, "2026-09-24")).toBe(3);
+    expect(selectors.selectStreak({ sessions }, "2026-09-26")).toBe(0);
+  });
+});

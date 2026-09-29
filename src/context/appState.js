@@ -3,7 +3,7 @@
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
 import { getTodayString, daysSince, toDateKey, parseDateKey, addDays } from "../utils/dateHelpers";
-import { isActiveDay } from "./selectors";
+import { isActiveDay, streakRun } from "./selectors";
 
 export const STORAGE_KEY = "speakup_data";
 export const SCHEMA_VERSION = 1;
@@ -101,6 +101,35 @@ export function archiveOldSessions(sessions, archive) {
     if (!next.throughDate || date > next.throughDate) next.throughDate = date;
   }
   return { sessions: Object.fromEntries(entries.filter((e) => !isOld(e))), archive: next };
+}
+
+const wordKey = (w) => w.word.toLowerCase();
+
+// Keeps the bank at WORD_BANK_LIMIT by dropping the words saved longest ago
+// (by learnedAt), never those in `keep`, and leaves the order as it was.
+function capWordBank(words, keep = new Set()) {
+  const overflow = words.length - WORD_BANK_LIMIT;
+  if (overflow <= 0) return words;
+  const evicted = new Set(
+    words
+      .filter((w) => !keep.has(wordKey(w)))
+      .sort((a, b) => (a.learnedAt || "").localeCompare(b.learnedAt || ""))
+      .slice(0, overflow)
+      .map(wordKey),
+  );
+  return words.filter((w) => !evicted.has(wordKey(w))).slice(-WORD_BANK_LIMIT);
+}
+
+// Union of two lists by key. On a conflict the item whose `stamp` is later
+// wins, local on a tie. Local items keep their order, cloud-only ones follow.
+function unionBy(local, cloud, key, stamp = () => "") {
+  const byKey = new Map((local || []).map((item) => [key(item), item]));
+  for (const item of cloud || []) {
+    const k = key(item);
+    const mine = byKey.get(k);
+    if (!mine || stamp(item) > stamp(mine)) byKey.set(k, item);
+  }
+  return [...byKey.values()];
 }
 
 // Of a local and a cloud archive, the one folded further forward.
@@ -379,20 +408,9 @@ export function reducer(state, action) {
       }
       // A full bank keeps the new words and drops the ones saved longest
       // ago. It used to cut the list at 100, which dropped the new words
-      // themselves (CRITICAL_REVIEW.md §11). The order is left as it was.
-      let wordBank = [...byKey.values()];
-      const overflow = wordBank.length - WORD_BANK_LIMIT;
-      if (overflow > 0) {
-        const incomingKeys = new Set(incoming.filter((w) => w.word).map((w) => w.word.toLowerCase()));
-        const evicted = new Set(
-          wordBank
-            .filter((w) => !incomingKeys.has(w.word.toLowerCase()))
-            .sort((a, b) => (a.learnedAt || "").localeCompare(b.learnedAt || ""))
-            .slice(0, overflow)
-            .map((w) => w.word.toLowerCase()),
-        );
-        wordBank = wordBank.filter((w) => !evicted.has(w.word.toLowerCase())).slice(-WORD_BANK_LIMIT);
-      }
+      // themselves (CRITICAL_REVIEW.md §11).
+      const incomingKeys = new Set(incoming.filter((w) => w.word).map(wordKey));
+      const wordBank = capWordBank([...byKey.values()], incomingKeys);
       return {
         ...state,
         practice: { ...state.practice, wordBank },
@@ -436,19 +454,55 @@ export function reducer(state, action) {
     case "MERGE_CLOUD_DATA": {
       const cloud = action.payload;
       if (!cloud) return state;
+      // Unites the two copies instead of letting the cloud overwrite whole
+      // fields, which erased words, chats and streak days made offline or on
+      // another device (CRITICAL_REVIEW.md §2א). No deletion markers yet, so
+      // something deleted on one side while the other was offline comes back
+      // (§2ב adds them with the migration).
       const { sessions, archive } = archiveOldSessions(
         { ...(cloud.sessions || {}), ...state.sessions },
         moreCompleteArchive(state.archive, cloud.archive),
       );
+      const byId = (x) => x.id;
+      const cloudRolePlay = cloud.rolePlay || {};
+      const cloudPractice = cloud.practice || {};
+      const chats = unionBy(state.rolePlay.chats, cloudRolePlay.chats, byId, (c) => c.updatedAt || "")
+        .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+        .slice(0, 50);
+      const wordBank = capWordBank(
+        unionBy(state.practice.wordBank, cloudPractice.wordBank, wordKey, (w) => w.updatedAt || w.learnedAt || ""),
+      );
+      const run = streakRun(sessions);
+      const localStats = state.lifetimeStats || {};
+      const cloudStats = cloud.lifetimeStats || {};
+      // Counters still stored until stage 5 turns them into selectors: the
+      // larger side, which is better than the cloud's alone but can still
+      // lose additions made on both devices.
+      const lifetimeStats = { ...cloudStats, ...localStats };
+      for (const k of Object.keys(lifetimeStats)) {
+        lifetimeStats[k] = Math.max(Number(localStats[k]) || 0, Number(cloudStats[k]) || 0);
+      }
       return {
         ...state,
         settings: cloud.settings || state.settings,
-        streak: cloud.streak || state.streak,
+        streak: {
+          current: run.current,
+          longest: Math.max(state.streak?.longest || 0, cloud.streak?.longest || 0, run.current),
+          lastPracticeDate: run.lastPracticeDate,
+        },
         sessions,
         archive,
-        rolePlay: cloud.rolePlay || state.rolePlay,
-        practice: cloud.practice || state.practice,
-        lifetimeStats: cloud.lifetimeStats || state.lifetimeStats,
+        rolePlay: {
+          ...state.rolePlay,
+          chats,
+          customTopics: unionBy(state.rolePlay.customTopics, cloudRolePlay.customTopics, byId),
+        },
+        practice: {
+          ...state.practice,
+          wordBank,
+          customTopics: unionBy(state.practice.customTopics, cloudPractice.customTopics, byId),
+        },
+        lifetimeStats,
         placement: cloud.placement || state.placement,
         baseline: cloud.baseline || state.baseline,
       };
