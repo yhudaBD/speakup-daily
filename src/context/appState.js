@@ -8,6 +8,7 @@ import { isActiveDay } from "./selectors";
 export const STORAGE_KEY = "speakup_data";
 export const SCHEMA_VERSION = 1;
 const SESSION_RETENTION_DAYS = 365;
+const WORD_BANK_LIMIT = 100;
 
 function createUserId() {
   return `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -376,9 +377,25 @@ export function reducer(state, action) {
           learnedAt: w.learnedAt || new Date().toISOString(),
         });
       }
+      // A full bank keeps the new words and drops the ones saved longest
+      // ago. It used to cut the list at 100, which dropped the new words
+      // themselves (CRITICAL_REVIEW.md §11). The order is left as it was.
+      let wordBank = [...byKey.values()];
+      const overflow = wordBank.length - WORD_BANK_LIMIT;
+      if (overflow > 0) {
+        const incomingKeys = new Set(incoming.filter((w) => w.word).map((w) => w.word.toLowerCase()));
+        const evicted = new Set(
+          wordBank
+            .filter((w) => !incomingKeys.has(w.word.toLowerCase()))
+            .sort((a, b) => (a.learnedAt || "").localeCompare(b.learnedAt || ""))
+            .slice(0, overflow)
+            .map((w) => w.word.toLowerCase()),
+        );
+        wordBank = wordBank.filter((w) => !evicted.has(w.word.toLowerCase())).slice(-WORD_BANK_LIMIT);
+      }
       return {
         ...state,
-        practice: { ...state.practice, wordBank: [...byKey.values()].slice(0, 100) },
+        practice: { ...state.practice, wordBank },
       };
     }
     case "REMOVE_WORD_FROM_BANK":

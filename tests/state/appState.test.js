@@ -184,10 +184,32 @@ describe("verified bugs (CRITICAL_REVIEW.md)", () => {
     expect(next.practice.wordBank.map((w) => w.word)).toContain("schedule");
   });
 
-  it.fails("§11: a new word is saved when the bank already holds 100 words", () => {
+  it("§11: a new word is saved when the bank already holds 100 words", () => {
     const state = loaded({ practice: { wordBank: bankOf(100) } });
     const next = reducer(state, { type: "ADD_PRACTICE_WORDS", payload: [{ word: "schedule" }] });
     expect(next.practice.wordBank.map((w) => w.word)).toContain("schedule");
+    expect(next.practice.wordBank).toHaveLength(100);
+  });
+
+  it("§11: a full bank makes room by dropping the words saved longest ago", () => {
+    const bank = bankOf(100).map((w, i) => ({ ...w, learnedAt: new Date(Date.UTC(2026, 0, 1 + i)).toISOString() }));
+    const shuffled = [...bank.slice(50), ...bank.slice(0, 50)];
+    const state = loaded({ practice: { wordBank: shuffled } });
+    const next = reducer(state, { type: "ADD_PRACTICE_WORDS", payload: [{ word: "schedule" }, { word: "deadline" }] });
+    const words = next.practice.wordBank.map((w) => w.word);
+    expect(words).toHaveLength(100);
+    expect(words).not.toContain("word0");
+    expect(words).not.toContain("word1");
+    expect(words).toContain("word2");
+    expect(words).toContain("word99");
+    expect(words.slice(-2)).toEqual(["schedule", "deadline"]);
+  });
+
+  it("§11: saving a word that's already there doesn't push anything out", () => {
+    const state = loaded({ practice: { wordBank: bankOf(100) } });
+    const next = reducer(state, { type: "ADD_PRACTICE_WORDS", payload: [{ word: "Word5" }] });
+    expect(next.practice.wordBank).toHaveLength(100);
+    expect(next.practice.wordBank.map((w) => w.word)).toContain("word0");
   });
 });
 
