@@ -3,7 +3,7 @@ process.env.TZ = "Asia/Jerusalem";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { daysSince, getLastNDays, getTodayString, toDateKey } from "../../src/utils/dateHelpers";
-import { computeStreak } from "../../src/context/appState";
+import { selectStreak, streakRun } from "../../src/context/selectors";
 
 afterEach(() => vi.useRealTimers());
 
@@ -34,28 +34,24 @@ describe("in Israel (UTC+3 in summer)", () => {
   });
 });
 
-describe("computeStreak", () => {
-  const streak = (current, longest, lastPracticeDate) => ({ current, longest, lastPracticeDate });
+// The streak is derived from the active days (§19); the day arithmetic has
+// to hold across month, year and daylight-saving boundaries.
+describe("streak across calendar boundaries", () => {
+  const spoke = { sentences: [{ sentenceId: "s", score: 80, kind: "speak" }] };
+  const days = (...keys) => Object.fromEntries(keys.map((k) => [k, spoke]));
 
-  it("continues the streak when the last practice was yesterday", () => {
-    expect(computeStreak(streak(3, 5, "2026-09-23"), "2026-09-24")).toEqual(streak(4, 5, "2026-09-24"));
+  it("continues across month and year boundaries", () => {
+    expect(streakRun(days("2026-09-29", "2026-09-30", "2026-10-01")).current).toBe(3);
+    expect(streakRun(days("2026-12-30", "2026-12-31", "2027-01-01")).current).toBe(3);
   });
 
-  it("keeps the streak unchanged for a second session the same day", () => {
-    expect(computeStreak(streak(4, 5, "2026-09-24"), "2026-09-24")).toEqual(streak(4, 5, "2026-09-24"));
+  it("continues across the end of daylight saving time", () => {
+    const sessions = days("2026-10-24", "2026-10-25", "2026-10-26");
+    expect(streakRun(sessions).current).toBe(3);
+    expect(selectStreak({ sessions }, "2026-10-27")).toBe(3);
   });
 
-  it("restarts at 1 after a missed day and tracks the longest streak", () => {
-    expect(computeStreak(streak(7, 7, "2026-09-21"), "2026-09-24")).toEqual(streak(1, 7, "2026-09-24"));
-    expect(computeStreak(streak(7, 7, "2026-09-23"), "2026-09-24")).toEqual(streak(8, 8, "2026-09-24"));
-  });
-
-  it("handles month and year boundaries", () => {
-    expect(computeStreak(streak(2, 2, "2026-09-30"), "2026-10-01").current).toBe(3);
-    expect(computeStreak(streak(2, 2, "2026-12-31"), "2027-01-01").current).toBe(3);
-  });
-
-  it("starts a first-ever streak at 1", () => {
-    expect(computeStreak(streak(0, 0, null), "2026-09-24")).toEqual(streak(1, 1, "2026-09-24"));
+  it("restarts after a missed day", () => {
+    expect(streakRun(days("2026-09-20", "2026-09-21", "2026-09-23", "2026-09-24")).current).toBe(2);
   });
 });

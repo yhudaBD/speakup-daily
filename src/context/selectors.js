@@ -116,6 +116,12 @@ export function streakRun(sessions) {
   return { current, lastPracticeDate: last };
 }
 
+// The sentences practiced on `today`, the daily goal's progress. Derived
+// rather than kept in state, so it resets at midnight (CRITICAL_REVIEW.md §28).
+export function selectTodayProgress(state, today) {
+  return state?.sessions?.[today]?.sentences || [];
+}
+
 // The streak to show on `today`: the run, while its last day is today or
 // yesterday, otherwise 0 (§19 uses this for display).
 export function selectStreak(state, today) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
@@ -15,6 +15,8 @@ import { getWeakSentenceStats, sentencesFromWeakList } from "../utils/practiceHi
 import { aiService } from "../services/ai.service";
 import { reportSpeakingTime } from "../utils/speakingTime";
 import { addAttempt, attemptFields } from "../utils/practiceAttempts";
+import { useToday } from "../hooks/useToday";
+import { selectTodayProgress } from "../context/selectors";
 
 function WaveAnimation() {
   return (
@@ -492,7 +494,9 @@ export default function Practice() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
-  const { settings, todayProgress, practice, sessions } = state;
+  const { settings, practice, sessions } = state;
+  const today = useToday();
+  const todayProgress = useMemo(() => selectTodayProgress({ sessions }, today), [sessions, today]);
   const wordBank = practice?.wordBank || [];
   const customTopics = practice?.customTopics || [];
 

@@ -2,7 +2,7 @@
 // AppContext.jsx so they can be unit-tested without React or Firebase.
 // AppContext.jsx owns the side effects: localStorage, Firestore sync and
 // auth.
-import { getTodayString, daysSince, toDateKey, parseDateKey, addDays } from "../utils/dateHelpers";
+import { getTodayString, daysSince } from "../utils/dateHelpers";
 import { migrateSessions } from "./migrations";
 import { isActiveDay, isSpoken, streakRun } from "./selectors";
 
@@ -62,19 +62,12 @@ const defaultSettings = {
   showChatTranslation: true,
 };
 
-// `today` is a local day key (see dateHelpers.js). "Yesterday" is derived
-// from it, not from the clock, so the rule is pure and testable.
-export function computeStreak(streak, today) {
-  const lastDate = streak.lastPracticeDate;
-  let current = streak.current;
-  if (lastDate === today) {
-    // same day, no change
-  } else {
-    const yesterday = toDateKey(addDays(parseDateKey(today), -1));
-    current = lastDate === yesterday ? current + 1 : 1;
-  }
-  const longest = Math.max(streak.longest, current);
-  return { current, longest, lastPracticeDate: today };
+// The stored streak after the days changed: the run of active days (D1) from
+// the days themselves, and the longest run ever. The streak shown comes from
+// selectStreak, which also drops a run that has ended (CRITICAL_REVIEW.md §19).
+function nextStreak(streak, sessions) {
+  const run = streakRun(sessions);
+  return { ...run, longest: Math.max(streak?.longest || 0, run.current) };
 }
 
 // Drops days older than SESSION_RETENTION_DAYS and folds them into
@@ -167,7 +160,6 @@ export const initialState = {
     lastPracticeDate: null,
   },
   sessions: {},
-  todayProgress: [],
   rolePlay: {
     chats: [],
     customTopics: [],
@@ -226,8 +218,7 @@ export function reducer(state, action) {
       return {
         ...state,
         sessions: newSessions,
-        todayProgress: updated,
-        streak: computeStreak(state.streak, today),
+        streak: nextStreak(state.streak, newSessions),
         lifetimeStats: {
           ...state.lifetimeStats,
           totalSentences: state.lifetimeStats.totalSentences + 1,
@@ -246,7 +237,7 @@ export function reducer(state, action) {
       return {
         ...state,
         sessions: newSessions,
-        streak: computeStreak(state.streak, today),
+        streak: nextStreak(state.streak, newSessions),
         lifetimeStats: {
           ...state.lifetimeStats,
           totalChats: state.lifetimeStats.totalChats + 1,
@@ -280,8 +271,6 @@ export function reducer(state, action) {
         },
       };
     }
-    case "RESET_TODAY":
-      return { ...state, todayProgress: [] };
     case "LOAD_DATA": {
       const user = ensureUser(action.payload.user);
       const { sessions, archive } = archiveOldSessions(

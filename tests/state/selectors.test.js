@@ -150,3 +150,27 @@ describe("speaking and sentence-completion numbers", () => {
     expect(selectors.isActiveDay({ sentences: [{ score: 70, wordResults: [] }] })).toBe(true);
   });
 });
+
+// CRITICAL_REVIEW.md §19 and §28: the streak shown and today's progress are
+// derived from the days, so they're right the morning after too.
+describe("streak and today's progress (§19, §28)", () => {
+  const spoke = { sentences: [{ sentenceId: "s", score: 80, kind: "speak" }] };
+  const clozeOnly = { sentences: [{ sentenceId: "c", score: 100, kind: "cloze" }] };
+
+  it("shows 0 after a 5-day gap, whatever the stored streak says", () => {
+    const state = { sessions: { "2026-09-23": spoke, "2026-09-24": spoke }, streak: { current: 12 } };
+    expect(selectors.selectStreak(state, "2026-09-29")).toBe(0);
+  });
+
+  it("doesn't let a day with only sentence completion keep the streak", () => {
+    const sessions = { "2026-09-23": spoke, "2026-09-24": clozeOnly };
+    expect(selectors.selectStreak({ sessions }, "2026-09-25")).toBe(0);
+  });
+
+  it("takes today's progress from today's day, so it resets at midnight", () => {
+    const state = { sessions: { "2026-09-28": { sentences: [spoke.sentences[0], clozeOnly.sentences[0]] } } };
+    expect(selectors.selectTodayProgress(state, "2026-09-28")).toHaveLength(2);
+    expect(selectors.selectTodayProgress(state, "2026-09-29")).toEqual([]);
+    expect(selectors.selectTodayProgress({}, "2026-09-29")).toEqual([]);
+  });
+});

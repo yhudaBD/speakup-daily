@@ -1,13 +1,14 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import BaselineCard from "../components/home/BaselineCard";
-import { isActiveDay, speakAverage } from "../context/selectors";
+import { isActiveDay, selectStreak, selectTodayProgress, speakAverage } from "../context/selectors";
 import { useApp } from "../context/AppContext";
-import { getGreeting, getTodayString, getLastNDays, parseDateKey } from "../utils/dateHelpers";
+import { useToday } from "../hooks/useToday";
+import { getGreeting, getLastNDays, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
 
-function WeeklyChart({ sessions }) {
-  const days = getLastNDays(7);
+function WeeklyChart({ sessions, today }) {
+  const days = getLastNDays(7, parseDateKey(today));
   const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
   return (
@@ -18,7 +19,7 @@ function WeeklyChart({ sessions }) {
           const session = sessions[day];
           // Spoken sentences only (CRITICAL_REVIEW.md §8).
           const score = speakAverage(session?.sentences) || 0;
-          const isToday = day === getTodayString();
+          const isToday = day === today;
           const date = parseDateKey(day);
           const label = dayLabels[date.getDay()];
           // A day with only conversations has no score, but it isn't an
@@ -46,11 +47,12 @@ function WeeklyChart({ sessions }) {
 export default function Home() {
   const { state } = useApp();
   const navigate = useNavigate();
-  const { settings, streak, sessions, todayProgress, user, practice, placement, lifetimeStats, isLoaded } = state;
+  const { settings, streak, sessions, user, practice, placement, lifetimeStats, isLoaded } = state;
   const wordBankCount = practice?.wordBank?.length || 0;
-  const today = getTodayString();
+  const today = useToday();
   const todaySession = sessions[today];
-  const completed = todayProgress.length;
+  const completed = selectTodayProgress(state, today).length;
+  const currentStreak = selectStreak(state, today);
   const goal = settings.dailyGoal;
   const pct = Math.min(100, Math.round((completed / goal) * 100));
   const todayChats = todaySession?.chats?.length || 0;
@@ -83,7 +85,7 @@ export default function Home() {
           </p>
           <h1 dir="ltr" style={{ color: "#fff", marginBottom: 8, textAlign: "right" }}>{greeting}</h1>
           <div dir="ltr" className="streak-badge" style={{ display: "inline-flex" }}>
-            🔥 {streak.current} day streak
+            🔥 {currentStreak} day streak
           </div>
         </div>
 
@@ -199,7 +201,7 @@ export default function Home() {
 
         {/* Weekly Chart */}
         <div className="card mb-4">
-          <WeeklyChart sessions={sessions} />
+          <WeeklyChart sessions={sessions} today={today} />
         </div>
 
         {/* Stats Row */}
