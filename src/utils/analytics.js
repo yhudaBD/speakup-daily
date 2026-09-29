@@ -28,3 +28,18 @@ export function logEvent(userId, type, details = {}) {
       // ignore — analytics must never break the app
     });
 }
+
+// Deletes this user's usage events on the server (CRITICAL_REVIEW.md §41ב).
+// Unlike logEvent it's awaited and throws: "delete account" must not report
+// success while the events remain. Resolves to how many were deleted.
+export async function deleteMyEvents() {
+  const user = auth?.currentUser;
+  if (!user) throw new Error("Not signed in");
+  const token = await user.getIdToken();
+  const response = await fetch("/api/delete-my-events", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`Deleting usage events failed: ${response.status}`);
+  return (await response.json()).deleted;
+}
