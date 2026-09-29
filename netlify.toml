@@ -2,7 +2,7 @@
   # Lint and tests run before the build, so broken code never ships: if
   # either fails, Netlify doesn't publish and the previous deploy stays live.
   # GitHub CI runs the same checks, but only reports; this is the gate.
-  command = "npm run lint && npm test -- --run && npm run build"
+  command = "npm run lint && npm test -- --run && npm run build && node scripts/check-bundle-size.mjs"
   publish = "dist"
   # Skip the build when a push changes nothing that ships (docs, tests, CI
   # config, Firestore rules), so it doesn't spend build minutes. See the

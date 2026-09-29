@@ -148,7 +148,7 @@ export function AppProvider({ children }) {
       try {
         if (await cloudSchemaFor(firebaseUser.email) === "v3") {
           // MIGRATION_PLAN.md §8: moves the account on its first open.
-          const bank = getSentenceBank();
+          const bank = await getSentenceBank();
           const sync = await openV3({ uid, local, dispatch, bank, track: (p) => cloudSync.track(p) });
           v3SyncRef.current = sync;
           // MIGRATION_PLAN.md §6: the other device's changes while open.

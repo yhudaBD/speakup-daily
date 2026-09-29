@@ -3,7 +3,24 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
+// The libraries in chunks of their own (CRITICAL_REVIEW.md §39): they change
+// far less often than the app, so after an update the service worker
+// downloads only the app's chunks again, not Firebase and React.
+const VENDOR_CHUNKS = [
+  ['firebase', /[\\/]node_modules[\\/](@firebase|firebase|re2js)[\\/]/],
+  ['react', /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/],
+]
+
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          return VENDOR_CHUNKS.find(([, test]) => test.test(id))?.[0]
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

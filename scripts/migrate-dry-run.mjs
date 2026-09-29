@@ -33,7 +33,7 @@ async function main() {
 
   const snapshot = await getFirestore().collection("users").get();
   const today = new Date().toISOString().slice(0, 10);
-  const bank = getSentenceBank();
+  const bank = await getSentenceBank();
   const results = snapshot.docs.map((doc) => {
     try {
       return checkAccount(doc.data(), { bank, today });
