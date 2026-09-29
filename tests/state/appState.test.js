@@ -395,3 +395,41 @@ describe("ADJUST_LEVEL and help (§5)", () => {
     expect(adjust(adjust(b1, 30, 0.8), 30, 0.8).placement.overall_level).toBe("A2");
   });
 });
+
+// CRITICAL_REVIEW.md §13: the level sets the practice and conversation
+// difficulty, unless the user chose them in Settings.
+describe("level sets the difficulty (§13)", () => {
+  const placed = (state, level) => reducer(state, { type: "SET_PLACEMENT_RESULT", payload: { overall_level: level } });
+
+  it("sets both difficulties from the placement level", () => {
+    const next = placed(loaded(), "B2");
+    expect(next.settings).toMatchObject({ difficulty: "advanced", chatDifficulty: "hard" });
+    expect(placed(loaded(), "A2").settings).toMatchObject({ difficulty: "medium", chatDifficulty: "easy" });
+  });
+
+  it("keeps difficulties the user chose", () => {
+    const chose = reducer(loaded(), { type: "UPDATE_SETTINGS", payload: { chatDifficulty: "medium" } });
+    expect(chose.settings.difficultyManual).toBe(true);
+    expect(placed(chose, "B2").settings).toMatchObject({ difficulty: "easy", chatDifficulty: "medium" });
+  });
+
+  it("doesn't count other settings as choosing a difficulty", () => {
+    const next = reducer(loaded(), { type: "UPDATE_SETTINGS", payload: { ttsSpeed: 0.8 } });
+    expect(next.settings.difficultyManual).toBeFalsy();
+  });
+
+  it("follows the level when ADJUST_LEVEL moves it, and only then", () => {
+    const b1 = placed(loaded(), "B1");
+    const once = reducer(b1, { type: "ADJUST_LEVEL", payload: { score: 90 } });
+    expect(once.settings).toMatchObject({ difficulty: "medium", chatDifficulty: "medium" });
+    const raised = reducer(once, { type: "ADJUST_LEVEL", payload: { score: 90 } });
+    expect(raised.placement.overall_level).toBe("B2");
+    expect(raised.settings).toMatchObject({ difficulty: "advanced", chatDifficulty: "hard" });
+  });
+
+  it("leaves a manual choice alone when the level moves", () => {
+    const chose = reducer(placed(loaded(), "B1"), { type: "UPDATE_SETTINGS", payload: { difficulty: "easy" } });
+    const raised = [90, 90].reduce((s, score) => reducer(s, { type: "ADJUST_LEVEL", payload: { score } }), chose);
+    expect(raised.settings.difficulty).toBe("easy");
+  });
+});

@@ -58,6 +58,23 @@ function adjustLevel(placement, score, helpedShare = 0) {
   };
 }
 
+// The practice and conversation difficulty for each CEFR level. The level
+// sets them unless the user chose them in Settings (difficultyManual), both
+// after the placement conversation and when ADJUST_LEVEL moves the level
+// (CRITICAL_REVIEW.md §13).
+export const LEVEL_TO_DIFFICULTY = {
+  "Pre-A1": "easy", A1: "easy", A2: "medium", B1: "medium", B2: "advanced", C1: "advanced",
+};
+const LEVEL_TO_CHAT_DIFFICULTY = {
+  "Pre-A1": "easy", A1: "easy", A2: "easy", B1: "medium", B2: "hard", C1: "hard",
+};
+const DIFFICULTY_KEYS = ["difficulty", "chatDifficulty"];
+
+function settingsForLevel(settings, level) {
+  if (settings.difficultyManual || !LEVEL_TO_DIFFICULTY[level]) return settings;
+  return { ...settings, difficulty: LEVEL_TO_DIFFICULTY[level], chatDifficulty: LEVEL_TO_CHAT_DIFFICULTY[level] };
+}
+
 const defaultSettings = {
   dailyGoal: 5,
   difficulty: "easy",
@@ -213,8 +230,13 @@ export function reducer(state, action) {
     // built outside the reducer so its new user id is generated once.
     case "RESET_FOR_ACCOUNT":
       return action.payload;
-    case "UPDATE_SETTINGS":
-      return { ...state, settings: { ...state.settings, ...action.payload } };
+    case "UPDATE_SETTINGS": {
+      const chosen = DIFFICULTY_KEYS.some((k) => k in action.payload);
+      return {
+        ...state,
+        settings: { ...state.settings, ...action.payload, ...(chosen ? { difficultyManual: true } : {}) },
+      };
+    }
     case "SAVE_SESSION_RESULT": {
       const today = getTodayString();
       // Keeps the rest of the day, its chats included (CRITICAL_REVIEW.md §3).
@@ -329,6 +351,7 @@ export function reducer(state, action) {
       return {
         ...state,
         placement: { ...action.payload, planProgress, completedAt: new Date().toISOString() },
+        settings: settingsForLevel(state.settings, action.payload.overall_level),
       };
     }
     case "UPDATE_PLAN_PROGRESS": {
@@ -352,7 +375,13 @@ export function reducer(state, action) {
     }
     case "ADJUST_LEVEL": {
       if (!state.placement) return state;
-      return { ...state, placement: adjustLevel(state.placement, action.payload.score, action.payload.helpedShare) };
+      const placement = adjustLevel(state.placement, action.payload.score, action.payload.helpedShare);
+      const moved = placement.overall_level !== state.placement.overall_level;
+      return {
+        ...state,
+        placement,
+        settings: moved ? settingsForLevel(state.settings, placement.overall_level) : state.settings,
+      };
     }
     case "MERGE_PLACEMENT_GAPS": {
       if (!state.placement) return state;
