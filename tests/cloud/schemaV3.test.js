@@ -211,3 +211,24 @@ describe("attempt ids", () => {
     expect(first[0]).toMatch(/^2026-09-28_000_/);
   });
 });
+
+// Deletion markers (tombstones.js) travel in the documents: a word's or a
+// topic's in its map entry, a chat's as its document (MIGRATION_PLAN.md §6).
+describe("deletion markers", () => {
+  const AT = "2026-09-29T10:00:00.000Z";
+  const deleted = { words: { "e.g.": AT }, chats: { chat_9: AT }, chatTopics: { rt_9: AT }, practiceTopics: { pt_9: AT } };
+
+  it("writes each marker in the documents", () => {
+    const docs = migrateToV3({ ...legacy, deleted }, { bank });
+    expect(docs.profile.wordBank[mapKey("e.g.")]).toEqual({ deletedAt: AT, updatedAt: AT });
+    expect(docs.profile.chatTopics.rt_9).toEqual({ deletedAt: AT, updatedAt: AT });
+    expect(docs.profile.practiceTopics.pt_9).toEqual({ deletedAt: AT, updatedAt: AT });
+    expect(docs.chats.chat_9).toEqual({ id: "chat_9", deletedAt: AT, updatedAt: AT });
+  });
+
+  it("gives them back as markers, and the items without them", () => {
+    const state = v3ToState(migrateToV3({ ...legacy, deleted }, { bank }), { bank });
+    expect(state.deleted).toEqual(deleted);
+    expect(state.practice.wordBank.map((w) => w.word)).toEqual(["schedule"]);
+  });
+});

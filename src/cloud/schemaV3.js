@@ -11,6 +11,7 @@
 // maps by id, so writes merge by key instead of replacing each other.
 
 import { streakRun } from "../context/selectors";
+import { legacyAttemptId } from "../utils/attemptId";
 
 export const SCHEMA_VERSION_V3 = 3;
 // A month document must stay under this (MIGRATION_PLAN.md §3). Firestore's
@@ -33,12 +34,6 @@ function compact(value) {
 }
 
 const monthOf = (date) => date.slice(0, 7);
-
-// An id for a record saved before ids existed: the same every run, so
-// running the migration again writes the same documents.
-function legacyAttemptId(date, index, itemId) {
-  return `${date}_${String(index).padStart(3, "0")}_${String(itemId).replace(/[^\w-]/g, "_")}`;
-}
 
 // A legacy record has no time of its own: noon UTC of its day, a second per
 // position, which keeps the day's order.
@@ -111,6 +106,23 @@ function toMap(list, keyOf, stamp) {
   );
 }
 
+// Deletion markers (tombstones.js) as map entries { deletedAt, updatedAt },
+// in place of an item not changed since it was deleted.
+function withMarkers(map, markers = {}) {
+  const out = { ...map };
+  for (const [key, at] of Object.entries(markers)) {
+    if (!((out[mapKey(key)]?.updatedAt || "") > at)) out[mapKey(key)] = { deletedAt: at, updatedAt: at };
+  }
+  return out;
+}
+
+// The markers in a map, by the item's own key.
+function markersOf(map) {
+  return Object.fromEntries(
+    Object.entries(map || {}).filter(([, item]) => item?.deletedAt).map(([key, item]) => [decodeURIComponent(key), item.deletedAt]),
+  );
+}
+
 // A map back to a list in its original order, without deleted items.
 function fromMap(map, { keep = [] } = {}) {
   return Object.values(map || {})
@@ -122,6 +134,7 @@ function fromMap(map, { keep = [] } = {}) {
 // Schema 2 document → { profile, months, chats } (MIGRATION_PLAN.md §8).
 // `bank` maps the fixed sentence bank's ids to their text.
 export function migrateToV3(doc, { bank } = {}) {
+  const deleted = doc.deleted || {};
   const profile = compact({
     schemaVersion: SCHEMA_VERSION_V3,
     ownerUid: doc.ownerUid ?? null,
@@ -131,9 +144,9 @@ export function migrateToV3(doc, { bank } = {}) {
     baseline: doc.baseline ?? null,
     archive: doc.archive ?? null,
     longestStreak: doc.streak?.longest || 0,
-    wordBank: toMap(doc.practice?.wordBank, (w) => mapKey(w.word.toLowerCase()), (w) => w.learnedAt ?? null),
-    practiceTopics: toMap(doc.practice?.customTopics, (t) => mapKey(t.id), (t) => t.createdAt ?? null),
-    chatTopics: toMap(doc.rolePlay?.customTopics, (t) => mapKey(t.id), (t) => t.createdAt ?? null),
+    wordBank: withMarkers(toMap(doc.practice?.wordBank, (w) => mapKey(w.word.toLowerCase()), (w) => w.learnedAt ?? null), deleted.words),
+    practiceTopics: withMarkers(toMap(doc.practice?.customTopics, (t) => mapKey(t.id), (t) => t.createdAt ?? null), deleted.practiceTopics),
+    chatTopics: withMarkers(toMap(doc.rolePlay?.customTopics, (t) => mapKey(t.id), (t) => t.createdAt ?? null), deleted.chatTopics),
   });
 
   const months = {};
@@ -152,6 +165,10 @@ export function migrateToV3(doc, { bank } = {}) {
   }
 
   const chats = Object.fromEntries((doc.rolePlay?.chats || []).map((c) => [mapKey(c.id), compact(c)]));
+  // A deleted chat's document stays as its marker.
+  for (const [id, at] of Object.entries(deleted.chats || {})) {
+    if (!((chats[mapKey(id)]?.updatedAt || "") > at)) chats[mapKey(id)] = { id, deletedAt: at, updatedAt: at };
+  }
 
   return { profile, months, chats };
 }
@@ -190,6 +207,12 @@ export function v3ToState({ profile = {}, months = {}, chats = {} }, { bank } = 
     sessions,
     rolePlay: { chats: chatList, customTopics: fromMap(profile.chatTopics) },
     practice: { wordBank: fromMap(profile.wordBank, { keep: ["updatedAt"] }), customTopics: fromMap(profile.practiceTopics) },
+    deleted: {
+      words: markersOf(profile.wordBank),
+      chats: Object.fromEntries(Object.values(chats).filter((c) => c.deletedAt).map((c) => [c.id, c.deletedAt])),
+      chatTopics: markersOf(profile.chatTopics),
+      practiceTopics: markersOf(profile.practiceTopics),
+    },
     lifetimeStats: {
       totalSentences: (profile.archive?.sentences || 0)
         + Object.values(sessions).reduce((n, d) => n + (d.sentences?.length || 0), 0),
