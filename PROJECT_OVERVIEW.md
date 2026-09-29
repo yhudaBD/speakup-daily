@@ -17,7 +17,10 @@
 - **AI**: Groq (chat + Whisper transcription), דרך proxy בצד שרת בלבד — המפתח **לעולם לא** מגיע לדפדפן
 - **Build tooling**:
   - `scripts/generate-icons.mjs` + `sharp` – יצירת אייקונים לפלטפורמות שונות
-  - `vite build` – בניית production
+  - `vite build` – בניית production. כל דף חוץ מדף הבית נטען רק כשפותחים אותו, ו-Firebase ו-React בקבצים נפרדים (סעיף 39)
+  - `scripts/check-bundle-size.mjs` – תקציב הטעינה הראשונה (300KB ב-gzip). רץ ב-CI וב-build של Netlify, ונכשל מעליו
+  - `scripts/migrate-dry-run.mjs` – ריצת ניסיון של המעבר למבנה הענן החדש, קריאה בלבד (👤 עם service account)
+  - `scripts/measure-cloud-docs.mjs`, `scripts/strip-event-names.mjs`, `scripts/eval-conversation-rubric.mjs` – מדידה, ניקוי אנליטיקה ובדיקת הרובריקה
 
 #### package.json (בקצרה)
 
@@ -66,14 +69,27 @@
 `AppContext.jsx` מטפל רק ב-side effects: localStorage, סנכרון Firestore והזדהות.
 ה-state נשמר תחת מפתח `speakup_data` ב-`localStorage`, עם `schemaVersion` לצורך מיגרציות עתידיות.
 
+**שני מבני ענן** (`MIGRATION_PLAN.md`), לפי מתג (`src/cloud/flags.js`):
+- **v2 (ברירת המחדל):** מסמך אחד, `users/{uid}`, שנכתב כולו בכל שינוי (`loadCloudProfile`/`saveCloudProfile`).
+- **v3 (דלוק כרגע רק לחשבון הבעלים, לשבוע בדיקה):** `users/{uid}/profile/main`, מסמך לכל חודש ב-`months/{yyyy-mm}` ומסמך לכל שיחה ב-`chats/{id}`.
+  - הקוד ב-`src/cloud/`: המרה (`schemaV3.js`), חישוב מה השתנה (`diffV3.js`), כתיבה וקריאה (`v3Store.js`), השהיה של 2 שניות ו-flush (`v3Sync.js`), פתיחה ומעבר (`openV3.js`), האזנה בזמן אמת (`realtime.js`).
+  - נכתב רק מה שהשתנה, כל ניסיון ומילה במפתח משלהם, כך ששני מכשירים לא דורסים זה את זה.
+  - בפתיחה נקראים רק הפרופיל ומה שהשתנה מאז הפתיחה הקודמת (`localBaseline.js`, חותמת זמן שרת `syncedAt`).
+  - הפעלה: `VITE_CLOUD_V3_EMAIL_HASHES` (SHA-256 של המייל) לחשבונות בודדים, `VITE_CLOUD_SCHEMA=v3` לכולם.
+
+**מחיקות בין מכשירים:** מילה, נושא או שיחה שנמחקו נשמרים כסימון עם זמן ב-`state.deleted` (`context/tombstones.js`), כדי שהמכשיר השני לא יחזיר אותם. סימון נמחק אחרי 90 יום. יום ששני המכשירים תרגלו בו שומר את הניסיונות של שניהם, לפי מזהה.
+
 **בידוד בין חשבונות:** `ownerUid` מסמן לאיזה חשבון Firebase שייכים הנתונים שבמכשיר. בהתחברות:
 - אם הנתונים שייכים לחשבון אחר, הם מוחלפים בפרופיל חדש (`RESET_FOR_ACCOUNT`) ולא ממוזגים לענן.
 - אם לנתונים אין בעלים (נשמרו לפני שהשדה נוסף), הם משויכים לחשבון הראשון שמתחבר (`CLAIM_LOCAL_DATA`).
 
 בהתנתקות (`signOutAndClear`) הנתונים נשמרים לענן פעם אחרונה, ואז נמחקים מה-`localStorage`. אם השמירה לענן לא אושרה, הם נשארים במכשיר.
 
-**מחיקת חשבון** (`deleteAccountData`, מ-Settings): מוחקת את `users/{uid}` ב-Firestore, את ה-`localStorage` ואת רשומת ה-Auth, ואז טוענת מחדש את האפליקציה.
-אירועי האנליטיקה ב-Netlify Blobs **לא** נמחקים.
+**מחיקת חשבון** (`deleteAccountData`, מ-Settings), לפי הסדר:
+1. אירועי האנליטיקה ב-Netlify Blobs (`delete-my-events.js`). אם זה נכשל, שום דבר עוד לא נמחק.
+2. כל המסמכים בענן, בשני המבנים: המסמך הישן וכל תתי-האוספים (`deleteAllCloudData`), כי Firestore לא מוחק תתי-אוספים יחד עם המסמך.
+3. הנתונים במכשיר: `localStorage`, הקלטות "יום 1" והעותק השמור של הענן.
+4. רשומת ה-Auth, ואז טעינה מחדש של האפליקציה.
 
 ```
 {
@@ -102,7 +118,7 @@
 `SAVE_ROLEPLAY_SESSION`, `UPDATE_ROLEPLAY_FEEDBACK`, `LOAD_DATA`, `UPSERT_ROLEPLAY_CHAT`,
 `DELETE_ROLEPLAY_CHAT`, `ADD_CUSTOM_TOPIC`/`DELETE_CUSTOM_TOPIC`,
 `ADD_PRACTICE_WORDS`/`REMOVE_WORD_FROM_BANK`, `ADD_CUSTOM_PRACTICE_TOPIC`/`DELETE_CUSTOM_PRACTICE_TOPIC`,
-`SET_PLACEMENT_RESULT`, `UPDATE_PLAN_PROGRESS`, `MERGE_PLACEMENT_GAPS`, `ADJUST_LEVEL`,
+`SET_PLACEMENT_RESULT`, `UPDATE_PLAN_PROGRESS`, `ADJUST_LEVEL`, `SET_BASELINE`,
 `MERGE_CLOUD_DATA`, `CLAIM_LOCAL_DATA`, `RESET_FOR_ACCOUNT`.
 
 ---
@@ -114,19 +130,22 @@
   - `_shared/` — קוד משותף לפונקציות (אימות token, עזרי HTTP, מכסה). זו לא פונקציה בעצמה
   - `log-event.js` — כתיבת אירועי שימוש (v2, Netlify Blobs). דורש משתמש מחובר, ושדות ה-`details` מסוננים ב-`_shared/events.js`
   - `get-dashboard-data.js` — קריאה מוגנת ב-`ADMIN_SECRET`, מרכזת נתונים לדשבורד (v2, Netlify Blobs)
+  - `delete-my-events.js` — מוחק את אירועי האנליטיקה של המשתמש המחובר, כחלק ממחיקת חשבון
 
 - `public/`
   - `manifest.json` — הגדרות PWA
   - `usage_dashboard.html` — לוח בקרה פרטי (סיסמה מול `ADMIN_SECRET`), **לא** מקושר מתוך ניווט האפליקציה
 
-- `src/App.jsx` — Router, `AuthGate`, `BottomNav`, `OfflineBanner`, `UpdateBanner`, טעינת כל הדפים כולל `/placement` ו-`/practice/cloze`
+- `src/App.jsx` — Router, `AuthGate`, `BottomNav`, הבאנרים, ו-routes לכל הדפים. דף הבית נטען מיד, ושאר הדפים לפי דרישה (`utils/lazyPage.js`, שמרענן פעם אחת אם קובץ של דף נעלם אחרי עדכון), עם `PageSkeleton` בזמן הטעינה
+
+- `src/cloud/` — מבנה הענן החדש (v3) והמתג שלו, ראה סעיף 3
 
 - `src/context/AppContext.jsx` — ראה סעיף 3 למעלה
 
 - `src/pages/`
   - `Home.jsx` — greeting + streak, כרטיס "גלה את הרמה שלך" (אם אין `placement`), Today's Mission, כרטיס נקודות חלשות, כרטיס RolePlay, גרף שבועי, סטטיסטיקות. מפנה אוטומטית ל-`/placement` בפעם הראשונה שהאפליקציה נפתחת (פרופיל ריק לגמרי, אחרי `isLoaded`)
   - `Practice.jsx` — תרגול הגייה: משפטים סטטיים (`data/sentences.js`, 321 משפטים ב-8 קטגוריות, משוקללים לכיוון נקודות חלשות) או נושא AI חופשי (עם הקשר מפרופיל ה-placement), הקלטה, ניקוד, שמירת מילים, ניתוח AI בסוף session. מספר המשפטים הזמינים בכל קטגוריה **לא** מוצג למשתמש (רק ל-wordbank/weak, ששם המספר משמעותי — התקדמות אישית, לא גודל מאגר תוכן). כולל כפתור כניסה למצב "השלמת משפטים" (`ClozePractice.jsx`)
-  - `ClozePractice.jsx` — מצב תרגול חדש, **ללא AI בכלל**: מחסיר מילת תוכן ממשפט קיים מ-`sentences.js`, בונה 3 מסיחים ממאגר המילים הרחב יותר (כל `sentences.js`), ומציג בחירה מרובה. תוצאות נכתבות דרך אותו `SAVE_SESSION_RESULT` כמו תרגול רגיל — נספר ב-streak/XP/Review בדיוק כמו תרגול הגייה
+  - `ClozePractice.jsx` — מצב תרגול חדש, **ללא AI בכלל**: מחסיר מילת תוכן ממשפט קיים מ-`sentences.js`, בונה 3 מסיחים ממאגר המילים הרחב יותר (כל `sentences.js`), ומציג בחירה מרובה. תוצאות נשמרות עם `kind: "cloze"` ונספרות בנפרד: לא נכנסות לממוצעי ההגייה, לא מחזיקות רצף לבד, ומקבלות 2 XP (D1, D3)
   - `RolePlay.jsx` — שיחות AI: נושאים מובנים + מותאמים אישית, כפתור **"🗣️ איך אומרים...?"**, הצעות תשובה, השמעה חוזרת, ניתוח שיחה בסוף + auto-leveling
   - `PlacementTest.jsx` — שיחת ההיכרות/קביעת רמה (ראה סעיף 5)
   - `Progress.jsx` — טאבים: Weekly, All Time (כולל Level/XP, הישגים, מגמת שימוש בעזרים), Review (משפטים חלשים), **"🗺️ התוכנית שלי"** (אם יש `learning_plan`) — מוצגת כמסלול ויזואלי אנכי (`components/progress/LearningPath.jsx`) עם עיגולי done/current/upcoming, לא רשימת כרטיסים שטוחה
@@ -151,7 +170,7 @@
   - `placementPrompt.js` — הפרומפט הפעיל של שיחת ההיכרות (ראה `placement_prompt.md` לתיעוד המלא)
 
 - `src/utils/`
-  - `pronunciationScorer.js` — דמיון מחרוזות (Levenshtein) בין המשפט למה שנאמר — **לא** ניתוח פונטי אמיתי, הוחלט במפורש לא לשפר את זה כרגע
+  - `pronunciationScorer.js` — "כמה ברור דיברת": יישור לפי סדר המילים, עם קיצורים ומספרים מנורמלים ודמיון מחרוזות לכל מילה. **לא** ניתוח פונטי אמיתי
   - `analytics.js` — `logEvent()` fire-and-forget לדשבורד
   - `dateHelpers.js`, `device.js`, `practiceHistory.js`, `speechVoice.js`
 
@@ -165,10 +184,11 @@
 (CEFR, מוסתרת מהמשתמש) וגם **תוכנית לימוד אישית** של 5-8 שלבים, שנשמרים ל-`placement`.
 
 התוכנית מוצגת בטאב "התוכנית שלי" ב-Progress; לחיצה על שלב פותחת שיחת RolePlay מותאמת
-(דרך `createCustomTopic`) ומסמנת התקדמות כשהיא מסתיימת. הרמה גם מתעדכנת אוטומטית — ציון
-גבוה (85+) או נמוך (מתחת ל-45) פעמיים ברצף ב-RolePlay מזיז את הרמה שלב אחד (`ADJUST_LEVEL`),
-כדי שרעש חד-פעמי לא ישנה כלום. הפרופיל (רמה/עבודה/קשיים) מוזרם לכל שיחת RolePlay ותרגול AI
-דרך `buildProfileContext()`, וקשיים חדשים נאספים אוטומטית מכל ניתוח שיחה (`MERGE_PLACEMENT_GAPS`).
+(דרך `createCustomTopic`) ומסמנת התקדמות אחרי 2 שיחות שהסתיימו (לפחות 3 תורות). הרמה גם מתעדכנת
+אוטומטית (`ADJUST_LEVEL`): שיחה עם 4 תורות עצמאיות נותחת לפי רובריקה קבועה (`services/analysisPrompt.js`),
+והרמה שהיא מראה מושווית לרמה הנוכחית. שתי שיחות ברצף מעליה או מתחתיה מזיזות שלב אחד. בקצוות הסולם
+נדרשים 2 שלבים הפרש, ושיחה שיותר מ-30% מהתורות שלה באו מהצעה או מתרגום לא מעלה רמה. הפרופיל
+(רמה/עבודה/קשיים) מוזרם לכל שיחת RolePlay ותרגול AI דרך `buildProfileContext()`.
 
 **אם השיחה נכשלת** (רשת/API) — `usePlacementTest` **לא** נופל בחזרה ל-mock (בניגוד לשאר
 `ai.service.js`): תוצאה מזויפת הייתה מטעה מדי כי היא קובעת אישית את כל שאר האפליקציה. במקום
@@ -184,7 +204,7 @@
 
 אירועי שימוש אנונימיים (`placement_completed`, `session_started`, `session_ended` עם
 `helpUsedCount`/`turnCount`/`topicTitle`/`currentLevel`) נכתבים דרך `log-event.js` ל-Netlify
-Blobs — קשורים למזהה מכשיר אנונימי (`user.id`), **לא** לתוכן שיחות. הדשבורד מציג: פעילות
+Blobs — שמורים לפי ה-uid של החשבון (כדי שמחיקת חשבון תמחק אותם), **לא** תוכן שיחות ולא שמות. הדשבורד מציג: פעילות
 30 יום לכל משתמש, פעילים שבועיים, מגמת שימוש בעזרים, רמה בהתחלה מול עכשיו, נושאים
 פופולריים, עלות AI משוערת (סף התראה $10, אבל בפועל זעום — ראה סעיף 7), ורשימת "לא פעילים
 3+ ימים".
@@ -202,7 +222,7 @@ Blobs — קשורים למזהה מכשיר אנונימי (`user.id`), **לא*
 
 ### 8. מה **לא** נבנה (הוחלט במפורש לדחות)
 
-- ניקוד הגייה פונטי אמיתי (נשאר Levenshtein) — הוחלט פעמיים לא לתעדף
+- ניקוד הגייה פונטי אמיתי (נשאר השוואת מחרוזות) — הוחלט פעמיים לא לתעדף
 - תשלומים/Stripe — לא הותחל
 - פיצ'רים חברתיים בין חברים — לא בעדיפות
 - מכסות לפי מסלול תשלום: היום יש רק תקרה יומית אחידה לכל חשבון (ראה סעיף 2)
