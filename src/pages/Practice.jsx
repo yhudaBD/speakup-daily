@@ -52,6 +52,9 @@ function ScoreDisplay({ score, wordResults }) {
 
   return (
     <div style={{ textAlign: "center" }}>
+      {/* The score is how well the speech engine understood the user, not
+          pronunciation as such (CRITICAL_REVIEW.md §4). */}
+      <p className="text-muted" style={{ fontSize: 13, marginBottom: 8 }}>כמה ברור דיברת</p>
       <div
         className="score-ring"
         style={{ "--score-color": bg, "--score-pct": `${score * 3.6}deg` }}
