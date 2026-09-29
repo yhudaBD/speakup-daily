@@ -1,6 +1,7 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import BaselineCard from "../components/home/BaselineCard";
+import { isActiveDay } from "../context/selectors";
 import { useApp } from "../context/AppContext";
 import { getGreeting, getTodayString, getLastNDays, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
@@ -19,16 +20,20 @@ function WeeklyChart({ sessions }) {
           const isToday = day === getTodayString();
           const date = parseDateKey(day);
           const label = dayLabels[date.getDay()];
+          // A day with only conversations has no score, but it isn't an
+          // empty day (CRITICAL_REVIEW.md §3).
+          const talkedOnly = score === 0 && isActiveDay(session);
           const heightPct = score > 0 ? `${score}%` : "14px";
           return (
             <div key={day} className="chart-bar-wrap">
               <div
-                className={`chart-bar${isToday ? " today" : ""}${score === 0 ? " empty" : ""}`}
+                className={`chart-bar${isToday ? " today" : ""}${score === 0 && !talkedOnly ? " empty" : ""}`}
                 style={{ height: heightPct }}
-                title={score > 0 ? `${score}%` : "No practice"}
+                title={score > 0 ? `${score}%` : talkedOnly ? "שיחה" : "No practice"}
               />
               <span className="chart-label">{label}</span>
               {score > 0 && <span className="chart-score">{score}</span>}
+              {talkedOnly && <span className="chart-score" aria-label="שיחה">💬</span>}
             </div>
           );
         })}

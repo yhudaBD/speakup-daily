@@ -92,6 +92,11 @@ export function useRolePlay({
       topicTitle: topic?.title,
       emoji: topic?.emoji,
       turnCount: finalTurnCount,
+      // Turns the user made themselves, spoken or typed (T4 sources). An
+      // active day needs at least one (ACTION_PLAN.md D1, selectors.js).
+      ownTurnCount: messagesRef.current.filter(
+        (m) => m.role === 'user' && (m.source === 'spoken' || m.source === 'typed'),
+      ).length,
       helpUsedCount: helpUsedCountRef.current,
       completedAt: new Date().toISOString(),
     });

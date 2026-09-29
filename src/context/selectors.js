@@ -24,3 +24,32 @@ export function repeatSpeakingMs(sentences) {
     .filter((s) => validDuration(s?.durationMs))
     .reduce((sum, s) => sum + s.durationMs, 0);
 }
+
+// A practice attempt said out loud, not a sentence-completion answer.
+// Records saved before `kind` existed are treated as spoken until §8 settles
+// how to classify them (CRITICAL_REVIEW.md §8, a stage 5 decision).
+export function isSpoken(sentence) {
+  return sentence?.kind ? sentence.kind === "speak" : true;
+}
+
+// A conversation the user took part in with at least one turn of their own
+// (spoken or typed, not a suggestion or translation). Records saved before
+// ownTurnCount existed fall back to any user turn (D1).
+function hasOwnTurn(chat) {
+  const own = typeof chat?.ownTurnCount === "number" ? chat.ownTurnCount : chat?.turnCount;
+  return (own || 0) > 0;
+}
+
+// D1: a day is active with at least one act of speaking, a sentence said
+// in practice or a turn of the user's own in a conversation. The same rule
+// feeds the streak, "days active" and the achievements.
+export function isActiveDay(day) {
+  if (!day) return false;
+  return (day.sentences || []).some(isSpoken) || (day.chats || []).some(hasOwnTurn);
+}
+
+// Active days ever: the archive of pruned days plus the days still kept.
+export function selectDaysActive(state) {
+  const kept = Object.values(state?.sessions || {}).filter(isActiveDay).length;
+  return (state?.archive?.daysActive || 0) + kept;
+}

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useReducer, useEffect, useState, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  STORAGE_KEY, SCHEMA_VERSION, ensureUser, pruneOldSessions, computeLifetimeStats, defaultLifetimeStats,
+  STORAGE_KEY, SCHEMA_VERSION, ensureUser, computeLifetimeStats, defaultLifetimeStats,
   initialState, reducer, snapshotForSync, localDataOwnership, freshStateFor,
 } from "./appState";
 import { getTodayString } from "../utils/dateHelpers";
@@ -64,18 +64,17 @@ export function AppProvider({ children }) {
         const parsed = JSON.parse(saved);
         const today = getTodayString();
         const isPreVersioned = !parsed.schemaVersion || parsed.schemaVersion < SCHEMA_VERSION;
-        const prunedSessions = pruneOldSessions(parsed.sessions);
-        // Backfill lifetimeStats once for existing users from their full history
-        // (computed before pruning, so nothing already earned is lost).
+        // Backfill lifetimeStats once for existing users from their full history.
+        // Days older than a year are pruned (and archived) by LOAD_DATA itself.
         const lifetimeStats = isPreVersioned
           ? computeLifetimeStats(parsed.sessions, parsed.rolePlay?.chats)
           : parsed.lifetimeStats || defaultLifetimeStats;
-        const todayProgress = prunedSessions?.[today]?.sentences || [];
+        const todayProgress = parsed.sessions?.[today]?.sentences || [];
         dispatch({
           type: "LOAD_DATA",
           payload: {
             ...parsed,
-            sessions: prunedSessions,
+            sessions: parsed.sessions || {},
             todayProgress,
             lifetimeStats,
             user: parsed.user || ensureUser(null),

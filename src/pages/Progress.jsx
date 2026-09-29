@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
+import { selectDaysActive } from "../context/selectors";
 import { createCustomTopic } from "../data/rolePlayTopics";
 import LearningPath from "../components/progress/LearningPath";
 
@@ -19,8 +20,8 @@ const ACHIEVEMENTS = [
   }},
   { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%", check: (state) => state.lifetimeStats.sentencesAbove90 >= 10 },
   { id: "month-strong", icon: "📅", title: "Month Strong", desc: "30 days in a row", check: (state) => state.streak.longest >= 30 },
-  { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => state.lifetimeStats.daysActive >= 1 },
-  { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => state.lifetimeStats.daysActive >= 5 },
+  { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => selectDaysActive(state) >= 1 },
+  { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => selectDaysActive(state) >= 5 },
   { id: "century", icon: "💯", title: "Century Club", desc: "100 sentences practiced", check: (state) => state.lifetimeStats.totalSentences >= 100 },
   { id: "chatterbox", icon: "💬", title: "Chatterbox", desc: "10 conversations completed", check: (state) => state.lifetimeStats.totalChats >= 10 },
   { id: "explorer", icon: "🗺️", title: "Category Explorer", desc: "Practiced 5+ different topics", check: (state) => {

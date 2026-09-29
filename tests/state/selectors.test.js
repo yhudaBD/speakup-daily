@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { independentSpeakingMs, repeatSpeakingMs } from "../../src/context/selectors";
+import * as selectors from "../../src/context/selectors";
+
+const { independentSpeakingMs, repeatSpeakingMs } = selectors;
 
 // T4 in ACTION_PLAN.md. The North Star (minutes of independent speaking a
 // week) counts only turns the user said out loud. Records saved before T4
@@ -42,5 +44,50 @@ describe("repeatSpeakingMs", () => {
     ];
     expect(repeatSpeakingMs(sentences)).toBe(4000);
     expect(repeatSpeakingMs(undefined)).toBe(0);
+  });
+});
+
+// CRITICAL_REVIEW.md §3 and ACTION_PLAN.md D1/D5: an active day has at least
+// one act of speaking, and "days active" is computed, not a stored counter.
+describe("isActiveDay", () => {
+  const { isActiveDay } = selectors;
+
+  it("counts a day with a sentence said out loud", () => {
+    expect(isActiveDay({ sentences: [{ sentenceId: "s1", score: 40 }] })).toBe(true);
+    expect(isActiveDay({ sentences: [{ sentenceId: "s1", score: 40, kind: "speak" }] })).toBe(true);
+  });
+
+  it("counts a day with only a conversation the user took part in", () => {
+    expect(isActiveDay({ sentences: [], chats: [{ chatId: "c1", turnCount: 3, ownTurnCount: 1 }] })).toBe(true);
+    expect(isActiveDay({ chats: [{ chatId: "c1", turnCount: 2 }] })).toBe(true); // saved before ownTurnCount
+  });
+
+  it("doesn't count a conversation with no turn of the user's own, or none at all", () => {
+    expect(isActiveDay({ chats: [{ chatId: "c1", turnCount: 4, ownTurnCount: 0 }] })).toBe(false);
+    expect(isActiveDay({ chats: [{ chatId: "c1", turnCount: 0 }] })).toBe(false);
+  });
+
+  it("doesn't count sentence completion alone", () => {
+    expect(isActiveDay({ sentences: [{ sentenceId: "s1", score: 100, kind: "cloze" }] })).toBe(false);
+  });
+
+  it("handles an empty or missing day", () => {
+    expect(isActiveDay({})).toBe(false);
+    expect(isActiveDay(undefined)).toBe(false);
+  });
+});
+
+describe("selectDaysActive", () => {
+  it("adds the archived days to the active days still kept", () => {
+    const state = {
+      archive: { daysActive: 4 },
+      sessions: {
+        "2026-09-20": { sentences: [{ sentenceId: "s1", score: 80 }] },
+        "2026-09-21": { chats: [{ chatId: "c1", turnCount: 2 }] },
+        "2026-09-22": { chats: [{ chatId: "c2", turnCount: 0 }] },
+      },
+    };
+    expect(selectors.selectDaysActive(state)).toBe(6);
+    expect(selectors.selectDaysActive({ sessions: {} })).toBe(0);
   });
 });
