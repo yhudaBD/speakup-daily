@@ -153,6 +153,13 @@ export const conversationAnalysisSchema = z.pipe(
   z.transform((analysis) => ({ ...analysis, overall_score: rubricScore(analysis.rubric) })),
 );
 
+// Help with one word the user got wrong in practice (WordHelp.jsx).
+export const wordHelpSchema = z.object({
+  say_he: optionalText,
+  tip_he: requiredText,
+  meaning_he: optionalText,
+});
+
 export const practiceAnalysisSchema = z.object({
   summary_he: requiredText,
   speaking_tips: textList(8),

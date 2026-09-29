@@ -292,3 +292,30 @@ describe("conversation prompt style", () => {
     expect(await sentPrompt("easy")).toMatch(/prefer simple words/i);
   });
 });
+
+// The word help card (user report, 2026-09-29): how to say a word the user
+// got wrong, and what it means in the sentence. No made-up help on failure.
+describe("explainWord", () => {
+  const args = { word: "nuts", sentence: "I'm allergic to nuts.", heard: "not" };
+
+  it("asks about the word in its sentence and what was heard instead", async () => {
+    fetchMock.mockResolvedValue(groqReply({ say_he: "נַאטְס", tip_he: "התנועה היא a קצרה, לא o", meaning_he: "אגוזים" }));
+    const out = await aiService.explainWord(args);
+    expect(out).toEqual({ say_he: "נַאטְס", tip_he: "התנועה היא a קצרה, לא o", meaning_he: "אגוזים" });
+    const { messages } = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(messages[1].content).toContain("I'm allergic to nuts.");
+    expect(messages[1].content).toContain('"nuts"');
+    expect(messages[1].content).toContain('"not"');
+  });
+
+  it("says when nothing was heard in the word's place", async () => {
+    fetchMock.mockResolvedValue(groqReply({ tip_he: "נסה שוב" }));
+    await aiService.explainWord({ ...args, heard: "" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages[1].content).toMatch(/nothing/i);
+  });
+
+  it("rejects instead of inventing help", async () => {
+    fetchMock.mockResolvedValue(new Response("down", { status: 502 }));
+    await expect(aiService.explainWord(args)).rejects.toThrow();
+  });
+});

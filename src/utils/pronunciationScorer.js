@@ -85,7 +85,8 @@ function similarity(a, b) {
 
 // Word-level alignment (edit distance with substitution cost 1 - similarity).
 // Returns each target word's similarity to the heard word aligned with it
-// (0 when it was left out), and how many heard words were extra.
+// (0 when it was left out), that heard word's index (-1 when left out), and
+// how many heard words were extra.
 function alignWords(target, heard) {
   const m = target.length, n = heard.length;
   const sim = target.map((t) => heard.map((h) => similarity(t, h)));
@@ -96,11 +97,13 @@ function alignWords(target, heard) {
     }
   }
   const matched = Array(m).fill(0);
+  const heardIndex = Array(m).fill(-1);
   let insertions = 0;
   let i = m, j = n;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && dp[i][j] === dp[i - 1][j - 1] + 1 - sim[i - 1][j - 1]) {
       matched[i - 1] = sim[i - 1][j - 1];
+      heardIndex[i - 1] = j - 1;
       i--; j--;
     } else if (i > 0 && dp[i][j] === dp[i - 1][j] + 1) {
       i--;
@@ -109,7 +112,7 @@ function alignWords(target, heard) {
       j--;
     }
   }
-  return { matched, insertions };
+  return { matched, heardIndex, insertions };
 }
 
 export function scorePronunciation(original, spoken) {
@@ -120,19 +123,21 @@ export function scorePronunciation(original, spoken) {
   const heard = tokensOf(spoken).flatMap(normalizeToken);
   if (!target.length) return { score: 0, wordResults: [] };
 
-  const { matched, insertions } = alignWords(target, heard);
+  const { matched, heardIndex, insertions } = alignWords(target, heard);
   // An unrelated word in the target's place earns nothing.
   const credit = matched.map((s) => (s > MATCH_FLOOR ? s : 0));
 
   let k = 0;
   const wordResults = tokens.map(({ token, parts }) => {
     const scores = credit.slice(k, k + parts.length);
+    // What was heard in this word's place, for the word help card.
+    const heardHere = heardIndex.slice(k, k + parts.length).filter((j) => j >= 0).map((j) => heard[j]);
     k += parts.length;
     const matchScore = scores.reduce((a, b) => a + b, 0) / scores.length;
     let status = "incorrect";
     if (matchScore > 0.85) status = "correct";
     else if (matchScore > MATCH_FLOOR) status = "partial";
-    return { word: token.replace(/^[^\w']+|[^\w']+$/g, ""), status, matchScore };
+    return { word: token.replace(/^[^\w']+|[^\w']+$/g, ""), status, matchScore, heard: heardHere.join(" ") };
   });
 
   const total = credit.reduce((a, b) => a + b, 0);
