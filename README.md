@@ -23,7 +23,9 @@ AI-assisted sessions are in **[CLAUDE.md](./CLAUDE.md)**.
 React 19 + Vite 8, no backend framework — Netlify Functions for anything that needs a secret
 (Groq API key) or shared storage (Netlify Blobs for usage analytics). Auth is Firebase
 (Google sign-in, required); state lives in `localStorage` per device and syncs to Firestore
-per account once signed in.
+per account once signed in. The cloud structure is moving from one document per account to
+a profile, a document per month and one per chat (`MIGRATION_PLAN.md`, `src/cloud/`), behind
+a switch (see "Cloud structure rollout" below).
 
 ## Local development
 
@@ -75,7 +77,26 @@ Without a DSN the Sentry SDK is compiled out and isn't downloaded at all.
 are the only thing keeping one account from reading another's synced history (the Firebase
 web config is public by design). After changing them, deploy with
 `npx firebase-tools deploy --only firestore:rules` (project set in `.firebaserc`), or paste the
-file into Firebase Console → Firestore → Rules.
+file into Firebase Console → Firestore → Rules. The rules are tested against the Firestore
+emulator (`rules-tests/`), with the app's own schema 3 writes: `npm run test:rules` (needs
+Java for the emulator) and the `rules` job in CI.
+
+**Cloud structure rollout** (`MIGRATION_PLAN.md` §8, `src/cloud/flags.js`). Both are
+build-time variables, so redeploy after changing them:
+- `VITE_CLOUD_V3_EMAIL_HASHES` — comma-separated SHA-256 hashes of the lowercased emails
+  that use the new structure. Hashes, not addresses: every `VITE_` value ships in the public
+  bundle. To make one: `node -e "crypto.subtle.digest('SHA-256',new TextEncoder().encode('you@example.com')).then(b=>console.log(Buffer.from(b).toString('hex')))"`
+- `VITE_CLOUD_SCHEMA=v3` — the new structure for everyone. Back to `v2` (or unset) is the
+  way back.
+- Before switching anyone on: `scripts/migrate-dry-run.mjs` moves every account in memory and
+  reports, as numbers only, what the move would lose. It needs a service account key (see the
+  top of the script) whose account has the **Cloud Datastore Viewer** role; revoke the key
+  when done.
+
+**Bundle budget**: every page but Home loads on demand, and Firebase and React are chunks of
+their own. `scripts/check-bundle-size.mjs` fails the build (in CI and on Netlify) when the
+JavaScript the first screen downloads passes 300KB gzipped. New content (word lists, audio)
+belongs in chunks loaded with `import()` where it's used.
 
 **Netlify Free build-minute cap**: the account is on Netlify's free tier, capped at 300 build
 minutes/month account-wide (not per site) on a fixed monthly anchor date — not the calendar
@@ -91,8 +112,9 @@ PROJECT_OVERVIEW.md §9 for the full incident writeup from September 2026.
 
 One feature branch per task, tests (`npm test -- --run`), build (`npm run build`) and lint
 (`npm run lint`) clean, then
-merge `--no-ff` into `main` and push. GitHub Actions (`.github/workflows/ci.yml`) runs the same
-checks, plus `npm audit` on production dependencies, on every push, so a red check on `main`
-means the deploy Netlify just made should not have happened. Netlify skips the build entirely
+merge `--no-ff` into `main` and push. Netlify's build command runs lint, tests, the build and
+the bundle budget first, so broken code doesn't publish and the previous deploy stays live.
+GitHub Actions (`.github/workflows/ci.yml`) runs the same checks, plus `npm audit` on
+production dependencies and the Firestore rules tests, on every push. Netlify skips the build entirely
 when a push touches only docs/tests/CI/Firestore rules (`ignore` in `netlify.toml`). `git log --oneline` on `main` is the authoritative
 history of what's been built and why — commit messages here are written to stand alone.
