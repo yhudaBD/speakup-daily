@@ -21,6 +21,28 @@ const conversation = [
 ];
 
 describe("analyzeConversation", () => {
+  // CRITICAL_REVIEW.md §5 fix #3: the model is told which turns the user
+  // didn't write, and not to score them.
+  it("marks turns read from a suggestion or a translation in the transcript", async () => {
+    fetchMock.mockResolvedValue(groqReply({ overall_score: 70, summary: "טוב" }));
+    await aiService.analyzeConversation({
+      topicTitle: "Café",
+      messages: [
+        { role: "assistant", content: "Hi!" },
+        { role: "user", content: "A coffee", source: "spoken" },
+        { role: "user", content: "With milk", source: "typed" },
+        { role: "user", content: "I would like a cake", source: "suggestion" },
+        { role: "user", content: "Where is the toilet?", source: "translated" },
+        { role: "user", content: "Old turn" },
+      ],
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const [system, user] = body.messages;
+    expect(user.content).toContain("AI: Hi!\nStudent: A coffee\nStudent: With milk\n"
+      + "Student (read a suggestion): I would like a cake\nStudent (used a translation): Where is the toilet?\nStudent: Old turn");
+    expect(system.content).toMatch(/read a suggestion.*used a translation/s);
+  });
+
   it("rejects instead of inventing a score when the AI is unavailable", async () => {
     fetchMock.mockResolvedValue(new Response("upstream down", { status: 502 }));
     await expect(aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" })).rejects.toThrow();
@@ -180,6 +202,8 @@ describe("sendMessage", () => {
     expect(out).toEqual({
       ai_reply: "Hello!",
       ai_reply_he: "",
+      hint_he: "",
+      starter: "",
       suggested_user_responses: [{ en: "Hi there", he: "", hint: "" }],
     });
     warn.mockRestore();
@@ -222,5 +246,27 @@ describe("beta access", () => {
 
     await expect(fresh.analyzeConversation({ messages: conversation, topicTitle: "Café" })).rejects.toThrow(/403/);
     expect(isNotInBeta()).toBe(false);
+  });
+});
+
+// CRITICAL_REVIEW.md §5: the hint ladder gets a Hebrew idea and opening words
+// with every reply, and nothing in hard mode.
+describe("sendMessage hints", () => {
+  const args = { systemPrompt: "You are a barista.", messages: [{ role: "user", content: "Hi" }] };
+
+  it("returns the Hebrew idea and the opening words", async () => {
+    fetchMock
+      .mockResolvedValueOnce(groqReply({ ai_reply: "Hello!", hint_he: "תזמין שתייה", starter: "Can I get", suggested_user_responses: ["Can I get a tea?"] }))
+      .mockResolvedValueOnce(groqReply({ translations: ["שלום!", "אפשר לקבל תה?"] }));
+    const out = await aiService.sendMessage(args);
+    expect(out).toMatchObject({ hint_he: "תזמין שתייה", starter: "Can I get" });
+  });
+
+  it("gives no help in hard mode", async () => {
+    fetchMock
+      .mockResolvedValueOnce(groqReply({ ai_reply: "Hello!", hint_he: "תזמין שתייה", starter: "Can I get", suggested_user_responses: ["Can I get a tea?"] }))
+      .mockResolvedValueOnce(groqReply({ translations: ["שלום!"] }));
+    const out = await aiService.sendMessage({ ...args, chatDifficulty: "hard" });
+    expect(out).toMatchObject({ hint_he: "", starter: "", suggested_user_responses: [] });
   });
 });

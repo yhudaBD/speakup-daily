@@ -20,6 +20,15 @@ export function independentSpeakingMs(messages) {
     .reduce((sum, m) => sum + m.durationMs, 0);
 }
 
+// Share of a conversation's user turns that came from a suggestion or a
+// translation. Turns saved before T4 have no source and count as the user's.
+// ADJUST_LEVEL won't raise the level on a conversation above 30% (§5 fix #4).
+export function helpedTurnShare(messages) {
+  const turns = (messages || []).filter((m) => m?.role === "user");
+  if (!turns.length) return 0;
+  return turns.filter((m) => m.source === "suggestion" || m.source === "translated").length / turns.length;
+}
+
 // Milliseconds spent reading sentences aloud in practice. Attempts saved
 // before T4 have no duration and count as 0.
 export function repeatSpeakingMs(sentences) {

@@ -31,6 +31,8 @@ describe("chatTurnSchema", () => {
     });
     expect(out).toEqual({
       ai_reply: "Hi!",
+      hint_he: "",
+      starter: "",
       suggested_user_responses: [{ en: "Hello", hint: "" }, { en: "I'd like tea", hint: "polite" }],
     });
   });
@@ -38,6 +40,13 @@ describe("chatTurnSchema", () => {
   it("requires a reply", () => {
     expect(chatTurnSchema.safeParse({ ai_reply: "  " }).success).toBe(false);
     expect(chatTurnSchema.safeParse({}).success).toBe(false);
+  });
+
+  // CRITICAL_REVIEW.md §5: the hint ladder's first two steps.
+  it("keeps the Hebrew idea and the opening words of a reply", () => {
+    const out = chatTurnSchema.parse({ ai_reply: "Hi", hint_he: " ספר מה אתה רוצה ", starter: "I'd like " });
+    expect(out).toMatchObject({ hint_he: "ספר מה אתה רוצה", starter: "I'd like" });
+    expect(chatTurnSchema.parse({ ai_reply: "Hi", hint_he: 5 })).toMatchObject({ hint_he: "", starter: "" });
   });
 
   it("treats missing suggestions as none", () => {

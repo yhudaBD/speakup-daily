@@ -27,11 +27,15 @@ const CEFR_LEVELS = ["Pre-A1", "A1", "A2", "B1", "B2", "C1"];
 // A single strong/weak conversation shouldn't whipsaw the level, but two in a
 // row without a mixed result in between is a real signal — nudge one CEFR
 // step and reset both streaks so the next adjustment needs fresh evidence.
-function adjustLevel(placement, score) {
+// A conversation where more than 30% of the turns came from a suggestion or a
+// translation is no evidence for a higher level (CRITICAL_REVIEW.md §5).
+const MAX_HELPED_SHARE_TO_RAISE = 0.3;
+
+function adjustLevel(placement, score, helpedShare = 0) {
   const currentIdx = CEFR_LEVELS.indexOf(placement.overall_level);
   if (currentIdx === -1) return placement;
 
-  const strong = score >= 85;
+  const strong = score >= 85 && helpedShare <= MAX_HELPED_SHARE_TO_RAISE;
   const weak = score < 45;
   const highStreak = strong ? (placement.highStreak || 0) + 1 : 0;
   const lowStreak = weak ? (placement.lowStreak || 0) + 1 : 0;
@@ -348,7 +352,7 @@ export function reducer(state, action) {
     }
     case "ADJUST_LEVEL": {
       if (!state.placement) return state;
-      return { ...state, placement: adjustLevel(state.placement, action.payload.score) };
+      return { ...state, placement: adjustLevel(state.placement, action.payload.score, action.payload.helpedShare) };
     }
     case "MERGE_PLACEMENT_GAPS": {
       if (!state.placement) return state;

@@ -200,3 +200,19 @@ describe("finished conversations (§16)", () => {
     expect(selectors.isActiveDay({ chats: [chat(1, { status: "abandoned" })] })).toBe(true);
   });
 });
+
+// CRITICAL_REVIEW.md §5 fix #4: the share of a conversation's user turns that
+// came from a suggestion or a translation.
+describe("helpedTurnShare", () => {
+  it("counts suggestion and translated turns out of the user's turns", () => {
+    const messages = [
+      { role: "assistant", content: "Hi" },
+      { role: "user", content: "a", source: "spoken" },
+      { role: "user", content: "b", source: "suggestion" },
+      { role: "user", content: "c", source: "translated" },
+      { role: "user", content: "d" },
+    ];
+    expect(selectors.helpedTurnShare(messages)).toBe(0.5);
+    expect(selectors.helpedTurnShare([])).toBe(0);
+  });
+});
