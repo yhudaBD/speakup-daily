@@ -9,12 +9,17 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { ANALYSIS_SYSTEM, analysisTranscript } from "../src/services/analysisPrompt.js";
-import { conversationAnalysisSchema } from "../src/services/aiSchemas.js";
+import { conversationAnalysisSchema, rubricLevel } from "../src/services/aiSchemas.js";
 
 export const PARTS = ["fluency", "grammar", "vocabulary"];
-// Agreement needed to call the prompt fit: 85% of parts within 1, and no
-// part off by 3 or more.
+// What it takes to call the prompt fit: 85% of parts within 1, no part off
+// by 3 or more, no pull to one side (the mean difference within 0.4; a
+// model that rates everyone 3 passes "within 1" but moves nobody's level),
+// and the level each example shows (rubricLevel, which ADJUST_LEVEL uses)
+// within one step of the expected one.
 export const MIN_AGREEMENT = 0.85;
+export const MAX_BIAS = 0.4;
+const LEVELS = ["Pre-A1", "A1", "A2", "B1", "B2", "C1"];
 
 const MODEL = "openai/gpt-oss-120b"; // TRANSLATION_MODEL in ai.service.js
 const TEMPERATURE = 0.3;
@@ -24,14 +29,23 @@ export function compareRubric(expected, actual) {
   return Object.fromEntries(PARTS.map((p) => [p, actual[p] - expected[p]]));
 }
 
-// Agreement over all examples: the share of parts within 1, and the
-// examples with a part off by 3 or more.
+// Levels between the expected rubric's and the actual one's.
+export function levelSteps(expected, actual) {
+  return LEVELS.indexOf(rubricLevel(actual)) - LEVELS.indexOf(rubricLevel(expected));
+}
+
+// Over all examples ({ id, expected, actual }): the share of parts within 1,
+// the mean difference, the examples with a part off by 3 or more, and those
+// whose level is off by more than one step.
 export function summarize(results) {
-  const diffs = results.flatMap((r) => PARTS.map((p) => r.diff[p]));
+  const diffs = results.flatMap((r) => PARTS.map((p) => r.actual[p] - r.expected[p]));
   const within = diffs.filter((d) => Math.abs(d) <= 1).length;
   const agreement = diffs.length ? within / diffs.length : 0;
-  const farOff = results.filter((r) => PARTS.some((p) => Math.abs(r.diff[p]) >= 3)).map((r) => r.id);
-  return { agreement, farOff, pass: agreement >= MIN_AGREEMENT && farOff.length === 0 };
+  const bias = diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0;
+  const farOff = results.filter((r) => PARTS.some((p) => Math.abs(r.actual[p] - r.expected[p]) >= 3)).map((r) => r.id);
+  const levelOff = results.filter((r) => Math.abs(levelSteps(r.expected, r.actual)) > 1).map((r) => r.id);
+  const pass = agreement >= MIN_AGREEMENT && Math.abs(bias) <= MAX_BIAS && farOff.length === 0 && levelOff.length === 0;
+  return { agreement, bias, farOff, levelOff, pass };
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -77,10 +91,9 @@ async function main() {
   for (const example of examples) {
     try {
       const { rubric, overall_score } = await analyze(example, apiKey);
-      const diff = compareRubric(example.expected, rubric);
-      results.push({ id: example.id, diff });
+      results.push({ id: example.id, expected: example.expected, actual: rubric });
       const shown = PARTS.map((p) => `${p} ${rubric[p]} (${example.expected[p]})`).join(", ");
-      console.log(`${example.id}: ${shown}, score ${overall_score}`);
+      console.log(`${example.id}: ${shown}, score ${overall_score}, level ${rubricLevel(rubric)} (${rubricLevel(example.expected)})`);
     } catch (err) {
       if (err.fatal) {
         console.error(err.message);
@@ -88,12 +101,14 @@ async function main() {
         return;
       }
       console.log(`${example.id}: failed, ${err.message}`);
-      results.push({ id: example.id, diff: Object.fromEntries(PARTS.map((p) => [p, 99])) });
+      results.push({ id: example.id, expected: example.expected, actual: { fluency: 99, grammar: 99, vocabulary: 99 } });
     }
   }
-  const { agreement, farOff, pass } = summarize(results);
+  const { agreement, bias, farOff, levelOff, pass } = summarize(results);
   console.log(`\nWithin 1 of expected: ${Math.round(agreement * 100)}% (need ${MIN_AGREEMENT * 100}%)`);
+  console.log(`Mean difference: ${bias.toFixed(2)} (need within ${MAX_BIAS})`);
   if (farOff.length) console.log(`Off by 3 or more: ${farOff.join(", ")}`);
+  if (levelOff.length) console.log(`Level off by 2 or more: ${levelOff.join(", ")}`);
   console.log(pass ? "PASS" : "FAIL");
   process.exitCode = pass ? 0 : 1;
 }

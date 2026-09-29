@@ -1,5 +1,6 @@
 import { addDays, parseDateKey, toDateKey } from "../utils/dateHelpers";
 import { sentenceKind } from "./migrations";
+import { rubricLevel } from "../services/aiSchemas";
 
 // Values derived from the saved data, computed rather than stored
 // (ACTION_PLAN.md, D5). A stored counter drifts from the data it summarizes;
@@ -40,12 +41,18 @@ export function ownTurns(messages) {
   ).length;
 }
 
-// The ADJUST_LEVEL payload for an analyzed conversation, or null when it
-// shouldn't move the level.
+// rubricLevel lives with the analysis schema, so the rubric examples script
+// can use it outside Vite (scripts/eval-conversation-rubric.mjs).
+export { rubricLevel };
+
+// The ADJUST_LEVEL payload for an analyzed conversation: the level it
+// shows, compared there with the user's own. Null when it shouldn't move
+// the level (CRITICAL_REVIEW.md §14).
 export function levelAdjustment(messages, feedback) {
-  if (typeof feedback?.overall_score !== "number") return null;
+  const level = rubricLevel(feedback?.rubric);
+  if (!level) return null;
   if (ownTurns(messages) < MIN_OWN_TURNS_FOR_LEVEL) return null;
-  return { score: feedback.overall_score, helpedShare: helpedTurnShare(messages) };
+  return { level, helpedShare: helpedTurnShare(messages) };
 }
 
 // Milliseconds spent reading sentences aloud in practice. Attempts saved

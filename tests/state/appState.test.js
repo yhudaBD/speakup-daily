@@ -380,19 +380,56 @@ describe("plan progress (§16)", () => {
 // translations (more than 30% of the turns) can't raise the level.
 describe("ADJUST_LEVEL and help (§5)", () => {
   const b1 = loaded({ placement: { overall_level: "B1" } });
-  const adjust = (state, score, helpedShare) => reducer(state, { type: "ADJUST_LEVEL", payload: { score, helpedShare } });
+  const adjust = (state, level, helpedShare) => reducer(state, { type: "ADJUST_LEVEL", payload: { level, helpedShare } });
 
-  it("raises the level after two strong conversations of the user's own", () => {
-    expect(adjust(adjust(b1, 90, 0.2), 90, 0).placement.overall_level).toBe("B2");
+  it("raises the level after two conversations above it, of the user's own", () => {
+    expect(adjust(adjust(b1, "B2", 0.2), "C1", 0).placement.overall_level).toBe("B2");
   });
 
   it("doesn't raise it when a strong conversation leaned on help", () => {
-    expect(adjust(adjust(b1, 90, 0.5), 90, 0).placement.overall_level).toBe("B1");
-    expect(adjust(adjust(b1, 90, 0), 90, 0.31).placement.overall_level).toBe("B1");
+    expect(adjust(adjust(b1, "B2", 0.5), "B2", 0).placement.overall_level).toBe("B1");
+    expect(adjust(adjust(b1, "B2", 0), "B2", 0.31).placement.overall_level).toBe("B1");
   });
 
   it("can still lower it", () => {
-    expect(adjust(adjust(b1, 30, 0.8), 30, 0.8).placement.overall_level).toBe("A2");
+    expect(adjust(adjust(b1, "A2", 0.8), "A1", 0.8).placement.overall_level).toBe("A2");
+  });
+});
+
+// CRITICAL_REVIEW.md §14: the level moves by comparing the level a
+// conversation shows with the user's, not by an absolute score. An absolute
+// score lowered an A2 learner for talking like an A2 learner.
+describe("ADJUST_LEVEL compares with the user's level (§14)", () => {
+  const at = (level) => loaded({ placement: { overall_level: level } });
+  const adjust = (state, level) => reducer(state, { type: "ADJUST_LEVEL", payload: { level, helpedShare: 0 } });
+
+  it("keeps a learner who talks at their level where they are", () => {
+    const a2 = [1, 2, 3, 4].reduce((s) => adjust(s, "A2"), at("A2"));
+    expect(a2.placement.overall_level).toBe("A2");
+    const b2 = [1, 2, 3, 4].reduce((s) => adjust(s, "B2"), at("B2"));
+    expect(b2.placement.overall_level).toBe("B2");
+  });
+
+  it("needs two in a row: a conversation at the level in between starts over", () => {
+    expect(adjust(adjust(adjust(at("B1"), "B2"), "B1"), "B2").placement.overall_level).toBe("B1");
+  });
+
+  // The rubric examples (scripts/eval-conversation-rubric.mjs) read C1
+  // speakers as B2 and Pre-A1 ones as A1 at times: at the ends of the scale,
+  // one step says nothing.
+  it("moves off the top or bottom level only on a conversation two steps away", () => {
+    const c1 = [1, 2].reduce((s) => adjust(s, "B2"), at("C1"));
+    expect(c1.placement.overall_level).toBe("C1");
+    expect([1, 2].reduce((s) => adjust(s, "B1"), at("C1")).placement.overall_level).toBe("B2");
+
+    const preA1 = [1, 2].reduce((s) => adjust(s, "A1"), at("Pre-A1"));
+    expect(preA1.placement.overall_level).toBe("Pre-A1");
+    expect([1, 2].reduce((s) => adjust(s, "A2"), at("Pre-A1")).placement.overall_level).toBe("A1");
+  });
+
+  it("ignores a conversation without a recognizable level", () => {
+    const b1 = at("B1");
+    expect(adjust(b1, undefined)).toBe(b1);
   });
 });
 
@@ -420,16 +457,16 @@ describe("level sets the difficulty (§13)", () => {
 
   it("follows the level when ADJUST_LEVEL moves it, and only then", () => {
     const b1 = placed(loaded(), "B1");
-    const once = reducer(b1, { type: "ADJUST_LEVEL", payload: { score: 90 } });
+    const once = reducer(b1, { type: "ADJUST_LEVEL", payload: { level: "B2" } });
     expect(once.settings).toMatchObject({ difficulty: "medium", chatDifficulty: "medium" });
-    const raised = reducer(once, { type: "ADJUST_LEVEL", payload: { score: 90 } });
+    const raised = reducer(once, { type: "ADJUST_LEVEL", payload: { level: "B2" } });
     expect(raised.placement.overall_level).toBe("B2");
     expect(raised.settings).toMatchObject({ difficulty: "advanced", chatDifficulty: "hard" });
   });
 
   it("leaves a manual choice alone when the level moves", () => {
     const chose = reducer(placed(loaded(), "B1"), { type: "UPDATE_SETTINGS", payload: { difficulty: "easy" } });
-    const raised = [90, 90].reduce((s, score) => reducer(s, { type: "ADJUST_LEVEL", payload: { score } }), chose);
+    const raised = ["B2", "B2"].reduce((s, level) => reducer(s, { type: "ADJUST_LEVEL", payload: { level } }), chose);
     expect(raised.settings.difficulty).toBe("easy");
   });
 });

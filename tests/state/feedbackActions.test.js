@@ -15,7 +15,7 @@ describe("actionsForFeedback", () => {
   it("saves the feedback and adjusts the level, without touching the placement gaps", () => {
     const actions = actionsForFeedback({ chatId: "c1", feedback, messages: own(4) });
     expect(actions.map((a) => a.type)).toEqual(["UPDATE_ROLEPLAY_FEEDBACK", "ADJUST_LEVEL"]);
-    expect(actions[1].payload).toEqual({ score: 90, helpedShare: 0 });
+    expect(actions[1].payload).toEqual({ level: "C1", helpedShare: 0 });
   });
 
   it("only saves the feedback of a conversation too short to move the level (§14)", () => {

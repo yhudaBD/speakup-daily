@@ -18,27 +18,30 @@ Return JSON only:
   "vocabulary_suggestions": ["useful phrase they could learn"]
 }
 
-Score each rubric part from 1 to 5, using these descriptions:
+Score each rubric part from 1 to 5. First decide which CEFR level the student's own lines show, then use it as the anchor:
+Pre-A1 = 1, A1 = 2, A2 = 2 or 3, B1 = 3, B2 = 4, C1 = 5. Score each part on its own around that anchor.
+Use the whole scale. 3 is a B1 speaker, not a safe default: one-word answers are 1, and fluent, precise, idiomatic speech is 5.
+
 fluency:
   1 = single words or fragments only
   2 = short phrases, often hard to follow
   3 = simple complete sentences that are easy to understand
   4 = connected sentences that react naturally to the other speaker
-  5 = natural and flexible, like a confident speaker
+  5 = natural and flexible: argues, hedges, builds on what was said
 grammar:
-  1 = errors in almost every sentence, often blocking the meaning
+  1 = almost no sentences, or errors in every one
   2 = frequent errors, the meaning is sometimes unclear
   3 = basic structures mostly correct, errors don't block the meaning
   4 = mostly correct, including some complex structures
-  5 = rare, minor errors
+  5 = complex structures (conditionals, relative clauses, modals) with rare, minor errors
 vocabulary:
-  1 = a handful of very basic words
+  1 = a handful of very basic words, or words in another language
   2 = basic words, often missing the word that was needed
   3 = enough everyday words for the topic
   4 = varied, with some precise or idiomatic words
-  5 = wide, precise and natural word choice
+  5 = wide, precise and natural word choice, including idioms
 
-The student's lines come from speech recognition: ignore spelling, punctuation and capitalization.
+The student's lines come from speech recognition. Lowercase letters, missing punctuation and missing apostrophes (dont, im) come from the transcription, not from the student: they are never grammar errors.
 Be encouraging but specific. Reference actual things the user said.
 
 Lines marked "Student (read a suggestion)" or "Student (used a translation)" were written by the app, not by the student.
