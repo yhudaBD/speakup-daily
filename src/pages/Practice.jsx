@@ -16,6 +16,8 @@ import { aiService } from "../services/ai.service";
 import { reportSpeakingTime } from "../utils/speakingTime";
 import { addAttempt, attemptFields } from "../utils/practiceAttempts";
 import { useToday } from "../hooks/useToday";
+import { WordHighlight } from "../components/practice/WordHighlight";
+import { WordHelp } from "../components/practice/WordHelp";
 import { selectTodayProgress } from "../context/selectors";
 
 function WaveAnimation() {
@@ -28,23 +30,9 @@ function WaveAnimation() {
   );
 }
 
-function WordHighlight({ wordResults }) {
-  if (!wordResults?.length) return null;
-  return (
-    <div style={{ textAlign: "center", margin: "16px 0", lineHeight: 2 }}>
-      {wordResults.map(({ word, status }, i) => (
-        <span
-          key={i}
-          className={`word-chip word-${status === "correct" ? "correct" : status === "partial" ? "partial" : "incorrect"}`}
-        >
-          {word}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function ScoreDisplay({ score, wordResults }) {
+function ScoreDisplay({ score, wordResults, sentence }) {
+  // The word whose help card is open (WordHelp).
+  const [selected, setSelected] = useState(null);
   let colorClass = "score-poor";
   let label = "Try Again! 💪";
   let bg = "var(--color-error)";
@@ -67,7 +55,8 @@ function ScoreDisplay({ score, wordResults }) {
       <p dir="ltr" style={{ fontSize: "1.2rem", fontWeight: 800, marginTop: 12, fontFamily: "var(--font-display)", textAlign: "center" }}>
         {label}
       </p>
-      <WordHighlight wordResults={wordResults} />
+      <WordHighlight wordResults={wordResults} selected={selected} onSelect={setSelected} />
+      {selected && <WordHelp key={selected.word} word={selected.word} heard={selected.heard} sentence={sentence} />}
     </div>
   );
 }
@@ -922,7 +911,7 @@ export default function Practice() {
 
           {practiceState === "RESULT" && result && (
             <>
-              <ScoreDisplay score={result.score} wordResults={result.wordResults} />
+              <ScoreDisplay key={result.spoken} score={result.score} wordResults={result.wordResults} sentence={currentSentence.text} />
               {result.spoken && (
                 <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
                   שמע: "<em dir="ltr">{result.spoken}</em>"

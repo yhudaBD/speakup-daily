@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chatTurnSchema,
   conversationAnalysisSchema,
+  wordHelpSchema,
   placementTurnSchema,
   practiceAnalysisSchema,
   practiceSentencesSchema,
@@ -137,5 +138,12 @@ describe("practice schemas", () => {
   it("requires at least one usable sentence", () => {
     expect(practiceSentencesSchema.safeParse({ sentences: [{ translation: "x" }] }).success).toBe(false);
     expect(practiceSentencesSchema.parse({ sentences: [{ text: " Hi " }] }).sentences[0].text).toBe("Hi");
+  });
+});
+
+describe("wordHelpSchema", () => {
+  it("needs a tip and fills the rest", () => {
+    expect(wordHelpSchema.parse({ tip_he: " תגיד a " })).toEqual({ say_he: "", tip_he: "תגיד a", meaning_he: "" });
+    expect(wordHelpSchema.safeParse({ say_he: "x" }).success).toBe(false);
   });
 });

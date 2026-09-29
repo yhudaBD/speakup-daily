@@ -665,6 +665,15 @@ h3 { font-size: clamp(1rem, 3vw, 1.25rem); }
 .word-correct { background: var(--color-success-light); color: #14532d; }
 .word-partial { background: var(--color-warning-light); color: #78350f; }
 .word-incorrect { background: var(--color-error-light); color: #7f1d1d; }
+/* A word that wasn't clear opens its help card (WordHelp). */
+.word-chip-button {
+  border: 2px solid transparent;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+.word-chip-button[aria-pressed="true"] { border-color: currentColor; }
 
 /* ===== WAVE ANIMATION ===== */
 .wave-container {

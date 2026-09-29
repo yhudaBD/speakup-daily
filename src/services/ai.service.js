@@ -5,7 +5,7 @@ import { auth } from "./firebase";
 import { markNotInBeta } from "./betaAccess";
 import {
   chatTurnSchema, translationSchema, placementTurnSchema,
-  conversationAnalysisSchema, practiceAnalysisSchema, practiceSentencesSchema,
+  conversationAnalysisSchema, practiceAnalysisSchema, practiceSentencesSchema, wordHelpSchema,
 } from "./aiSchemas";
 
 const PROXY_URL = "/api/groq-proxy";
@@ -105,6 +105,15 @@ Rules:
 - Pick 3-5 useful words/phrases from the sentences practiced — focus on ones worth remembering.
 - speaking_tips: 2-3 tips about SPOKEN English (not written grammar textbooks).
 - Be encouraging and specific. Reference the topic/category if given.`;
+
+const WORD_HELP_SYSTEM = `You help an Israeli adult learner who said one English word unclearly while reading a sentence aloud.
+Return JSON only:
+{
+  "say_he": "How the word sounds, written in Hebrew letters (with niqqud where it helps)",
+  "tip_he": "1-2 short Hebrew sentences: how to say it right. If speech recognition heard a different word, explain the likely mix-up (for example the vowel).",
+  "meaning_he": "What the word means in this sentence, in Hebrew, in a few words"
+}
+Be concrete and short. Do not mention speech recognition or scores.`;
 
 // gpt-oss models on Groq occasionally fail to produce valid JSON-mode output —
 // observed in practice as three distinct 400 error codes:
@@ -400,6 +409,24 @@ export const aiService = {
       ],
       temperature: 0.3,
       schema: conversationAnalysisSchema,
+      signal,
+    });
+  },
+
+  // How to say one word the user got wrong in a practice sentence, and what
+  // it means there (WordHelp.jsx). `heard` is what speech recognition heard
+  // in its place, empty when nothing was. Throws on failure; the card shows
+  // an error with a retry instead of made-up help.
+  async explainWord({ word, sentence, heard, signal }) {
+    const heardLine = heard ? `Speech recognition heard instead: "${heard}"` : "Speech recognition heard nothing in its place.";
+    return groqChat({
+      model: CHAT_MODEL,
+      messages: [
+        { role: "system", content: WORD_HELP_SYSTEM },
+        { role: "user", content: `Sentence: ${sentence}\nWord: "${word}"\n${heardLine}` },
+      ],
+      temperature: 0.3,
+      schema: wordHelpSchema,
       signal,
     });
   },

@@ -67,3 +67,17 @@ describe("verified bugs (CRITICAL_REVIEW.md §4)", () => {
     expect(score("I'll be there in five minutes.", "I'll be there in 5 minutes")).toBeGreaterThanOrEqual(95);
   });
 });
+
+// For the word help card (user report, 2026-09-29): what was heard in place
+// of each word of the sentence.
+describe("scorePronunciation heard words", () => {
+  const heard = (target, spoken) => scorePronunciation(target, spoken).wordResults.map((w) => w.heard);
+
+  it("gives the heard word aligned with each target word", () => {
+    expect(heard("I'm allergic to nuts.", "I am allergic to not")).toEqual(["i am", "allergic", "to", "not"]);
+  });
+
+  it("gives an empty string for a word that wasn't said", () => {
+    expect(heard("I really need water", "I need water")).toEqual(["i", "", "need", "water"]);
+  });
+});
