@@ -675,6 +675,65 @@ h3 { font-size: clamp(1rem, 3vw, 1.25rem); }
 }
 .word-chip-button[aria-pressed="true"] { border-color: currentColor; }
 
+/* ===== SENTENCE COMPLETION (ClozeQuestion) ===== */
+.cloze-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+.cloze-sentence {
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.7;
+  color: var(--color-text);
+  text-align: left;
+}
+.cloze-blank {
+  display: inline-block;
+  min-width: 4.5em;
+  padding: 0 8px;
+  margin: 0 4px;
+  border-bottom: 3px solid var(--color-primary);
+  background: var(--color-primary-light);
+  border-radius: 8px 8px 0 0;
+  text-align: center;
+  color: var(--color-primary);
+  transition: all 0.25s ease;
+}
+.cloze-blank.is-correct { background: var(--color-success-light); border-color: var(--color-success); color: #166534; }
+.cloze-blank.is-wrong { background: var(--color-error-light); border-color: var(--color-error); color: #991b1b; }
+.cloze-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cloze-option {
+  min-height: 60px;
+  padding: 14px 10px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-primary-light);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.cloze-option:not(:disabled):hover { border-color: var(--color-primary); transform: translateY(-2px); }
+.cloze-option:not(:disabled):active { transform: scale(0.97); }
+.cloze-option:disabled { cursor: default; }
+.cloze-option.is-correct { border-color: var(--color-success); background: var(--color-success-light); color: #166534; }
+.cloze-option.is-wrong { border-color: var(--color-error); background: var(--color-error-light); color: #991b1b; }
+.cloze-option.is-dimmed { opacity: 0.5; box-shadow: none; }
+
 /* ===== WAVE ANIMATION ===== */
 .wave-container {
   display: flex;

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getDailySentences, categories, categoryMeta, sentences as allSentences } from "../data/sentences";
+import { ClozeQuestion } from "../components/practice/ClozeQuestion";
 
 // Short/function words make poor blanks (too easy, or ambiguous without
 // context) — only pull content words long enough to actually test recall.
@@ -166,6 +167,7 @@ export default function ClozePractice() {
     [results]
   );
   const correctCount = results.filter((r) => r.score === 100).length;
+  const progress = items.length ? Math.round((results.length / items.length) * 100) : 0;
 
   if (screen === "setup") {
     return <CategoryPicker onPick={startSession} onBack={() => navigate("/practice")} />;
@@ -209,50 +211,25 @@ export default function ClozePractice() {
   return (
     <div className="page-enter" style={{ padding: "20px 0" }}>
       <div className="container desktop-center">
-        <p className="text-muted mb-3" style={{ fontSize: 13 }}>
-          {categoryMeta[current.category]?.emoji || "✍️"} משפט {idx + 1} מתוך {items.length}
-        </p>
-
-        <div className="card" style={{ marginBottom: 20, textAlign: "center" }}>
-          <p dir="ltr" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.6 }}>{current.blanked}</p>
-          {settings.showTranslation && (
-            <p className="text-muted" style={{ marginTop: 10, direction: "rtl" }}>{current.translation}</p>
-          )}
+        <div style={{ marginBottom: 16 }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-muted" style={{ fontSize: 13 }}>
+              {categoryMeta[current.category]?.emoji || "✍️"} משפט {idx + 1} מתוך {items.length}
+            </span>
+            <span style={{ fontWeight: 700, fontSize: 13, color: "var(--color-primary)" }}>{progress}%</span>
+          </div>
+          <div className="progress-bar-track">
+            <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+          </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-          {current.options.map((option) => {
-            const isAnswer = option.toLowerCase() === current.answer.toLowerCase();
-            const isChosen = chosen === option;
-            let border = "1.5px solid #EEF0FF";
-            let bg = "#fff";
-            if (chosen) {
-              if (isAnswer) { border = "2px solid var(--color-success)"; bg = "var(--color-success-light)"; }
-              else if (isChosen) { border = "2px solid var(--color-error)"; bg = "var(--color-error-light)"; }
-            }
-            return (
-              <button
-                key={option}
-                type="button"
-                disabled={!!chosen}
-                onClick={() => handleChoose(option)}
-                dir="ltr"
-                style={{
-                  padding: "14px 10px",
-                  borderRadius: 14,
-                  border,
-                  background: bg,
-                  cursor: chosen ? "default" : "pointer",
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: "var(--color-text)",
-                }}
-              >
-                {option}
-              </button>
-            );
-          })}
-        </div>
+        <ClozeQuestion
+          item={current}
+          chosen={chosen}
+          onChoose={handleChoose}
+          showTranslation={settings.showTranslation}
+          ttsSpeed={settings.ttsSpeed}
+        />
 
         {chosen && (
           <button className="btn btn-primary btn-block" onClick={handleNext}>
