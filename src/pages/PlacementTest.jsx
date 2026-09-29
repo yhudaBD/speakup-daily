@@ -6,6 +6,7 @@ import { ConversationBubble } from '../components/roleplay/ConversationBubble';
 import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
 import { MicButton } from '../components/roleplay/MicButton';
 import { isBaselineDismissed } from '../services/baselineRecordings';
+import { chatPhaseIsImmersive, useImmersiveChat } from '../hooks/useImmersiveChat';
 
 const EMOJI = '🧭';
 
@@ -131,12 +132,7 @@ export default function PlacementTest() {
     }
   };
 
-  useEffect(() => {
-    if (phase !== 'IDLE') {
-      document.documentElement.classList.add('immersive-chat');
-      return () => document.documentElement.classList.remove('immersive-chat');
-    }
-  }, [phase]);
+  useImmersiveChat(chatPhaseIsImmersive(phase));
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
