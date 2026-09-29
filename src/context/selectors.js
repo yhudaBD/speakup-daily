@@ -27,6 +27,18 @@ export function repeatSpeakingMs(sentences) {
     .reduce((sum, s) => sum + s.durationMs, 0);
 }
 
+// First score, best score and number of attempts of a saved practice record
+// (CRITICAL_REVIEW.md §9). Records saved before these fields existed kept only
+// one attempt, so their score is both the first and the best.
+export function attemptScores(sentence) {
+  const score = sentence?.score ?? 0;
+  return {
+    firstScore: sentence?.firstScore ?? score,
+    bestScore: sentence?.bestScore ?? score,
+    attempts: sentence?.attempts ?? 1,
+  };
+}
+
 // A practice attempt said out loud, not a sentence-completion answer.
 // Records saved before `kind` existed are treated as spoken until §8 settles
 // how to classify them (CRITICAL_REVIEW.md §8, a stage 5 decision).
