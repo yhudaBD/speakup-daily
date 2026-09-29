@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useReducer, useEffect, useState, useRef } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  STORAGE_KEY, SCHEMA_VERSION, ensureUser, computeLifetimeStats, defaultLifetimeStats,
+  STORAGE_KEY, ensureUser, computeLifetimeStats, defaultLifetimeStats,
   initialState, reducer, snapshotForSync, localDataOwnership, freshStateFor,
 } from "./appState";
 import {
@@ -9,7 +9,7 @@ import {
 } from "../services/firebase";
 import { cloudSync, docSizeBytes, sizeRange } from "../services/cloudSync";
 import { clearLocalAccountData } from "../services/localAccountData";
-import { logEvent } from "../utils/analytics";
+import { deleteMyEvents, logEvent } from "../utils/analytics";
 
 const AppContext = createContext(null);
 
@@ -218,6 +218,10 @@ export function AppProvider({ children }) {
   const deleteAccountData = useCallback(async () => {
     const uid = firebaseUser?.uid;
     if (!uid) throw new Error("Not signed in");
+    // The usage events go first (§41ב), while the user can still be verified.
+    // If that fails nothing else has been deleted yet, which is what Settings
+    // tells the user.
+    await deleteMyEvents();
     persistBlockedRef.current = true;
     cloudReadyUidRef.current = null;
     try {

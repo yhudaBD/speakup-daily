@@ -17,6 +17,7 @@ import { getStore } from "@netlify/blobs";
 import { HttpError, errorResponse, json, readJson, requirePost } from "./_shared/http.js";
 import { requireUser } from "./_shared/auth.js";
 import { sanitizeDetails } from "./_shared/events.js";
+import { eventKey } from "./_shared/eventKeys.js";
 
 const ALLOWED_TYPES = new Set([
   "placement_completed", "session_started", "session_ended", "cloud_doc_large", "speaking_time",
@@ -35,7 +36,8 @@ export default async (req) => {
     }
 
     const store = getStore("events");
-    const key = `${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+    // Keyed by uid, so delete-my-events finds them (§41ב).
+    const key = eventKey(uid);
     await store.setJSON(key, {
       userId: userId.slice(0, 100),
       uid,
