@@ -1,4 +1,5 @@
 import { addDays, parseDateKey, toDateKey } from "../utils/dateHelpers";
+import { sentenceKind } from "./migrations";
 
 // Values derived from the saved data, computed rather than stored
 // (ACTION_PLAN.md, D5). A stored counter drifts from the data it summarizes;
@@ -39,11 +40,44 @@ export function attemptScores(sentence) {
   };
 }
 
-// A practice attempt said out loud, not a sentence-completion answer.
-// Records saved before `kind` existed are treated as spoken until §8 settles
-// how to classify them (CRITICAL_REVIEW.md §8, a stage 5 decision).
+// A practice attempt said out loud, not a sentence-completion answer
+// (CRITICAL_REVIEW.md §8). Records without `kind` follow the migration's rule.
 export function isSpoken(sentence) {
-  return sentence?.kind ? sentence.kind === "speak" : true;
+  return sentenceKind(sentence) === "speak";
+}
+
+const isCloze = (sentence) => sentenceKind(sentence) === "cloze";
+const keptSentences = (state) => Object.values(state?.sessions || {}).flatMap((d) => d?.sentences || []);
+const averageScore = (list) =>
+  list.length ? Math.round(list.reduce((sum, s) => sum + (s.score || 0), 0) / list.length) : null;
+
+// Average pronunciation score of the spoken sentences in a list, or null when
+// there are none. Sentence-completion answers score 100 or 0 and would
+// distort it (§8).
+export function speakAverage(sentences) {
+  return averageScore((sentences || []).filter(isSpoken));
+}
+
+// Average pronunciation score over the days still kept.
+export function selectSpeakAverage(state) {
+  return speakAverage(keptSentences(state));
+}
+
+// Spoken sentences that scored 90 or more, ever: the archive of pruned days
+// plus the days still kept. Archives folded before §8 have no count.
+export function selectSentencesAbove90(state) {
+  const kept = keptSentences(state).filter((s) => isSpoken(s) && s.score >= 90).length;
+  return (state?.archive?.speakAbove90 || 0) + kept;
+}
+
+// Sentence completion's own numbers over the days still kept.
+export function selectClozeStats(state) {
+  const answers = keptSentences(state).filter(isCloze);
+  return {
+    answers: answers.length,
+    correct: answers.filter((s) => s.score === 100).length,
+    average: averageScore(answers),
+  };
 }
 
 // A conversation the user took part in with at least one turn of their own

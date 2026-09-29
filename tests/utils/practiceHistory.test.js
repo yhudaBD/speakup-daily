@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { getWeakSentenceStats } from "../../src/utils/practiceHistory";
 
-const attempt = (score) => ({ sentenceId: "s1", text: "I need water", score });
+const attempt = (score) => ({ sentenceId: "s1", text: "I need water", score, kind: "speak" });
+
+// CRITICAL_REVIEW.md §8: a sentence-completion answer isn't a pronunciation
+// attempt, so it never makes a sentence weak.
+describe("getWeakSentenceStats and sentence completion", () => {
+  it("ignores sentence-completion answers", () => {
+    const sessions = { "2026-09-20": { sentences: [{ sentenceId: "c1", text: "I ___ water", score: 0, kind: "cloze" }] } };
+    expect(getWeakSentenceStats(sessions)).toEqual({});
+  });
+});
 
 describe("getWeakSentenceStats", () => {
   it("flags a sentence that failed and was never passed", () => {

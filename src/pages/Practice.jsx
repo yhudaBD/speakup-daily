@@ -677,6 +677,7 @@ export default function Practice() {
       text: currentSentence.text,
       translation: currentSentence.translation,
       category: currentSentence.category || selectedCategory,
+      kind: "speak",
       score: result.score,
       ...attemptFields(attemptTally || addAttempt(null, result)),
       wordResults: result.wordResults,

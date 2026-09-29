@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { getTodayString, getLastNDays, formatDate } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
-import { selectDaysActive } from "../context/selectors";
+import {
+  isSpoken, selectClozeStats, selectDaysActive, selectSentencesAbove90, selectSpeakAverage, speakAverage,
+} from "../context/selectors";
 import { createCustomTopic } from "../data/rolePlayTopics";
 import LearningPath from "../components/progress/LearningPath";
 
@@ -18,7 +20,7 @@ const ACHIEVEMENTS = [
     const s = state.sessions[today];
     return s && s.sentences.every(x => x.score === 100);
   }},
-  { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%", check: (state) => state.lifetimeStats.sentencesAbove90 >= 10 },
+  { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%", check: (state) => selectSentencesAbove90(state) >= 10 },
   { id: "month-strong", icon: "📅", title: "Month Strong", desc: "30 days in a row", check: (state) => state.streak.longest >= 30 },
   { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => selectDaysActive(state) >= 1 },
   { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => selectDaysActive(state) >= 5 },
@@ -91,9 +93,11 @@ export default function Progress() {
 
   const allSentences = Object.values(sessions).flatMap(s => s.sentences || []);
   const allChats = Object.values(sessions).flatMap(s => s.chats || []);
-  const totalAvg = allSentences.length
-    ? Math.round(allSentences.reduce((s, x) => s + x.score, 0) / allSentences.length)
-    : 0;
+  // Pronunciation numbers count spoken sentences only; sentence completion
+  // has its own (CRITICAL_REVIEW.md §8).
+  const spokenCount = allSentences.filter(isSpoken).length;
+  const totalAvg = selectSpeakAverage(state);
+  const cloze = selectClozeStats(state);
 
   const helpTrend = (() => {
     const withCounts = allChats
@@ -144,6 +148,7 @@ export default function Progress() {
               {days.map(day => {
                 const session = sessions[day];
                 const isToday = day === getTodayString();
+                const dayAverage = speakAverage(session?.sentences);
                 return (
                   <div key={day} className="card" style={{
                     display: "flex",
@@ -164,14 +169,14 @@ export default function Progress() {
                         <p className="text-muted">No practice</p>
                       )}
                     </div>
-                    {session ? (
+                    {dayAverage !== null ? (
                       <div style={{
                         fontFamily: "var(--font-display)",
                         fontWeight: 900,
                         fontSize: "1.4rem",
-                        color: session.averageScore >= 70 ? "var(--color-success)" : "var(--color-warning)"
+                        color: dayAverage >= 70 ? "var(--color-success)" : "var(--color-warning)"
                       }}>
-                        {session.averageScore}%
+                        {dayAverage}%
                       </div>
                     ) : (
                       <span style={{ fontSize: 20 }}>—</span>
@@ -213,7 +218,7 @@ export default function Progress() {
             <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-primary)" }}>
-                  {allSentences.length}
+                  {spokenCount}
                 </div>
                 <div className="text-muted">Sentences Practiced</div>
               </div>
@@ -225,9 +230,9 @@ export default function Progress() {
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-success)" }}>
-                  {totalAvg}%
+                  {totalAvg === null ? "—" : `${totalAvg}%`}
                 </div>
-                <div className="text-muted">Overall Average</div>
+                <div className="text-muted">Speaking Average</div>
               </div>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-error)" }}>
@@ -240,6 +245,14 @@ export default function Progress() {
                   🏆 {streak.longest}
                 </div>
                 <div className="text-muted">Best Streak</div>
+              </div>
+              <div className="card" style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-primary)" }}>
+                  🧩 {cloze.answers}
+                </div>
+                <div className="text-muted">
+                  Sentence Completion{cloze.average !== null && ` · ${cloze.average}% correct`}
+                </div>
               </div>
             </div>
 
