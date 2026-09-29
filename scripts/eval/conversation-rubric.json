@@ -1,0 +1,311 @@
+{
+  "about": "Conversations with the rubric a teacher would expect (1-5 each), for scripts/eval-conversation-rubric.mjs. Written by Claude as a first calibration set (CRITICAL_REVIEW.md §14); to be checked by an English teacher. A result within 1 of the expected value counts as agreement.",
+  "examples": [
+    {
+      "id": "pre-a1-cafe",
+      "topic": "Coffee shop",
+      "expected": { "fluency": 1, "grammar": 1, "vocabulary": 1 },
+      "messages": [
+        { "role": "assistant", "content": "Hi! What can I get for you today?" },
+        { "role": "user", "content": "coffee", "source": "spoken" },
+        { "role": "assistant", "content": "Sure. What size would you like?" },
+        { "role": "user", "content": "yes", "source": "spoken" },
+        { "role": "assistant", "content": "Small, medium or large?" },
+        { "role": "user", "content": "big", "source": "spoken" },
+        { "role": "assistant", "content": "A large coffee. Anything else?" },
+        { "role": "user", "content": "no thank", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "a1-doctor",
+      "topic": "At the doctor",
+      "expected": { "fluency": 2, "grammar": 1, "vocabulary": 2 },
+      "messages": [
+        { "role": "assistant", "content": "Hello, what brings you in today?" },
+        { "role": "user", "content": "i have pain head", "source": "spoken" },
+        { "role": "assistant", "content": "I am sorry to hear that. How long have you had the headache?" },
+        { "role": "user", "content": "two day", "source": "spoken" },
+        { "role": "assistant", "content": "Do you have a fever?" },
+        { "role": "user", "content": "i dont know the fever maybe yes hot", "source": "spoken" },
+        { "role": "assistant", "content": "Have you taken any medicine?" },
+        { "role": "user", "content": "no medicine i am not take", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "a1-hotel",
+      "topic": "Hotel check-in",
+      "expected": { "fluency": 2, "grammar": 2, "vocabulary": 2 },
+      "messages": [
+        { "role": "assistant", "content": "Good evening, welcome. Do you have a reservation?" },
+        { "role": "user", "content": "yes i have reservation name cohen", "source": "spoken" },
+        { "role": "assistant", "content": "Thank you, Mr. Cohen. Two nights, is that right?" },
+        { "role": "user", "content": "yes two night", "source": "spoken" },
+        { "role": "assistant", "content": "Would you like breakfast included?" },
+        { "role": "user", "content": "what time is breakfast", "source": "spoken" },
+        { "role": "assistant", "content": "From seven to ten in the morning." },
+        { "role": "user", "content": "ok yes i want breakfast please", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "a2-supermarket",
+      "topic": "Supermarket",
+      "expected": { "fluency": 3, "grammar": 2, "vocabulary": 2 },
+      "messages": [
+        { "role": "assistant", "content": "Hi, can I help you find something?" },
+        { "role": "user", "content": "yes i search the milk without lactose", "source": "spoken" },
+        { "role": "assistant", "content": "Lactose-free milk is in aisle four, next to the yogurt." },
+        { "role": "user", "content": "thank you and where is the bread it is fresh today", "source": "spoken" },
+        { "role": "assistant", "content": "The bread is at the back. It came in this morning." },
+        { "role": "user", "content": "good i need also eggs for my children they like very much", "source": "spoken" },
+        { "role": "assistant", "content": "Eggs are right next to the milk." },
+        { "role": "user", "content": "ok thanks you very helpful", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "a2-directions",
+      "topic": "Asking for directions",
+      "expected": { "fluency": 3, "grammar": 3, "vocabulary": 2 },
+      "messages": [
+        { "role": "assistant", "content": "You look lost. Can I help?" },
+        { "role": "user", "content": "yes please where is the train station", "source": "spoken" },
+        { "role": "assistant", "content": "Go straight and turn left at the bank. It is about ten minutes." },
+        { "role": "user", "content": "is it far to walk", "source": "spoken" },
+        { "role": "assistant", "content": "Not really, but you can take bus number five." },
+        { "role": "user", "content": "i will walk it is nice weather", "source": "spoken" },
+        { "role": "assistant", "content": "Good idea. Enjoy your walk!" },
+        { "role": "user", "content": "thank you have a nice day", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b1-job-interview",
+      "topic": "Job interview",
+      "expected": { "fluency": 3, "grammar": 3, "vocabulary": 3 },
+      "messages": [
+        { "role": "assistant", "content": "Tell me a little about yourself." },
+        { "role": "user", "content": "i work five years in a software company as a tester i check the apps before they go to customers", "source": "spoken" },
+        { "role": "assistant", "content": "Why do you want to leave your current job?" },
+        { "role": "user", "content": "i want to learn more things and grow maybe to be a developer", "source": "spoken" },
+        { "role": "assistant", "content": "What is your biggest strength?" },
+        { "role": "user", "content": "i am very careful with details and i find bugs that other people miss", "source": "spoken" },
+        { "role": "assistant", "content": "And a weakness?" },
+        { "role": "user", "content": "sometimes i am too slow because i check everything two times", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b1-restaurant-complaint",
+      "topic": "Restaurant",
+      "expected": { "fluency": 4, "grammar": 3, "vocabulary": 3 },
+      "messages": [
+        { "role": "assistant", "content": "How is everything with your meal?" },
+        { "role": "user", "content": "to be honest the steak is a little cold and i ordered it medium but it's well done", "source": "spoken" },
+        { "role": "assistant", "content": "I am so sorry. Would you like me to bring you a new one?" },
+        { "role": "user", "content": "yes please but can you make it fast because we have a movie at nine", "source": "spoken" },
+        { "role": "assistant", "content": "Of course. I will ask the kitchen to hurry." },
+        { "role": "user", "content": "thanks and could we get more water meanwhile", "source": "spoken" },
+        { "role": "assistant", "content": "Right away." },
+        { "role": "user", "content": "great i appreciate it", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b1-small-talk",
+      "topic": "Meeting a new neighbor",
+      "expected": { "fluency": 4, "grammar": 3, "vocabulary": 3 },
+      "messages": [
+        { "role": "assistant", "content": "Hi, I just moved in next door. I am Sam." },
+        { "role": "user", "content": "oh welcome i'm dana nice to meet you where did you move from", "source": "spoken" },
+        { "role": "assistant", "content": "From Haifa. I got a new job here in Tel Aviv." },
+        { "role": "user", "content": "cool what do you do", "source": "spoken" },
+        { "role": "assistant", "content": "I am a nurse at the hospital." },
+        { "role": "user", "content": "wow that's hard work if you need anything like sugar or help with the boxes just knock", "source": "spoken" },
+        { "role": "assistant", "content": "That is very kind of you." },
+        { "role": "user", "content": "no problem the building is quiet you will like it here", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b2-negotiation",
+      "topic": "Negotiating a price",
+      "expected": { "fluency": 4, "grammar": 4, "vocabulary": 4 },
+      "messages": [
+        { "role": "assistant", "content": "The price for the full package is five thousand dollars." },
+        { "role": "user", "content": "that's more than we budgeted for is there any flexibility if we sign a two year contract", "source": "spoken" },
+        { "role": "assistant", "content": "We could offer ten percent off for two years." },
+        { "role": "user", "content": "i was hoping for something closer to fifteen especially since we'd be paying upfront", "source": "spoken" },
+        { "role": "assistant", "content": "Upfront payment changes things. Twelve percent?" },
+        { "role": "user", "content": "twelve works if you throw in the onboarding sessions for our team", "source": "spoken" },
+        { "role": "assistant", "content": "I think we can do that." },
+        { "role": "user", "content": "great then let's put it in writing and i'll get it approved by friday", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b2-apartment",
+      "topic": "Renting an apartment",
+      "expected": { "fluency": 4, "grammar": 4, "vocabulary": 4 },
+      "messages": [
+        { "role": "assistant", "content": "So, what do you think of the apartment?" },
+        { "role": "user", "content": "it's bright and the layout is nice but the kitchen looks like it hasn't been renovated in years", "source": "spoken" },
+        { "role": "assistant", "content": "The owner is planning to replace the cabinets." },
+        { "role": "user", "content": "would that happen before we move in because we can't live with a construction site", "source": "spoken" },
+        { "role": "assistant", "content": "It should be done by the end of the month." },
+        { "role": "user", "content": "and are utilities included in the rent or do we pay them separately", "source": "spoken" },
+        { "role": "assistant", "content": "Water is included, electricity is separate." },
+        { "role": "user", "content": "okay that's reasonable could you send me the contract so i can go over it", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "c1-debate",
+      "topic": "Discussing remote work",
+      "expected": { "fluency": 5, "grammar": 5, "vocabulary": 5 },
+      "messages": [
+        { "role": "assistant", "content": "Do you think remote work is here to stay?" },
+        { "role": "user", "content": "i think hybrid is here to stay fully remote tends to erode the informal knowledge sharing that happens when people bump into each other", "source": "spoken" },
+        { "role": "assistant", "content": "But many people say they are more productive at home." },
+        { "role": "user", "content": "they may well be for focused individual work the catch is that collaboration and mentoring suffer and those costs only show up months later", "source": "spoken" },
+        { "role": "assistant", "content": "So what would you recommend to a company?" },
+        { "role": "user", "content": "i'd anchor a couple of days a week around meetings and pairing and leave the rest for deep work otherwise you get the worst of both worlds", "source": "spoken" },
+        { "role": "assistant", "content": "That sounds balanced." },
+        { "role": "user", "content": "it's a compromise but a deliberate one rather than whatever happens by default", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "c1-customer-service",
+      "topic": "Calling customer service",
+      "expected": { "fluency": 5, "grammar": 5, "vocabulary": 4 },
+      "messages": [
+        { "role": "assistant", "content": "Thank you for calling. How can I help?" },
+        { "role": "user", "content": "i've been charged twice for the same order and i'd like the duplicate payment reversed", "source": "spoken" },
+        { "role": "assistant", "content": "I can see two charges. The second should drop off automatically." },
+        { "role": "user", "content": "i was told that last week as well and it's still there so i'd rather you issue a refund now than wait and see", "source": "spoken" },
+        { "role": "assistant", "content": "Understood. I will process a refund today." },
+        { "role": "user", "content": "thank you could you also email me a confirmation so i have something in writing", "source": "spoken" },
+        { "role": "assistant", "content": "Of course, you will get it within the hour." },
+        { "role": "user", "content": "perfect i appreciate you sorting it out", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "a1-with-suggestions",
+      "topic": "Coffee shop",
+      "note": "The fluent lines were read from suggestions and must not raise the scores.",
+      "expected": { "fluency": 1, "grammar": 2, "vocabulary": 1 },
+      "messages": [
+        { "role": "assistant", "content": "Hi! What can I get for you?" },
+        { "role": "user", "content": "I would like a large cappuccino with oat milk, please.", "source": "suggestion" },
+        { "role": "assistant", "content": "Sure. Anything to eat?" },
+        { "role": "user", "content": "cake", "source": "spoken" },
+        { "role": "assistant", "content": "We have chocolate or cheesecake." },
+        { "role": "user", "content": "Could I have a slice of cheesecake to take away?", "source": "suggestion" },
+        { "role": "assistant", "content": "Of course. For here or to go?" },
+        { "role": "user", "content": "go", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "a2-with-translation",
+      "topic": "Pharmacy",
+      "note": "The translated line must not count toward the scores.",
+      "expected": { "fluency": 2, "grammar": 2, "vocabulary": 2 },
+      "messages": [
+        { "role": "assistant", "content": "Hello, how can I help you?" },
+        { "role": "user", "content": "i need something for the throat", "source": "spoken" },
+        { "role": "assistant", "content": "Is it a sore throat or a cough?" },
+        { "role": "user", "content": "I have a dry cough that keeps me awake at night.", "source": "translated" },
+        { "role": "assistant", "content": "This syrup helps with a dry cough." },
+        { "role": "user", "content": "how much is", "source": "spoken" },
+        { "role": "assistant", "content": "Thirty-five shekels." },
+        { "role": "user", "content": "ok i take", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b1-typed",
+      "topic": "Planning a trip",
+      "expected": { "fluency": 3, "grammar": 3, "vocabulary": 3 },
+      "messages": [
+        { "role": "assistant", "content": "Where are you thinking of traveling this summer?" },
+        { "role": "user", "content": "I want to go to Italy with my wife, maybe Rome and Florence.", "source": "typed" },
+        { "role": "assistant", "content": "Great choice. How long will you stay?" },
+        { "role": "user", "content": "Around ten days. We don't like to hurry.", "source": "typed" },
+        { "role": "assistant", "content": "Will you rent a car?" },
+        { "role": "user", "content": "No, I think the train is more easy between the cities.", "source": "typed" },
+        { "role": "assistant", "content": "That is true, the trains are very good." },
+        { "role": "user", "content": "Also we want to eat a lot of pasta, it is the main reason.", "source": "typed" }
+      ]
+    },
+    {
+      "id": "b2-old-records",
+      "topic": "Talking about a movie",
+      "note": "Turns saved before sources existed; all count as the student's.",
+      "expected": { "fluency": 4, "grammar": 4, "vocabulary": 4 },
+      "messages": [
+        { "role": "assistant", "content": "Have you seen any good movies lately?" },
+        { "role": "user", "content": "yeah i watched a thriller last weekend that kept me on the edge of my seat" },
+        { "role": "assistant", "content": "What was it about?" },
+        { "role": "user", "content": "a journalist who uncovers a scandal and slowly realizes her own editor is involved" },
+        { "role": "assistant", "content": "Did you like the ending?" },
+        { "role": "user", "content": "not really it felt rushed like they ran out of budget in the last twenty minutes" },
+        { "role": "assistant", "content": "That happens a lot." },
+        { "role": "user", "content": "still i'd recommend it the acting alone is worth it" }
+      ]
+    },
+    {
+      "id": "a2-short-answers",
+      "topic": "Gym registration",
+      "expected": { "fluency": 2, "grammar": 3, "vocabulary": 2 },
+      "messages": [
+        { "role": "assistant", "content": "Welcome! Would you like to sign up for a membership?" },
+        { "role": "user", "content": "yes please", "source": "spoken" },
+        { "role": "assistant", "content": "Monthly or yearly?" },
+        { "role": "user", "content": "monthly", "source": "spoken" },
+        { "role": "assistant", "content": "Do you want classes too, like yoga or spinning?" },
+        { "role": "user", "content": "yoga is good", "source": "spoken" },
+        { "role": "assistant", "content": "Great. When would you like to start?" },
+        { "role": "user", "content": "tomorrow morning", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "b1-hebrew-structure",
+      "topic": "At the bank",
+      "note": "Typical Hebrew-speaker errors: word order, missing articles, 'I am agree'.",
+      "expected": { "fluency": 3, "grammar": 2, "vocabulary": 3 },
+      "messages": [
+        { "role": "assistant", "content": "How can I help you today?" },
+        { "role": "user", "content": "i want to open account of savings for my son he is ten", "source": "spoken" },
+        { "role": "assistant", "content": "Sure. We have an account with a good interest rate for children." },
+        { "role": "user", "content": "how much is the interest and there is a fee every month", "source": "spoken" },
+        { "role": "assistant", "content": "Two percent a year, and no monthly fee." },
+        { "role": "user", "content": "ok i am agree it sound good", "source": "spoken" },
+        { "role": "assistant", "content": "I just need his ID and yours." },
+        { "role": "user", "content": "i bring it tomorrow because now i don't have with me", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "c1-mixed-help",
+      "topic": "Team meeting",
+      "note": "Strong own turns; one line from a suggestion that shouldn't matter.",
+      "expected": { "fluency": 5, "grammar": 4, "vocabulary": 5 },
+      "messages": [
+        { "role": "assistant", "content": "Where are we with the release?" },
+        { "role": "user", "content": "we're mostly on track the one blocker is the payment integration which is waiting on the vendor's sandbox", "source": "spoken" },
+        { "role": "assistant", "content": "Can we release without it?" },
+        { "role": "user", "content": "technically yes but we'd be shipping a checkout that can't take money which kind of defeats the purpose", "source": "spoken" },
+        { "role": "assistant", "content": "Fair point. What do you suggest?" },
+        { "role": "user", "content": "Let's escalate to their account manager today.", "source": "suggestion" },
+        { "role": "assistant", "content": "And if they don't respond?" },
+        { "role": "user", "content": "then we slip by a week and use the time to tighten up the error handling we've been putting off", "source": "spoken" }
+      ]
+    },
+    {
+      "id": "pre-a1-hebrew-words",
+      "topic": "Taxi",
+      "note": "Mostly Hebrew words and single English words.",
+      "expected": { "fluency": 1, "grammar": 1, "vocabulary": 1 },
+      "messages": [
+        { "role": "assistant", "content": "Where would you like to go?" },
+        { "role": "user", "content": "airport", "source": "spoken" },
+        { "role": "assistant", "content": "Which terminal?" },
+        { "role": "user", "content": "terminal שלוש", "source": "spoken" },
+        { "role": "assistant", "content": "Terminal three. Is this your first time here?" },
+        { "role": "user", "content": "no understand", "source": "spoken" },
+        { "role": "assistant", "content": "No problem. We will be there in twenty minutes." },
+        { "role": "user", "content": "ok", "source": "spoken" }
+      ]
+    }
+  ]
+}

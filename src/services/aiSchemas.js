@@ -59,13 +59,6 @@ export function toCefr(value) {
 const cefr = loose(toCefr);
 const requiredCefr = cefr.check(z.refine((v) => v !== undefined, "no CEFR level"));
 
-// "75" and 75 both work. null, missing or non-numeric fail rather than
-// quietly becoming 0. z.number() also rejects NaN and Infinity.
-const score = z.pipe(
-  z.pipe(z.unknown(), z.transform((v) => (typeof v === "string" && v.trim() !== "" ? Number(v) : v))),
-  z.pipe(z.number(), z.transform((n) => Math.round(Math.min(100, Math.max(0, n))))),
-);
-
 const suggestion = z.union([
   z.pipe(requiredText, z.transform((en) => ({ en, hint: "" }))),
   z.object({ en: requiredText, hint: optionalText }),
@@ -122,14 +115,31 @@ export const placementTurnSchema = z.pipe(
   }),
 );
 
-export const conversationAnalysisSchema = z.object({
-  overall_score: score,
-  summary: requiredText,
-  strengths: textList(8),
-  improvements: textList(8),
-  grammar_notes: textList(8),
-  vocabulary_suggestions: textList(8),
-});
+// One rubric part, 1-5. "4" and 4 both work; null, missing or non-numeric
+// fail rather than being guessed. z.number() also rejects NaN and Infinity.
+const rubricPart = z.pipe(
+  z.pipe(z.unknown(), z.transform((v) => (typeof v === "string" && v.trim() !== "" ? Number(v) : v))),
+  z.pipe(z.number(), z.transform((n) => Math.round(Math.min(5, Math.max(1, n))))),
+);
+
+// The analysis score, 0-100, from the rubric's 3-15 (CRITICAL_REVIEW.md §14).
+export function rubricScore({ fluency, grammar, vocabulary }) {
+  return Math.round(((fluency + grammar + vocabulary - 3) / 12) * 100);
+}
+
+// The model's own overall_score is dropped: the score is computed in code
+// from the rubric, so it means the same thing every time.
+export const conversationAnalysisSchema = z.pipe(
+  z.object({
+    rubric: z.object({ fluency: rubricPart, grammar: rubricPart, vocabulary: rubricPart }),
+    summary: requiredText,
+    strengths: textList(8),
+    improvements: textList(8),
+    grammar_notes: textList(8),
+    vocabulary_suggestions: textList(8),
+  }),
+  z.transform((analysis) => ({ ...analysis, overall_score: rubricScore(analysis.rubric) })),
+);
 
 export const practiceAnalysisSchema = z.object({
   summary_he: requiredText,

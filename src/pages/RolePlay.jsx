@@ -10,7 +10,8 @@ import { ReplyFailedBubble } from '../components/roleplay/ReplyFailedBubble';
 import { HintLadder } from '../components/roleplay/HintLadder';
 import { useHintLadder } from '../hooks/useHintLadder';
 import { MicButton } from '../components/roleplay/MicButton';
-import { helpedTurnShare, isCompletedChat } from '../context/selectors';
+import { isCompletedChat, levelAdjustment } from '../context/selectors';
+import { useConversationAnalysis } from '../hooks/useConversationAnalysis';
 
 function createSessionId() {
   return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -426,30 +427,13 @@ function AnalysisScreen({ feedback, topic, onBack, onHome }) {
 
 // ── Done Screen ─────────────────────────────────────────────────────────────
 function DoneScreen({ turnCount, topic, messages, chatId, savedFeedback, onNewChat, onBack, onHome, onFeedbackSaved }) {
-  const [analyzing, setAnalyzing] = useState(false);
-  const [feedback, setFeedback] = useState(savedFeedback || null);
-  const [error, setError] = useState(null);
+  // Runs by itself after a conversation with 4 turns of the user's own (§14).
+  const { feedback, analyzing, error, analyze: handleAnalyze } = useConversationAnalysis({
+    chatId, messages, topicTitle: topic.title, savedFeedback, onSaved: onFeedbackSaved,
+  });
   // Ending a chat before saying anything used to "analyze" it into a 0%
   // score, which ADJUST_LEVEL then counted as a weak result.
   const hasUserMessages = messages.some((m) => m.role === 'user');
-
-  const handleAnalyze = async () => {
-    setAnalyzing(true);
-    setError(null);
-    try {
-      const result = await aiService.analyzeConversation({
-        messages,
-        topicTitle: topic.title,
-      });
-      setFeedback(result);
-      onFeedbackSaved(chatId, result);
-    } catch (err) {
-      console.error(err);
-      setError('לא הצלחנו לנתח את השיחה. נסה שוב.');
-    } finally {
-      setAnalyzing(false);
-    }
-  };
 
   if (feedback) {
     return (
@@ -617,11 +601,10 @@ export default function RolePlay() {
     if (newGaps.length) {
       dispatch({ type: 'MERGE_PLACEMENT_GAPS', payload: newGaps });
     }
-    if (typeof feedback.overall_score === 'number') {
-      // A conversation leaning on suggestions can't raise the level (§5).
-      const helpedShare = helpedTurnShare(chats.find((c) => c.id === chatId)?.messages);
-      dispatch({ type: 'ADJUST_LEVEL', payload: { score: feedback.overall_score, helpedShare } });
-    }
+    // Only a conversation with 4 turns of the user's own moves the level
+    // (§14), and one leaning on suggestions can't raise it (§5).
+    const adjustment = levelAdjustment(chats.find((c) => c.id === chatId)?.messages, feedback);
+    if (adjustment) dispatch({ type: 'ADJUST_LEVEL', payload: adjustment });
   }, [dispatch, chats]);
 
   const {

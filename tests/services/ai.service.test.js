@@ -24,7 +24,7 @@ describe("analyzeConversation", () => {
   // CRITICAL_REVIEW.md §5 fix #3: the model is told which turns the user
   // didn't write, and not to score them.
   it("marks turns read from a suggestion or a translation in the transcript", async () => {
-    fetchMock.mockResolvedValue(groqReply({ overall_score: 70, summary: "טוב" }));
+    fetchMock.mockResolvedValue(groqReply({ rubric: { fluency: 3, grammar: 3, vocabulary: 3 }, summary: "טוב" }));
     await aiService.analyzeConversation({
       topicTitle: "Café",
       messages: [
@@ -55,13 +55,14 @@ describe("analyzeConversation", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("normalizes a valid analysis and clamps the score", async () => {
+  it("normalizes a valid analysis and computes the score from the rubric", async () => {
     fetchMock.mockResolvedValue(groqReply({
-      overall_score: "140", summary: "טוב", strengths: ["a", 5, ""], improvements: "not a list",
+      rubric: { fluency: 5, grammar: 5, vocabulary: 5 }, summary: "טוב", strengths: ["a", 5, ""], improvements: "not a list",
     }));
     const result = await aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" });
     expect(result).toEqual({
-      overall_score: 100, summary: "טוב", strengths: ["a"], improvements: [], grammar_notes: [], vocabulary_suggestions: [],
+      rubric: { fluency: 5, grammar: 5, vocabulary: 5 }, overall_score: 100,
+      summary: "טוב", strengths: ["a"], improvements: [], grammar_notes: [], vocabulary_suggestions: [],
     });
   });
 
@@ -74,9 +75,9 @@ describe("analyzeConversation", () => {
   it("succeeds when a retry returns a valid reply", async () => {
     fetchMock
       .mockResolvedValueOnce(groqReply({ summary: "x" }))
-      .mockResolvedValueOnce(groqReply({ overall_score: 70, summary: "טוב" }));
+      .mockResolvedValueOnce(groqReply({ rubric: { fluency: 4, grammar: 3, vocabulary: 4 }, summary: "טוב" }));
     const result = await aiService.analyzeConversation({ messages: conversation, topicTitle: "Café" });
-    expect(result.overall_score).toBe(70);
+    expect(result.overall_score).toBe(67);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

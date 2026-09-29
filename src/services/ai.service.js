@@ -1,4 +1,5 @@
 import { systemInstruction } from "../data/rolePlayTopics";
+import { ANALYSIS_SYSTEM, analysisTranscript } from "./analysisPrompt";
 import { placementSystemPrompt } from "../data/placementPrompt";
 import { auth } from "./firebase";
 import { markNotInBeta } from "./betaAccess";
@@ -105,35 +106,6 @@ Rules:
 - Pick 3-5 useful words/phrases from the sentences practiced — focus on ones worth remembering.
 - speaking_tips: 2-3 tips about SPOKEN English (not written grammar textbooks).
 - Be encouraging and specific. Reference the topic/category if given.`;
-
-const ANALYSIS_SYSTEM = `You are an English conversation coach for Israeli adults.
-Analyze a completed roleplay conversation and provide constructive feedback in Hebrew.
-
-Return JSON only:
-{
-  "overall_score": 75,
-  "summary": "2-3 sentence overall assessment in Hebrew",
-  "strengths": ["strength 1 in Hebrew", "strength 2 in Hebrew"],
-  "improvements": ["specific tip 1 in Hebrew", "specific tip 2 in Hebrew"],
-  "grammar_notes": ["note about a grammar pattern in Hebrew"],
-  "vocabulary_suggestions": ["useful phrase they could learn"]
-}
-
-Score 0-100 based on: fluency, grammar, vocabulary range, and appropriateness.
-Be encouraging but specific. Reference actual things the user said.
-
-Lines marked "Student (read a suggestion)" or "Student (used a translation)" were written by the app, not by the student.
-Do not score them, praise them or learn the student's level from them. Judge only the unmarked "Student" lines.`;
-
-// How the conversation reads to the analysis. Turns the user didn't write
-// are marked so the model doesn't score the app's English as theirs
-// (CRITICAL_REVIEW.md §5 fix #3). Turns saved before T4 have no source.
-const SOURCE_MARKS = { suggestion: " (read a suggestion)", translated: " (used a translation)" };
-function analysisTranscript(messages) {
-  return messages
-    .map((m) => (m.role === "user" ? `Student${SOURCE_MARKS[m.source] || ""}: ${m.content}` : `AI: ${m.content}`))
-    .join("\n");
-}
 
 // gpt-oss models on Groq occasionally fail to produce valid JSON-mode output —
 // observed in practice as three distinct 400 error codes:

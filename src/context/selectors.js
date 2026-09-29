@@ -29,6 +29,25 @@ export function helpedTurnShare(messages) {
   return turns.filter((m) => m.source === "suggestion" || m.source === "translated").length / turns.length;
 }
 
+// A conversation says something about the user's level only with at least
+// MIN_OWN_TURNS_FOR_LEVEL turns of their own, spoken or typed
+// (CRITICAL_REVIEW.md §14). Turns saved before T4 count as their own.
+export const MIN_OWN_TURNS_FOR_LEVEL = 4;
+
+export function ownTurns(messages) {
+  return (messages || []).filter(
+    (m) => m?.role === "user" && (!m.source || m.source === "spoken" || m.source === "typed"),
+  ).length;
+}
+
+// The ADJUST_LEVEL payload for an analyzed conversation, or null when it
+// shouldn't move the level.
+export function levelAdjustment(messages, feedback) {
+  if (typeof feedback?.overall_score !== "number") return null;
+  if (ownTurns(messages) < MIN_OWN_TURNS_FOR_LEVEL) return null;
+  return { score: feedback.overall_score, helpedShare: helpedTurnShare(messages) };
+}
+
 // Milliseconds spent reading sentences aloud in practice. Attempts saved
 // before T4 have no duration and count as 0.
 export function repeatSpeakingMs(sentences) {
