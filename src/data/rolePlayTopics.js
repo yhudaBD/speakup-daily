@@ -186,14 +186,16 @@ In each turn, you MUST respond in valid JSON format ONLY. No markdown, no extra 
 Your JSON must strictly match this schema:
 {
   "ai_reply": "Your conversational response in English, full words only, no contractions.",
+  "hint_he": "One short Hebrew sentence with an idea of WHAT the user could answer, not a translation of an answer.",
+  "starter": "The first 2-4 English words of a good answer.",
   "suggested_user_responses": [
-    { "en": "A complete natural sentence the user could say next." },
-    { "en": "A different complete sentence option." },
-    { "en": "A third complete sentence option." }
+    { "en": "One complete natural sentence the user could say next, starting with the starter." }
   ]
 }
+The user gets help step by step (hint_he, then starter, then the full sentence), so write all three.
+Example: "hint_he": "תגיד איזה גודל אתה רוצה", "starter": "I would like", "en": "I would like a large one, please."
 SUGGESTED RESPONSE RULES:
-- Every suggestion must be a complete sentence — never truncate with "..." or partial phrases.
+- The suggestion must be a complete sentence — never truncate with "..." or partial phrases.
 - Never use contractions — always write full forms (I would not I'd, do not not don't, that is not that's).
 Do NOT include Hebrew translations — they are handled separately.
 `;

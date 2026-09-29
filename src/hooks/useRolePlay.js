@@ -4,6 +4,7 @@ import { speakNaturally, getBestEnglishVoice, preloadVoices } from '../utils/spe
 import { logEvent } from '../utils/analytics';
 import { MIN_CHAT_TURNS, TURN_SOURCES } from '../context/selectors';
 import { reportSpeakingTime } from '../utils/speakingTime';
+import { helpFrom } from '../utils/hintLadder';
 
 const MAX_TURNS = 10;
 
@@ -19,7 +20,8 @@ export function useRolePlay({
   onSessionComplete,
 }) {
   const [messages, setMessages] = useState([]);
-  const [suggestedReplies, setSuggestedReplies] = useState([]);
+  // This turn's hint ladder (hintLadder.js), or null.
+  const [turnHelp, setTurnHelp] = useState(null);
   const [phase, setPhase] = useState('IDLE');
   const [turnCount, setTurnCount] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -135,7 +137,7 @@ export function useRolePlay({
     });
     if (signal.aborted) return null;
     addMessage('assistant', response.ai_reply, response.ai_reply_he);
-    setSuggestedReplies(response.suggested_user_responses || []);
+    setTurnHelp(helpFrom(response));
     return response;
   }, [topic, toApiMessages, chatDifficulty, placement, addMessage]);
 
@@ -178,7 +180,7 @@ export function useRolePlay({
       });
       if (signal.aborted) return;
       addMessage('assistant', response.ai_reply, response.ai_reply_he);
-      setSuggestedReplies(response.suggested_user_responses || []);
+      setTurnHelp(helpFrom(response));
     } catch (err) {
       if (isAbortError(err) || signal.aborted) return;
       console.error('AI opening line failed:', err);
@@ -203,7 +205,7 @@ export function useRolePlay({
     setPhaseSafe('AI_THINKING');
     messagesRef.current = [];
     setMessages([]);
-    setSuggestedReplies([]);
+    setTurnHelp(null);
     turnCountRef.current = 0;
     setTurnCount(0);
     sessionSavedRef.current = false;
@@ -228,7 +230,7 @@ export function useRolePlay({
     setMessages([...chat.messages]);
     turnCountRef.current = turns;
     setTurnCount(turns);
-    setSuggestedReplies([]);
+    setTurnHelp(null);
     sessionSavedRef.current = chat.status === 'completed';
 
     if (chat.status === 'completed' || turns >= MAX_TURNS) {
@@ -248,7 +250,7 @@ export function useRolePlay({
     cancelRequest();
     messagesRef.current = [];
     setMessages([]);
-    setSuggestedReplies([]);
+    setTurnHelp(null);
     turnCountRef.current = 0;
     setTurnCount(0);
     initializedRef.current = false;
@@ -290,7 +292,7 @@ export function useRolePlay({
     if (!userText.trim() || !topic) return;
     if (phaseRef.current !== 'USER_TURN') return;
 
-    setSuggestedReplies([]);
+    setTurnHelp(null);
 
     const turn = { source: TURN_SOURCES.includes(source) ? source : 'typed' };
     if (turn.source === 'spoken' && Number.isFinite(durationMs) && durationMs > 0) {
@@ -330,7 +332,7 @@ export function useRolePlay({
 
   return {
     messages,
-    suggestedReplies,
+    turnHelp,
     phase,
     turnCount,
     MAX_TURNS,

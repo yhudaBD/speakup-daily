@@ -73,6 +73,10 @@ const suggestion = z.union([
 
 export const chatTurnSchema = z.object({
   ai_reply: requiredText,
+  // The hint ladder's first two steps (CRITICAL_REVIEW.md §5): an idea in
+  // Hebrew and the opening words of an answer.
+  hint_he: optionalText,
+  starter: optionalText,
   suggested_user_responses: listOf(suggestion, 5),
 });
 

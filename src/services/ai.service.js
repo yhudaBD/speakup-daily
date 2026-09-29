@@ -38,19 +38,19 @@ Return JSON only: { "translations": ["...", ...] }`;
 const DIFFICULTY_INSTRUCTIONS = {
   easy: `
 SUGGESTED RESPONSES (EASY DIFFICULTY):
-Provide exactly 3 complete, natural sentences the user could say next.
+Provide exactly 1 complete, natural sentence the user could say next.
 Each must be a full sentence — never end with "..." or leave words out.
 Never use contractions — write full forms (I would, do not, that is, I am, etc.).
 `,
   medium: `
 SUGGESTED RESPONSES (MEDIUM DIFFICULTY):
-Provide exactly 3 complete sentences — slightly more advanced vocabulary than easy, but still natural.
+Provide exactly 1 complete sentence — slightly more advanced vocabulary than easy, but still natural.
 Each must be a full sentence — never end with "..." or leave words out.
 Never use contractions — write full forms (I would, do not, that is, I am, etc.).
 `,
   hard: `
 SUGGESTED RESPONSES (HARD DIFFICULTY):
-Return an empty array: "suggested_user_responses": []
+Return an empty array: "suggested_user_responses": [], and empty "hint_he" and "starter".
 The user must respond entirely on their own with no help.
 `,
 };
@@ -120,7 +120,20 @@ Return JSON only:
 }
 
 Score 0-100 based on: fluency, grammar, vocabulary range, and appropriateness.
-Be encouraging but specific. Reference actual things the user said.`;
+Be encouraging but specific. Reference actual things the user said.
+
+Lines marked "Student (read a suggestion)" or "Student (used a translation)" were written by the app, not by the student.
+Do not score them, praise them or learn the student's level from them. Judge only the unmarked "Student" lines.`;
+
+// How the conversation reads to the analysis. Turns the user didn't write
+// are marked so the model doesn't score the app's English as theirs
+// (CRITICAL_REVIEW.md §5 fix #3). Turns saved before T4 have no source.
+const SOURCE_MARKS = { suggestion: " (read a suggestion)", translated: " (used a translation)" };
+function analysisTranscript(messages) {
+  return messages
+    .map((m) => (m.role === "user" ? `Student${SOURCE_MARKS[m.source] || ""}: ${m.content}` : `AI: ${m.content}`))
+    .join("\n");
+}
 
 // gpt-oss models on Groq occasionally fail to produce valid JSON-mode output —
 // observed in practice as three distinct 400 error codes:
@@ -356,7 +369,8 @@ export const aiService = {
       signal,
     });
 
-    const suggestions = chatDifficulty === "hard" ? [] : parsed.suggested_user_responses;
+    const hard = chatDifficulty === "hard";
+    const suggestions = hard ? [] : parsed.suggested_user_responses;
 
     const toTranslate = [parsed.ai_reply, ...suggestions.map((s) => s.en)];
     let hebrew = [];
@@ -370,6 +384,8 @@ export const aiService = {
     return {
       ai_reply: parsed.ai_reply,
       ai_reply_he: hebrew[0] || "",
+      hint_he: hard ? "" : parsed.hint_he,
+      starter: hard ? "" : parsed.starter,
       suggested_user_responses: suggestions.map((s, i) => ({
         en: s.en,
         he: hebrew[i + 1] || "",
@@ -400,9 +416,7 @@ export const aiService = {
       throw new Error("Nothing to analyze: the conversation has no user messages");
     }
 
-    const transcript = messages
-      .map((m) => `${m.role === "user" ? "Student" : "AI"}: ${m.content}`)
-      .join("\n");
+    const transcript = analysisTranscript(messages);
 
     return groqChat({
       model: TRANSLATION_MODEL,

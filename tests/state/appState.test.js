@@ -375,3 +375,23 @@ describe("plan progress (§16)", () => {
     expect(twice.placement.planProgress[0]).toEqual({ sessionsCompleted: 2, status: "done" });
   });
 });
+
+// CRITICAL_REVIEW.md §5 fix #4: a conversation leaning on suggestions or
+// translations (more than 30% of the turns) can't raise the level.
+describe("ADJUST_LEVEL and help (§5)", () => {
+  const b1 = loaded({ placement: { overall_level: "B1" } });
+  const adjust = (state, score, helpedShare) => reducer(state, { type: "ADJUST_LEVEL", payload: { score, helpedShare } });
+
+  it("raises the level after two strong conversations of the user's own", () => {
+    expect(adjust(adjust(b1, 90, 0.2), 90, 0).placement.overall_level).toBe("B2");
+  });
+
+  it("doesn't raise it when a strong conversation leaned on help", () => {
+    expect(adjust(adjust(b1, 90, 0.5), 90, 0).placement.overall_level).toBe("B1");
+    expect(adjust(adjust(b1, 90, 0), 90, 0.31).placement.overall_level).toBe("B1");
+  });
+
+  it("can still lower it", () => {
+    expect(adjust(adjust(b1, 30, 0.8), 30, 0.8).placement.overall_level).toBe("A2");
+  });
+});

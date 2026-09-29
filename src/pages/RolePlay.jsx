@@ -7,9 +7,10 @@ import { aiService } from '../services/ai.service';
 import { ConversationBubble } from '../components/roleplay/ConversationBubble';
 import { ThinkingBubble } from '../components/roleplay/ThinkingBubble';
 import { ReplyFailedBubble } from '../components/roleplay/ReplyFailedBubble';
-import { SuggestedReplies } from '../components/roleplay/SuggestedReplies';
+import { HintLadder } from '../components/roleplay/HintLadder';
+import { useHintLadder } from '../hooks/useHintLadder';
 import { MicButton } from '../components/roleplay/MicButton';
-import { isCompletedChat } from '../context/selectors';
+import { helpedTurnShare, isCompletedChat } from '../context/selectors';
 
 function createSessionId() {
   return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -617,12 +618,14 @@ export default function RolePlay() {
       dispatch({ type: 'MERGE_PLACEMENT_GAPS', payload: newGaps });
     }
     if (typeof feedback.overall_score === 'number') {
-      dispatch({ type: 'ADJUST_LEVEL', payload: { score: feedback.overall_score } });
+      // A conversation leaning on suggestions can't raise the level (§5).
+      const helpedShare = helpedTurnShare(chats.find((c) => c.id === chatId)?.messages);
+      dispatch({ type: 'ADJUST_LEVEL', payload: { score: feedback.overall_score, helpedShare } });
     }
-  }, [dispatch]);
+  }, [dispatch, chats]);
 
   const {
-    messages, suggestedReplies, phase, turnCount, MAX_TURNS,
+    messages, turnHelp, phase, turnCount, MAX_TURNS,
     isSpeaking, handleUserMessage, retryReply, endConversation, replayMessage, logHelpUsed,
   } = useRolePlay({
     topic: activeSession?.topic,
@@ -636,6 +639,15 @@ export default function RolePlay() {
     onSessionComplete: handleSessionComplete,
   });
 
+  // Help replaces ready-made replies: the full sentence goes out only once
+  // it's said out loud (CRITICAL_REVIEW.md §5).
+  const ladder = useHintLadder(turnHelp, { onHelpUsed: logHelpUsed });
+  const { route } = ladder;
+  const sendTurn = useCallback((text, turn) => {
+    const toSend = route(text, turn);
+    if (toSend) handleUserMessage(toSend.text, toSend.turn);
+  }, [route, handleUserMessage]);
+
   useEffect(() => {
     if (activeSession) {
       document.documentElement.classList.add('immersive-chat');
@@ -645,7 +657,7 @@ export default function RolePlay() {
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, phase, suggestedReplies]);
+  }, [messages, phase, ladder.shown, ladder.notice]);
 
   const startNewChat = (topic) => {
     setActiveSession({ id: createSessionId(), topic, initialChat: null });
@@ -799,13 +811,8 @@ export default function RolePlay() {
         <div ref={chatBottomRef} />
       </div>
 
-      {phase === 'USER_TURN' && suggestedReplies.length > 0 && (
-        <SuggestedReplies
-          replies={suggestedReplies}
-          onSelect={(text) => { logHelpUsed(); handleUserMessage(text, { source: 'suggestion' }); }}
-          disabled={phase !== 'USER_TURN'}
-          showTranslation={showTranslation}
-        />
+      {phase === 'USER_TURN' && (
+        <HintLadder ladder={ladder} help={turnHelp} showTranslation={showTranslation} />
       )}
 
       <div className="chat-shell-footer">
@@ -815,7 +822,7 @@ export default function RolePlay() {
         />
         <MicButton
           phase={phase}
-          onSpoke={handleUserMessage}
+          onSpoke={sendTurn}
           insertText={insertText}
           onInsertConsumed={() => setInsertText('')}
         />
