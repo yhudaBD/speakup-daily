@@ -40,14 +40,13 @@ const DIFFICULTY_INSTRUCTIONS = {
   easy: `
 SUGGESTED RESPONSES (EASY DIFFICULTY):
 Provide exactly 1 complete, natural sentence the user could say next.
-Each must be a full sentence — never end with "..." or leave words out.
-Never use contractions — write full forms (I would, do not, that is, I am, etc.).
+It must be a whole sentence — never end with "..." or leave words out.
+Prefer simple words, in your reply and in the hints: this learner is a beginner.
 `,
   medium: `
 SUGGESTED RESPONSES (MEDIUM DIFFICULTY):
 Provide exactly 1 complete sentence — slightly more advanced vocabulary than easy, but still natural.
-Each must be a full sentence — never end with "..." or leave words out.
-Never use contractions — write full forms (I would, do not, that is, I am, etc.).
+It must be a whole sentence — never end with "..." or leave words out.
 `,
   hard: `
 SUGGESTED RESPONSES (HARD DIFFICULTY):
