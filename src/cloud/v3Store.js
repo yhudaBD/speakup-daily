@@ -2,7 +2,8 @@
 // §3-§5). The decisions are in pure modules: which documents (schemaV3.js)
 // and what to write (diffV3.js). This file only talks to Firestore.
 import {
-  FieldPath, collection, deleteField, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, where, writeBatch,
+  FieldPath, Timestamp, collection, deleteField, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query,
+  serverTimestamp, where, writeBatch,
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 import { nestFields } from "./diffV3";
@@ -14,6 +15,11 @@ export const RECENT_CHATS = 20;
 
 const ref = (uid, path) => doc(db, "users", uid, ...path.split("/"));
 
+// Every written document gets the server's time in syncedAt, so an open
+// can read only what was written after its last read (loadV3 `since`),
+// whatever the devices' clocks say (ACTION_PLAN.md 7ג2).
+export const SYNCED_AT = "syncedAt";
+
 // Writes diffV3 operations, in as many batches as needed. A batch is all or
 // nothing; if one fails the caller keeps its baseline and retries the lot.
 export async function writeOps(uid, ops) {
@@ -24,9 +30,10 @@ export async function writeOps(uid, ops) {
       if (op.delete) {
         batch.delete(target);
       } else if (op.set) {
-        batch.set(target, op.set);
+        batch.set(target, { ...op.set, [SYNCED_AT]: serverTimestamp() });
       } else {
-        const { data, paths } = nestFields(op, { deleteValue: deleteField() });
+        const stamped = { ...op, fields: [...(op.fields || []), [[SYNCED_AT], serverTimestamp()]] };
+        const { data, paths } = nestFields(stamped, { deleteValue: deleteField() });
         batch.set(target, data, { mergeFields: paths.map((p) => new FieldPath(...p)) });
       }
     }
@@ -34,23 +41,36 @@ export async function writeOps(uid, ops) {
   }
 }
 
-const byId = (snapshot) => Object.fromEntries(snapshot.docs.map((d) => [d.id, d.data()]));
+// A document's data without its syncedAt, and that time in milliseconds
+// (0 for one written before syncedAt existed).
+export function unstamp(data) {
+  const { [SYNCED_AT]: stamp, ...rest } = data || {};
+  return { data: rest, millis: typeof stamp?.toMillis === "function" ? stamp.toMillis() : 0 };
+}
 
-// The schema 3 documents, or null when this account hasn't moved yet.
-// With `since` (an ISO time), only months and chats changed after it: on a
-// device that already has the rest, that's usually one or two reads.
+// The schema 3 documents, or null when this account hasn't moved yet, and
+// `syncedAt`: the server's time of the newest one read. With `since` (such
+// a time, from the last open: localBaseline.js), only the profile and the
+// months and chats written after it: usually one to five reads instead of
+// every document.
 export async function loadV3(uid, { since } = {}) {
   const profile = await getDoc(ref(uid, "profile/main"));
   if (!profile.exists()) return null;
   const months = collection(db, "users", uid, "months");
   const chats = collection(db, "users", uid, "chats");
+  const after = since ? where(SYNCED_AT, ">", Timestamp.fromMillis(since)) : null;
   const [monthDocs, chatDocs] = await Promise.all([
-    getDocs(since ? query(months, where("updatedAt", ">", since)) : months),
-    getDocs(since
-      ? query(chats, where("updatedAt", ">", since))
-      : query(chats, orderBy("updatedAt", "desc"), limit(RECENT_CHATS))),
+    getDocs(after ? query(months, after) : months),
+    getDocs(after ? query(chats, after) : query(chats, orderBy("updatedAt", "desc"), limit(RECENT_CHATS))),
   ]);
-  return { profile: profile.data(), months: byId(monthDocs), chats: byId(chatDocs) };
+  let syncedAt = since || 0;
+  const read = (data) => {
+    const { data: rest, millis } = unstamp(data);
+    syncedAt = Math.max(syncedAt, millis);
+    return rest;
+  };
+  const byId = (snapshot) => Object.fromEntries(snapshot.docs.map((d) => [d.id, read(d.data())]));
+  return { profile: read(profile.data()), months: byId(monthDocs), chats: byId(chatDocs), syncedAt };
 }
 
 // One document as the other device changes it (realtime.js). This device's
@@ -60,7 +80,7 @@ export async function loadV3(uid, { since } = {}) {
 export function listenDoc(uid, path, onData) {
   return onSnapshot(ref(uid, path), (snapshot) => {
     if (snapshot.metadata.hasPendingWrites || !snapshot.exists()) return;
-    onData(snapshot.data());
+    onData(unstamp(snapshot.data()).data);
   }, (e) => console.error("Cloud listen failed", path, e));
 }
 

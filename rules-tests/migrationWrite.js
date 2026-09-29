@@ -107,4 +107,21 @@ describe("schema 3 in Firestore", () => {
     }
     expect((await getDoc(doc(holder.db, "users", "alice"))).exists()).toBe(false);
   });
+  it("reads only what was written after the last read (ACTION_PLAN.md 7ג2)", async () => {
+    const { docs, ops } = move();
+    docs.months["2026-08"] = { month: "2026-08", days: { "2026-08-30": { attempts: { a0: { id: "a0", itemId: "s1", score: 70, kind: "speak", ts: NOW } } } } };
+    await store.writeOps("alice", [...diffV3({}, { months: { "2026-08": docs.months["2026-08"] } }, { now: NOW }), ...ops]);
+    const full = await store.loadV3("alice");
+    expect(Object.keys(full.months).sort()).toEqual(["2026-08", "2026-09"]);
+    expect(full.syncedAt).toBeGreaterThan(0);
+    expect(full.profile.syncedAt).toBeUndefined();
+
+    const next = structuredClone(docs);
+    next.months["2026-09"].days["2026-09-30"] = { attempts: { b1: { id: "b1", itemId: "s1", score: 80, kind: "speak", ts: NOW } } };
+    await store.writeOps("alice", diffV3(docs, next, { now: NOW }));
+    const changed = await store.loadV3("alice", { since: full.syncedAt });
+    expect(Object.keys(changed.months)).toEqual(["2026-09"]);
+    expect(changed.chats).toEqual({});
+    expect(changed.syncedAt).toBeGreaterThan(full.syncedAt);
+  });
 });

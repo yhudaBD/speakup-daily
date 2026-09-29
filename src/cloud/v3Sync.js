@@ -26,6 +26,9 @@ export function createV3Sync({
   track = (promise) => promise,
   now = () => new Date().toISOString(),
   debounceMs = DEBOUNCE_MS,
+  // Called with the documents whenever what the cloud holds, as far as this
+  // device knows, changes: kept for the next open (localBaseline.js).
+  onBaseline = () => {},
 }) {
   let written = baseline;
   let pending = null;
@@ -46,6 +49,7 @@ export function createV3Sync({
       written = next;
       // What the other device changed while this write was on its way.
       for (const [path, data] of arrived) written = withDoc(written, path, data);
+      onBaseline(written);
     } finally {
       arrived = null;
     }
@@ -79,6 +83,7 @@ export function createV3Sync({
     setDoc(path, data) {
       written = withDoc(written, path, data);
       arrived?.push([path, data]);
+      onBaseline(written);
     },
     dispose() {
       clearTimeout(timer);
