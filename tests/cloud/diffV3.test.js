@@ -43,14 +43,15 @@ describe("diffV3", () => {
     }]);
   });
 
-  it("writes a whole new day, and a new month with its name", () => {
+  it("writes a new day's attempts at their keys, never the whole day, and a new month with its name", () => {
     const next = clone(base());
-    next.months["2026-10"] = { month: "2026-10", days: { "2026-10-01": { attempts: { a9: attempt("a9") }, chats: {} } } };
+    next.months["2026-10"] = { month: "2026-10", days: { "2026-10-01": { attempts: { a9: attempt("a9") }, chats: {}, completedAt: "T" } } };
     expect(diff(base(), next)).toEqual([{
       doc: "months/2026-10",
       fields: [
         [["month"], "2026-10"],
-        [["days", "2026-10-01"], { attempts: { a9: attempt("a9") }, chats: {} }],
+        [["days", "2026-10-01", "attempts", "a9"], attempt("a9")],
+        [["days", "2026-10-01", "completedAt"], "T"],
         [["updatedAt"], NOW],
       ],
     }]);
@@ -70,16 +71,40 @@ describe("diffV3", () => {
     }]);
   });
 
-  it("leaves a tombstone for a word removed on this device, so the other device doesn't bring it back", () => {
+  it("writes a deletion marker in place of the word, so the other device doesn't bring it back", () => {
     const next = clone(base());
-    delete next.profile.wordBank[mapKey("schedule")];
+    next.profile.wordBank[mapKey("schedule")] = { deletedAt: NOW, updatedAt: NOW };
     expect(diff(base(), next)).toEqual([{
       doc: "profile/main",
       fields: [
-        [["wordBank", mapKey("schedule")], { word: "schedule", pos: 0, updatedAt: NOW, deletedAt: NOW }],
+        [["wordBank", mapKey("schedule")], { deletedAt: NOW, updatedAt: NOW }],
         [["updatedAt"], NOW],
       ],
     }]);
+  });
+
+  it("leaves a word that only left this device's full bank, and removes a marker past its time", () => {
+    const dropped = clone(base());
+    delete dropped.profile.wordBank[mapKey("schedule")];
+    expect(diff(base(), dropped)).toEqual([]);
+
+    const marked = clone(base());
+    marked.profile.wordBank[mapKey("schedule")] = { deletedAt: "2026-06-01", updatedAt: "2026-06-01" };
+    expect(diff(marked, dropped)).toEqual([{
+      doc: "profile/main",
+      fields: [[["updatedAt"], NOW]],
+      deleteFields: [["wordBank", mapKey("schedule")]],
+    }]);
+  });
+
+  it("writes a deleted chat's marker, and deletes the document when the marker is past its time", () => {
+    const next = clone(base());
+    next.chats.c1 = { id: "c1", deletedAt: NOW, updatedAt: NOW };
+    expect(diff(base(), next)).toEqual([{ doc: "chats/c1", set: { id: "c1", deletedAt: NOW, updatedAt: NOW } }]);
+
+    const pruned = clone(base());
+    delete pruned.chats.c1;
+    expect(diff(next, pruned)).toEqual([{ doc: "chats/c1", delete: true }]);
   });
 
   it("writes a changed chat whole, and leaves a chat that only left this device's list", () => {

@@ -11,9 +11,11 @@
 // A path is an array of segments (FieldPath), since map keys are encoded
 // and may hold characters a dotted path can't.
 
-// Profile fields that are maps by id: written one entry at a time, and an
-// entry removed here becomes a tombstone (deletedAt) rather than vanishing,
-// so the other device doesn't bring it back (MIGRATION_PLAN.md §6).
+// Profile fields that are maps by id: written one entry at a time. A deleted
+// item is a marker entry (deletedAt, from tombstones.js via schemaV3.js), so
+// the other device doesn't bring it back (MIGRATION_PLAN.md §6). An entry
+// that only left this device's list (a full word bank) stays in the cloud;
+// a marker that left it (past its 90 days) is removed.
 const MAP_FIELDS = new Set(["wordBank", "practiceTopics", "chatTopics"]);
 // Profile fields the sync keeps itself, not part of the state: never
 // written as a change or deleted for being missing from it.
@@ -45,8 +47,8 @@ function diffProfile(prev = {}, next = {}, now) {
       for (const k of unionKeys(before, after)) {
         if (k in after) {
           if (!same(before[k], after[k])) fields.push([[key, k], after[k]]);
-        } else if (!before[k].deletedAt) {
-          fields.push([[key, k], { ...before[k], updatedAt: now, deletedAt: now }]);
+        } else if (before[k]?.deletedAt) {
+          deleteFields.push([key, k]);
         }
       }
     } else if (!same(prev[key], next[key])) {
@@ -57,7 +59,9 @@ function diffProfile(prev = {}, next = {}, now) {
   return operation("profile/main", fields, deleteFields, now);
 }
 
-function diffDay(date, before, after) {
+// A day is never written whole, a new one included: the other device may
+// have written that day already, and a whole day would replace its attempts.
+function diffDay(date, before = {}, after = {}) {
   const fields = [];
   for (const key of Object.keys(after)) {
     if (key === "attempts" || key === "chats") {
@@ -73,17 +77,12 @@ function diffDay(date, before, after) {
 }
 
 function diffMonth(month, before, after, now) {
-  if (!before) {
-    const fields = [[["month"], after.month ?? month]];
-    for (const [date, day] of Object.entries(after.days || {})) fields.push([["days", date], day]);
-    return operation(`months/${month}`, fields, [], now);
-  }
-  const fields = [];
+  const fields = before ? [] : [[["month"], after.month ?? month]];
   const deleteFields = [];
   for (const [date, day] of Object.entries(after.days || {})) {
-    if (!before.days?.[date]) fields.push([["days", date], day]);
-    else fields.push(...diffDay(date, before.days[date], day));
+    fields.push(...diffDay(date, before?.days?.[date], day));
   }
+  if (!before) return operation(`months/${month}`, fields, [], now);
   // A day that left the state was folded into the archive (older than a year).
   for (const date of Object.keys(before.days || {})) {
     if (!after.days?.[date]) deleteFields.push(["days", date]);
@@ -113,11 +112,15 @@ export function diffV3(prev = {}, next = {}, { now = new Date().toISOString() } 
 
   // A chat is written whole: only one device talks in a conversation at a
   // time. One that left this device's list (it keeps the latest ones) stays
-  // in the cloud; deleting a chat is an explicit tombstone (part D).
+  // in the cloud; a deleted chat's document is its marker, deleted itself
+  // once the marker is past its time.
   for (const [id, chat] of Object.entries(next.chats || {})) {
     if (!same(withoutUpdatedAt(prev.chats?.[id]), withoutUpdatedAt(chat))) {
       ops.push({ doc: `chats/${id}`, set: { ...chat, updatedAt: now } });
     }
+  }
+  for (const [id, chat] of Object.entries(prev.chats || {})) {
+    if (chat?.deletedAt && !next.chats?.[id]) ops.push({ doc: `chats/${id}`, delete: true });
   }
 
   return ops.filter(Boolean);

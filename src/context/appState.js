@@ -7,6 +7,9 @@ import { toCefr } from "../services/aiSchemas";
 import { dayXp } from "./achievements";
 import { migrateSessions } from "./migrations";
 import { isActiveDay, isCompletedChat, isSpoken, streakRun } from "./selectors";
+import {
+  clearDeleted, emptyDeleted, markDeleted, mergeDays, mergeDeleted, normalizeDeleted, withoutDeleted,
+} from "./tombstones";
 
 export const STORAGE_KEY = "speakup_data";
 export const SCHEMA_VERSION = 2;
@@ -221,6 +224,8 @@ export const initialState = {
   // null until the user does one or the other. The recordings themselves
   // stay on the device (services/baselineRecordings.js).
   baseline: null,
+  // What was deleted and when, for the other device (tombstones.js).
+  deleted: emptyDeleted(),
   // Totals of days pruned after a year (archiveOldSessions), or null.
   archive: null,
   // Firebase uid of the account this device's saved data belongs to. See
@@ -342,6 +347,7 @@ export function reducer(state, action) {
         },
         lifetimeStats: action.payload.lifetimeStats || defaultLifetimeStats,
         placement: normalizePlacement("placement" in action.payload ? action.payload.placement : state.placement),
+        deleted: mergeDeleted(action.payload.deleted, null),
         isLoaded: true,
       };
     }
@@ -350,6 +356,7 @@ export function reducer(state, action) {
       const chats = state.rolePlay.chats.filter((c) => c.id !== chat.id);
       return {
         ...state,
+        deleted: clearDeleted(state.deleted, "chats", [chat.id]),
         rolePlay: {
           ...state.rolePlay,
           chats: [{ ...chat, updatedAt: new Date().toISOString() }, ...chats].slice(0, 50),
@@ -359,6 +366,7 @@ export function reducer(state, action) {
     case "DELETE_ROLEPLAY_CHAT":
       return {
         ...state,
+        deleted: markDeleted(state.deleted, "chats", [action.payload]),
         rolePlay: {
           ...state.rolePlay,
           chats: state.rolePlay.chats.filter((c) => c.id !== action.payload),
@@ -416,6 +424,11 @@ export function reducer(state, action) {
     case "DELETE_CUSTOM_TOPIC":
       return {
         ...state,
+        deleted: markDeleted(
+          markDeleted(state.deleted, "chatTopics", [action.payload]),
+          "chats",
+          state.rolePlay.chats.filter((c) => c.topicId === action.payload).map((c) => c.id),
+        ),
         rolePlay: {
           ...state.rolePlay,
           chats: state.rolePlay.chats.filter((c) => c.topicId !== action.payload),
@@ -446,12 +459,18 @@ export function reducer(state, action) {
       const wordBank = capWordBank([...byKey.values()], incomingKeys);
       return {
         ...state,
+        deleted: clearDeleted(state.deleted, "words", incomingKeys),
         practice: { ...state.practice, wordBank },
       };
     }
     case "REMOVE_WORD_FROM_BANK":
       return {
         ...state,
+        deleted: markDeleted(
+          state.deleted,
+          "words",
+          (state.practice?.wordBank || []).filter((w) => w.id === action.payload).map(wordKey),
+        ),
         practice: {
           ...state.practice,
           wordBank: (state.practice?.wordBank || []).filter((w) => w.id !== action.payload),
@@ -468,6 +487,7 @@ export function reducer(state, action) {
     case "DELETE_CUSTOM_PRACTICE_TOPIC":
       return {
         ...state,
+        deleted: markDeleted(state.deleted, "practiceTopics", [action.payload]),
         practice: {
           ...state.practice,
           customTopics: (state.practice?.customTopics || []).filter((t) => t.id !== action.payload),
@@ -489,22 +509,27 @@ export function reducer(state, action) {
       if (!cloud) return state;
       // Unites the two copies instead of letting the cloud overwrite whole
       // fields, which erased words, chats and streak days made offline or on
-      // another device (CRITICAL_REVIEW.md §2א). No deletion markers yet, so
-      // something deleted on one side while the other was offline comes back
-      // (§2ב adds them with the migration).
+      // another device (CRITICAL_REVIEW.md §2א). Something deleted on either
+      // side stays deleted (§2ב, tombstones.js), and a day both sides have
+      // keeps both sides' attempts.
       const { sessions, archive } = archiveOldSessions(
-        { ...(migrateSessions(cloud.sessions, cloud.schemaVersion) || {}), ...state.sessions },
+        mergeDays(state.sessions, migrateSessions(cloud.sessions, cloud.schemaVersion) || {}),
         moreCompleteArchive(state.archive, cloud.archive),
       );
+      const deleted = mergeDeleted(state.deleted, cloud.deleted);
       const byId = (x) => x.id;
+      const chatStamp = (c) => c.updatedAt || "";
+      const wordStamp = (w) => w.updatedAt || w.learnedAt || "";
+      const topicStamp = (t) => t.updatedAt || t.createdAt || "";
       const cloudRolePlay = cloud.rolePlay || {};
       const cloudPractice = cloud.practice || {};
-      const chats = unionBy(state.rolePlay.chats, cloudRolePlay.chats, byId, (c) => c.updatedAt || "")
+      const chats = withoutDeleted(unionBy(state.rolePlay.chats, cloudRolePlay.chats, byId, chatStamp), deleted.chats, byId, chatStamp)
         .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
         .slice(0, 50);
-      const wordBank = capWordBank(
-        unionBy(state.practice.wordBank, cloudPractice.wordBank, wordKey, (w) => w.updatedAt || w.learnedAt || ""),
-      );
+      const wordBank = capWordBank(withoutDeleted(
+        unionBy(state.practice.wordBank, cloudPractice.wordBank, wordKey, wordStamp), deleted.words, wordKey, wordStamp,
+      ));
+      const topics = (local, remote, markers) => withoutDeleted(unionBy(local, remote, byId), markers, byId, topicStamp);
       const run = streakRun(sessions);
       const localStats = state.lifetimeStats || {};
       const cloudStats = cloud.lifetimeStats || {};
@@ -527,13 +552,14 @@ export function reducer(state, action) {
         rolePlay: {
           ...state.rolePlay,
           chats,
-          customTopics: unionBy(state.rolePlay.customTopics, cloudRolePlay.customTopics, byId),
+          customTopics: topics(state.rolePlay.customTopics, cloudRolePlay.customTopics, deleted.chatTopics),
         },
         practice: {
           ...state.practice,
           wordBank,
-          customTopics: unionBy(state.practice.customTopics, cloudPractice.customTopics, byId),
+          customTopics: topics(state.practice.customTopics, cloudPractice.customTopics, deleted.practiceTopics),
         },
+        deleted,
         lifetimeStats,
         placement: normalizePlacement(cloud.placement || state.placement),
         baseline: cloud.baseline || state.baseline,
@@ -560,6 +586,7 @@ export function snapshotForSync(state) {
     lifetimeStats: state.lifetimeStats,
     placement: state.placement,
     baseline: state.baseline ?? null,
+    deleted: normalizeDeleted(state.deleted),
   };
 }
 
