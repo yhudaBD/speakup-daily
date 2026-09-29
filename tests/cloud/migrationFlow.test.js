@@ -1,21 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { cloudSchemaFor } from "../../src/cloud/flags";
+import { cloudSchemaFor, emailHash } from "../../src/cloud/flags";
 import { baselineFor, legacyFingerprint, migrationOps } from "../../src/cloud/migrationFlow";
 
 // MIGRATION_PLAN.md §8: staged rollout, and a move that can be cut off and
 // run again.
 describe("cloudSchemaFor", () => {
-  it("keeps everyone on the old structure unless switched on", () => {
-    expect(cloudSchemaFor("dana@example.com", {})).toBe("v2");
-    expect(cloudSchemaFor("dana@example.com", { VITE_CLOUD_SCHEMA: "v2" })).toBe("v2");
+  it("keeps everyone on the old structure unless switched on", async () => {
+    expect(await cloudSchemaFor("dana@example.com", {})).toBe("v2");
+    expect(await cloudSchemaFor("dana@example.com", { VITE_CLOUD_SCHEMA: "v2" })).toBe("v2");
   });
 
-  it("moves listed accounts first, then everyone", () => {
-    const env = { VITE_CLOUD_V3_EMAILS: " Owner@Example.com , other@example.com" };
-    expect(cloudSchemaFor("owner@example.com", env)).toBe("v3");
-    expect(cloudSchemaFor("dana@example.com", env)).toBe("v2");
-    expect(cloudSchemaFor(undefined, env)).toBe("v2");
-    expect(cloudSchemaFor("dana@example.com", { VITE_CLOUD_SCHEMA: "v3" })).toBe("v3");
+  it("moves listed accounts first, then everyone", async () => {
+    const env = { VITE_CLOUD_V3_EMAIL_HASHES: ` ${await emailHash("owner@example.com")} , ${await emailHash("other@example.com")}` };
+    expect(await cloudSchemaFor("Owner@Example.com ", env)).toBe("v3");
+    expect(await cloudSchemaFor("dana@example.com", env)).toBe("v2");
+    expect(await cloudSchemaFor(undefined, env)).toBe("v2");
+    expect(await cloudSchemaFor("dana@example.com", { VITE_CLOUD_SCHEMA: "v3" })).toBe("v3");
+  });
+
+  // VITE_ variables ship in the bundle anyone can read, so the list holds
+  // hashes and not the addresses themselves.
+  it("lists accounts by the SHA-256 of the address, lowercased", async () => {
+    // sha256("abc"), the standard test vector.
+    expect(await emailHash("ABC ")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    expect(await cloudSchemaFor("owner@example.com", { VITE_CLOUD_V3_EMAIL_HASHES: "owner@example.com" })).toBe("v2");
   });
 });
 
