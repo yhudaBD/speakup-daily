@@ -321,12 +321,16 @@ export function useRolePlay({
     completeSession(turnCountRef.current);
   }, [setPhaseSafe, syncToStorage, completeSession, cancelRequest]);
 
+  // speakNaturally always ends (§6). A replay cut off by a newer one ends
+  // too, and mustn't clear the newer one's speaking state.
+  const replayIdRef = useRef(0);
   const replayMessage = useCallback((text) => {
+    const id = ++replayIdRef.current;
     setIsSpeaking(true);
     speakNaturally(text, {
       rate: ttsSpeed,
-      onEnd: () => setIsSpeaking(false),
-      onStart: () => setIsSpeaking(true),
+      onEnd: () => { if (replayIdRef.current === id) setIsSpeaking(false); },
+      onStart: () => { if (replayIdRef.current === id) setIsSpeaking(true); },
     });
   }, [ttsSpeed]);
 
