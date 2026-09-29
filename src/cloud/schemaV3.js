@@ -10,6 +10,7 @@
 // Lists that two devices may change at once (attempts, words, topics) are
 // maps by id, so writes merge by key instead of replacing each other.
 
+import { migrateSessions } from "../context/migrations";
 import { streakRun } from "../context/selectors";
 import { legacyAttemptId } from "../utils/attemptId";
 
@@ -149,9 +150,12 @@ export function migrateToV3(doc, { bank } = {}) {
     chatTopics: withMarkers(toMap(doc.rolePlay?.customTopics, (t) => mapKey(t.id), (t) => t.createdAt ?? null), deleted.chatTopics),
   });
 
+  // Days saved before schema 2 get their records' kind first, as LOAD_DATA
+  // does (migrations.js).
+  const sessions = migrateSessions(doc.sessions, doc.schemaVersion) || {};
   const months = {};
-  for (const date of Object.keys(doc.sessions || {}).sort()) {
-    const day = doc.sessions[date] || {};
+  for (const date of Object.keys(sessions).sort()) {
+    const day = sessions[date] || {};
     const month = (months[monthOf(date)] ||= { month: monthOf(date), days: {} });
     const attempts = Object.fromEntries((day.sentences || []).map((s, i) => {
       const id = s.id || legacyAttemptId(date, i, s.sentenceId);
