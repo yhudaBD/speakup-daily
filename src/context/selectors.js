@@ -88,6 +88,27 @@ function hasOwnTurn(chat) {
   return (own || 0) > 0;
 }
 
+// A finished conversation: at least MIN_CHAT_TURNS user turns. A shorter one
+// is saved as "abandoned"; it doesn't advance the plan or count as a
+// conversation, though one turn of the user's own still makes the day active
+// (CRITICAL_REVIEW.md §16).
+export const MIN_CHAT_TURNS = 3;
+
+export function isCompletedChat(chat) {
+  if (chat?.status === "abandoned") return false;
+  return (chat?.turnCount || 0) >= MIN_CHAT_TURNS;
+}
+
+// Finished conversations ever: the archive plus the days still kept.
+// Archives folded before §16 only counted all conversations.
+export function selectTotalChats(state) {
+  const kept = Object.values(state?.sessions || {})
+    .flatMap((d) => d?.chats || [])
+    .filter(isCompletedChat).length;
+  const archive = state?.archive;
+  return (archive ? archive.completedChats ?? archive.chats ?? 0 : 0) + kept;
+}
+
 // D1: a day is active with at least one act of speaking, a sentence said
 // in practice or a turn of the user's own in a conversation. The same rule
 // feeds the streak, "days active" and the achievements.

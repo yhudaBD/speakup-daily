@@ -233,7 +233,7 @@ describe("archiving old days", () => {
   it("folds days older than a year into the archive on load, keeping the totals", () => {
     const state = loaded({ sessions: { ...oldDays, ...recent } });
     expect(Object.keys(state.sessions)).toEqual(["2027-11-30"]);
-    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1, speakAbove90: 0 });
+    expect(state.archive).toEqual({ throughDate: "2026-09-22", daysActive: 2, sentences: 3, chats: 1, completedChats: 1, speakAbove90: 0 });
     expect(selectDaysActive(state)).toBe(3);
   });
 
@@ -362,5 +362,16 @@ describe("streak on save (§19)", () => {
     });
     const next = reducer(state, { type: "SAVE_ROLEPLAY_SESSION", payload: { chatId: "c", turnCount: 3, ownTurnCount: 3 } });
     expect(next.streak).toEqual({ current: 2, longest: 6, lastPracticeDate: "2026-09-28" });
+  });
+});
+
+// CRITICAL_REVIEW.md §16: a plan step is done after 2 finished conversations.
+describe("plan progress (§16)", () => {
+  it("marks a step done after its second finished conversation", () => {
+    const state = loaded({ placement: { overall_level: "B1" } });
+    const once = reducer(state, { type: "UPDATE_PLAN_PROGRESS", payload: { moduleIndex: 0 } });
+    expect(once.placement.planProgress[0]).toEqual({ sessionsCompleted: 1, status: "in_progress" });
+    const twice = reducer(once, { type: "UPDATE_PLAN_PROGRESS", payload: { moduleIndex: 0 } });
+    expect(twice.placement.planProgress[0]).toEqual({ sessionsCompleted: 2, status: "done" });
   });
 });

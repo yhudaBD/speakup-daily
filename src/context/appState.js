@@ -4,7 +4,7 @@
 // auth.
 import { getTodayString, daysSince } from "../utils/dateHelpers";
 import { migrateSessions } from "./migrations";
-import { isActiveDay, isSpoken, streakRun } from "./selectors";
+import { isActiveDay, isCompletedChat, isSpoken, streakRun } from "./selectors";
 
 export const STORAGE_KEY = "speakup_data";
 export const SCHEMA_VERSION = 2;
@@ -86,6 +86,7 @@ export function archiveOldSessions(sessions, archive) {
     daysActive: archive?.daysActive || 0,
     sentences: archive?.sentences || 0,
     chats: archive?.chats || 0,
+    completedChats: archive?.completedChats ?? archive?.chats ?? 0,
     speakAbove90: archive?.speakAbove90 || 0,
   };
   for (const [date, day] of entries.filter(isOld)) {
@@ -93,6 +94,7 @@ export function archiveOldSessions(sessions, archive) {
     if (isActiveDay(day)) next.daysActive++;
     next.sentences += (day?.sentences || []).length;
     next.chats += (day?.chats || []).length;
+    next.completedChats += (day?.chats || []).filter(isCompletedChat).length;
     next.speakAbove90 += (day?.sentences || []).filter((s) => isSpoken(s) && s.score >= 90).length;
     if (!next.throughDate || date > next.throughDate) next.throughDate = date;
   }
@@ -138,17 +140,16 @@ function moreCompleteArchive(local, cloud) {
 // One-time backfill for users whose saved data predates lifetimeStats — derives
 // permanent counters from full history so achievements/XP stay accurate even
 // after old session day-buckets get pruned.
-export function computeLifetimeStats(sessions, rolePlayChats) {
+// Finished conversations are counted by selectTotalChats (§16).
+export function computeLifetimeStats(sessions) {
   const allSentences = Object.values(sessions || {}).flatMap((s) => s.sentences || []);
   return {
     totalSentences: allSentences.length,
-    totalChats: (rolePlayChats || []).filter((c) => c.status === "completed").length,
   };
 }
 
 export const defaultLifetimeStats = {
   totalSentences: 0,
-  totalChats: 0,
 };
 
 export const initialState = {
@@ -238,10 +239,6 @@ export function reducer(state, action) {
         ...state,
         sessions: newSessions,
         streak: nextStreak(state.streak, newSessions),
-        lifetimeStats: {
-          ...state.lifetimeStats,
-          totalChats: state.lifetimeStats.totalChats + 1,
-        },
       };
     }
     case "UPDATE_ROLEPLAY_FEEDBACK": {

@@ -1,7 +1,7 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import BaselineCard from "../components/home/BaselineCard";
-import { isActiveDay, selectStreak, selectTodayProgress, speakAverage } from "../context/selectors";
+import { isActiveDay, selectStreak, selectTodayProgress, selectTotalChats, speakAverage } from "../context/selectors";
 import { useApp } from "../context/AppContext";
 import { useToday } from "../hooks/useToday";
 import { getGreeting, getLastNDays, parseDateKey } from "../utils/dateHelpers";
@@ -68,7 +68,7 @@ export default function Home() {
   useEffect(() => {
     if (!isLoaded || placement) return;
     const isFreshProfile = Object.keys(sessions).length === 0
-      && (lifetimeStats?.totalChats || 0) === 0
+      && selectTotalChats(state) === 0
       && (lifetimeStats?.totalSentences || 0) === 0;
     if (isFreshProfile) navigate('/placement');
     // eslint-disable-next-line react-hooks/exhaustive-deps
