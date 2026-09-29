@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import { useToday } from "../hooks/useToday";
-import { getTodayString, getLastNDays, formatDate, parseDateKey } from "../utils/dateHelpers";
+import { ACHIEVEMENT_RULES, selectLevel, selectSpokenSentences } from "../context/achievements";
+import { getLastNDays, formatDate, parseDateKey } from "../utils/dateHelpers";
 import { getWeakSentenceStats } from "../utils/practiceHistory";
 import {
-  isSpoken, selectClozeStats, selectDaysActive, selectSentencesAbove90, selectSpeakAverage, selectStreak,
+  selectClozeStats, selectSpeakAverage, selectStreak,
   selectTotalChats, speakAverage,
 } from "../context/selectors";
 import { createCustomTopic } from "../data/rolePlayTopics";
@@ -15,40 +16,21 @@ const LEVEL_TO_DIFFICULTY = {
   "Pre-A1": "easy", A1: "easy", A2: "medium", B1: "medium", B2: "advanced", C1: "advanced",
 };
 
+// What each achievement looks like; whether it's earned is ACHIEVEMENT_RULES
+// in achievements.js (CRITICAL_REVIEW.md §20).
 const ACHIEVEMENTS = [
-  { id: "on-fire", icon: "🔥", title: "On Fire", desc: "7 days in a row", check: (state) => selectStreak(state, getTodayString()) >= 7 },
-  { id: "perfect-day", icon: "⭐", title: "Perfect Day", desc: "100% on all sentences", check: (state) => {
-    const today = getTodayString();
-    const s = state.sessions[today];
-    return s && s.sentences.every(x => x.score === 100);
-  }},
-  { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%", check: (state) => selectSentencesAbove90(state) >= 10 },
-  { id: "month-strong", icon: "📅", title: "Month Strong", desc: "30 days in a row", check: (state) => state.streak.longest >= 30 },
-  { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice", check: (state) => selectDaysActive(state) >= 1 },
-  { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days", check: (state) => selectDaysActive(state) >= 5 },
-  { id: "century", icon: "💯", title: "Century Club", desc: "100 sentences practiced", check: (state) => state.lifetimeStats.totalSentences >= 100 },
-  { id: "chatterbox", icon: "💬", title: "Chatterbox", desc: "10 conversations completed", check: (state) => selectTotalChats(state) >= 10 },
-  { id: "explorer", icon: "🗺️", title: "Category Explorer", desc: "Practiced 5+ different topics", check: (state) => {
-    const cats = new Set(
-      Object.values(state.sessions).flatMap(s => s.sentences || []).map(x => x.category).filter(Boolean)
-    );
-    return cats.size >= 5;
-  }},
-  { id: "wordsmith", icon: "📖", title: "Wordsmith", desc: "50 words saved for review", check: (state) => (state.practice?.wordBank?.length || 0) >= 50 },
-  { id: "night-owl", icon: "🦉", title: "Night Owl", desc: "Practiced after 10pm", check: (state) =>
-    Object.values(state.sessions).some(s => s.completedAt && new Date(s.completedAt).getHours() >= 22)
-  },
+  { id: "on-fire", icon: "🔥", title: "On Fire", desc: "7 days in a row" },
+  { id: "perfect-day", icon: "⭐", title: "Perfect Day", desc: "100% on all sentences said today" },
+  { id: "sharp-tongue", icon: "🎯", title: "Sharp Tongue", desc: "10 sentences above 90%" },
+  { id: "month-strong", icon: "📅", title: "Month Strong", desc: "30 days in a row" },
+  { id: "getting-started", icon: "🚀", title: "First Step", desc: "Complete your first practice" },
+  { id: "consistent", icon: "💪", title: "Consistent", desc: "Practice 5 different days" },
+  { id: "century", icon: "💯", title: "Century Club", desc: "100 sentences said out loud" },
+  { id: "chatterbox", icon: "💬", title: "Chatterbox", desc: "10 conversations completed" },
+  { id: "explorer", icon: "🗺️", title: "Category Explorer", desc: "Practiced 5+ different topics" },
+  { id: "wordsmith", icon: "📖", title: "Wordsmith", desc: "50 words saved for review" },
+  { id: "night-owl", icon: "🦉", title: "Night Owl", desc: "Practiced after 10pm" },
 ];
-
-function computeLevel(state) {
-  const xp = state.lifetimeStats.totalSentences * 10
-    + selectTotalChats(state) * 25
-    + state.streak.longest * 5;
-  const xpPerLevel = 200;
-  const level = Math.floor(xp / xpPerLevel) + 1;
-  const xpIntoLevel = xp % xpPerLevel;
-  return { xp, level, xpIntoLevel, xpPerLevel };
-}
 
 function TabButton({ label, active, onClick }) {
   return (
@@ -93,11 +75,9 @@ export default function Progress() {
     navigate('/roleplay', { state: { autoTopic: topic, planModuleIndex: index } });
   };
 
-  const allSentences = Object.values(sessions).flatMap(s => s.sentences || []);
   const allChats = Object.values(sessions).flatMap(s => s.chats || []);
   // Pronunciation numbers count spoken sentences only; sentence completion
   // has its own (CRITICAL_REVIEW.md §8).
-  const spokenCount = allSentences.filter(isSpoken).length;
   const totalAvg = selectSpeakAverage(state);
   const cloze = selectClozeStats(state);
 
@@ -117,7 +97,7 @@ export default function Progress() {
   })();
 
   const weakSentences = getWeakSentenceStats(sessions);
-  const { level, xpIntoLevel, xpPerLevel } = computeLevel(state);
+  const { level, xpIntoLevel, xpPerLevel } = selectLevel(state);
 
   const today = useToday();
   const days = getLastNDays(7, parseDateKey(today));
@@ -221,7 +201,7 @@ export default function Progress() {
             <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="card" style={{ textAlign: "center" }}>
                 <div style={{ fontSize: "2.2rem", fontFamily: "var(--font-display)", fontWeight: 900, color: "var(--color-primary)" }}>
-                  {spokenCount}
+                  {selectSpokenSentences(state)}
                 </div>
                 <div className="text-muted">Sentences Practiced</div>
               </div>
@@ -262,7 +242,7 @@ export default function Progress() {
             <h3 style={{ marginTop: 8 }}>🏅 Achievements</h3>
             <div style={{ display: "grid", gap: 10 }}>
               {ACHIEVEMENTS.map(a => {
-                const earned = a.check(state);
+                const earned = ACHIEVEMENT_RULES[a.id](state, today);
                 return (
                   <div key={a.id} className="achievement" style={{
                     opacity: earned ? 1 : 0.45,
